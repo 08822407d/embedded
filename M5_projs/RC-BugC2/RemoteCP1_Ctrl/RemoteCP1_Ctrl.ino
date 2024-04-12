@@ -6,8 +6,7 @@
 #define	LOACAL_IP		IPAddress(192, 168, 4, 100 + SYSNUM)
 #define	SERVER_IP		IPAddress(192, 168, 4, 1)
 #define GATWAY_ADDR		IPAddress(192, 168, 4, 1)
-// #define SUBNET_ADDR		IPAddress(255, 255, 255, 0)
-#define SUBNET_ADDR		IPAddress(255, 255, 0, 0)
+#define SUBNET_ADDR		IPAddress(255, 255, 255, 0)
 #define PRIMARY_DNS		IPAddress(8, 8, 8, 8)
 #define SECONDARY_DNS	IPAddress(8, 8, 4, 4)
 #define AP_SSID			"M5SticC-P2 AP"
@@ -15,62 +14,128 @@
 
 // #define EEPROM_SIZE 64
 #define SERVER_PORT		1003
-#define UDP_PACK_SIZE	8
 
 
-
+int width = 0;
+int height = 0;
 const char *ssid		= AP_SSID;
 const char *password	= AP_PASSWD;
-
-uint64_t counter = 0;
-
-
 WiFiUDP Udp;
-uint32_t send_count  = 0;
-uint8_t system_state = 0;
-uint8_t SendBuff[UDP_PACK_SIZE];
-void SendUDP(const uint8_t *Buffer) {
+
+extern void sendTest(void);
+extern void imuTest(void);
+
+
+void SendUDP(const uint8_t *Buffer, size_t packlen) {
 	if (WiFi.status() == WL_CONNECTED) {
 		Udp.beginPacket(SERVER_IP, SERVER_PORT);
-		Udp.write(Buffer, UDP_PACK_SIZE);
+		Udp.write(Buffer, packlen);
 		Udp.endPacket();
 	}
 }
 
 
+
 void setup() {
-	// put your setup code here, to run once:
+	M5.begin();
+	M5.Imu.Init();
 	Serial.begin(115200);
+
+	M5.Lcd.setRotation(1);
+	width = M5.Lcd.width();
+	height = M5.Lcd.height();
+
+	M5.Lcd.setTextSize(2);
+	// put your setup code here, to run once:
+	delay(1000);
 }
+
 
 
 void loop() {
-
-	delay(2000);
-	Serial.printf("\nDisconnecting to %s", ssid);
-	WiFi.disconnect(true);  // Disconnect wifi.  断开wifi连接
-	WiFi.mode(WIFI_OFF);  // Set the wifi mode to off.  设置wifi模式为关闭
-	Serial.println("\nDISCONNECTED!");
-	delay(2000);
+	// sendTest();
+	imuTest();
+}
 
 
-	Serial.printf("\nConnecting to %s", ssid);
+void sendTest() {
+	M5.Lcd.fillRect(0, 0, width, height, BLACK);
+	M5.Lcd.setCursor(4, 4);
+
+	M5.Lcd.setTextColor(GREEN);
+	Serial.printf("Connecting to %s", ssid);
+	M5.Lcd.printf("Connecting to :\n");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf("  %s", ssid);
+	M5.Lcd.setTextColor(GREEN);
+
 	WiFi.begin(ssid, password);
 	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
+		delay(250);
 		Serial.print(".");
+		M5.Lcd.print(".");
 	}
-	Serial.println("\nCONNECTED!");
+
+	Serial.println("CONNECTED!\n");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.println("CONNECTED!\n");
+	M5.Lcd.setTextColor(GREEN);
+
+
 
 	Udp.begin(2000);
 
-	counter++;
-	*((uint64_t *)SendBuff) = counter;
-	SendUDP(SendBuff);
+	size_t packelen = 8;
+	uint8_t SendBuff[packelen];
+	*(uint32_t *)(SendBuff + 1) = 0;
+
+	SendBuff[0]++;
+	SendUDP(SendBuff, sizeof(SendBuff));
+	SendBuff[1]++;
+	SendBuff[1]++;
+	SendUDP(SendBuff, sizeof(SendBuff));
 
 	Udp.stop();
+
+
+
+	delay(250);
+	Serial.printf("Disconnecting with %s\n", ssid);
+	M5.Lcd.printf("Disconnecting with :\n");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf("  %s\n", ssid);
+	M5.Lcd.setTextColor(GREEN);
+
+	WiFi.disconnect(true);  // Disconnect wifi.  断开wifi连接
+	WiFi.mode(WIFI_OFF);  // Set the wifi mode to off.  设置wifi模式为关闭
+
+	Serial.println("DISCONNECTED!\n");
+	M5.Lcd.println("DISCONNECTED!\n");
+	delay(500);
 }
 
+void imuTest() {
+	float accX = 0;
+	float accY = 0;
+	float accZ = 0;
+	float gyroX = 0;
+	float gyroY = 0;
+	float gyroZ = 0;
+	M5.Imu.getAccelData(&accX, &accY, &accZ);
+	M5.Imu.getGyroData(&gyroX, &gyroY, &gyroZ);
+
+
+	M5.Lcd.fillRect(0, 0, width, height, BLACK);
+	M5.Lcd.setCursor(4, 4);
+
+	M5.Lcd.setTextColor(GREEN);
+	M5.Lcd.println("Pose:\n");
+	M5.Lcd.setCursor(4, 24);
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf("accX:\n  %.2f\naccY:\n  %.2f\naccZ:\n  %.2f\n", gyroX, gyroY, gyroZ);
+
+	delay(100);
+}
 
 // #define	LOACAL_IP		IPAddress(192, 168, 4, 100 + SYSNUM)
 // #define GATWAY_ADDR		IPAddress(192, 168, 4, 1)

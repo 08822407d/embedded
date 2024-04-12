@@ -1,4 +1,4 @@
-#include "M5HatBugC.h"
+#include "M5HatBugC2.h"
 
 bool M5HatBugC::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl,
                       long freq) {

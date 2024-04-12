@@ -1,5 +1,5 @@
-#ifndef _M5_HAT_BUGC_H_
-#define _M5_HAT_BUGC_H_
+#ifndef _M5_HAT_BUGC2_H_
+#define _M5_HAT_BUGC2_H_
 
 #include "Arduino.h"
 #include "Wire.h"
@@ -115,4 +115,4 @@ class M5HatBugC {
     bool move(bugc_motion_t motion, int8_t speed = 50);
 };
 
-#endif
+#endif /* _M5_HAT_BUGC2_H_ */
