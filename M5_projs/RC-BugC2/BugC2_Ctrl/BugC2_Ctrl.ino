@@ -28,11 +28,15 @@ const char	*password	= AP_PASSWD;
 WiFiServer	server(80);
 WiFiUDP		Udp_BugC2_Controller;
 
+int width = 0;
+int height = 0;
 
 void setup(void) {
 	StickCP2.begin();
-	// Serial.begin(115200);
+	Serial.begin(115200);
 
+	width = StickCP2.Display.width();
+	height = StickCP2.Display.height();
 	StickCP2.Display.setRotation(1);
 	StickCP2.Display.setTextSize(2);
 	// Wire.begin(0, 26, 100000UL);
@@ -47,7 +51,7 @@ void setup(void) {
 	Udp_BugC2_Controller.begin(1003);
 
 	IPAddress myIP = WiFi.softAPIP();
-	StickCP2.Display.setCursor(0, 4);
+	StickCP2.Display.setCursor(0, 8);
 	StickCP2.Display.setTextColor(GREEN);
 	StickCP2.Display.printf("This AP IP:\n");
 	StickCP2.Display.setTextColor(ORANGE);
@@ -56,39 +60,45 @@ void setup(void) {
 
 
 void loop(void) {
-	WiFiClient client = server.available();
-	if (client) {
-		Serial.println("New Client.");
+	int udplength = Udp_BugC2_Controller.parsePacket();
+	if (udplength == 8) {
+		StickCP2.Display.fillRect(0, 48, 240, 175 - 48, BLACK);
+		delay(50);
 
-		// StickCP2.Display.setCursor(0, 44);
-		// StickCP2.Display.setTextColor(GREEN);
-		// StickCP2.Display.printf("Client IP:\n");
-		// StickCP2.Display.setTextColor(ORANGE);
-		// StickCP2.Display.printf("%s", client.localIP().toString());
+		IPAddress udp_client = Udp_BugC2_Controller.remoteIP();
+		// Serial.println("Recieved Data.");
+		StickCP2.Display.setCursor(0, 48);
+		StickCP2.Display.setTextColor(GREEN);
+		StickCP2.Display.printf("From client: \n");
+		StickCP2.Display.setTextColor(ORANGE);
+		StickCP2.Display.printf("  %s\n", udp_client.toString());
+
+		char udpdata[udplength];
+		Udp_BugC2_Controller.read(udpdata, udplength);
+
+		StickCP2.Display.setTextColor(GREEN);
+		StickCP2.Display.setCursor(0, 88);
+		StickCP2.Display.printf("Recieved Data:\n");
+		StickCP2.Display.setTextColor(ORANGE);
+		StickCP2.Display.printf("  0x%08x  ", *(uint64_t *)udpdata);
+
+
+		// if ((udpdata[0] == 0xAA) && (udpdata[1] == 0x55) &&
+		// 	(udpdata[7] == 0xee)) {
+		// 	for (int i = 0; i < 8; i++) {
+		// 		Serial.printf("%02X ", udpdata[i]);
+		// 	}
+		// 	Serial.println();
+		// 	if (udpdata[6] == 0x01) {
+		// 		IIC_ReState = Setspeed(udpdata[3] - 100, udpdata[4] - 100,
+		// 							   udpdata[5] - 100);
+		// 	} else {
+		// 		IIC_ReState = Setspeed(0, 0, 0);
+		// 	}
+		// } else {
+		// 	IIC_ReState = Setspeed(0, 0, 0);
+		// }
 	}
-
-	// int udplength = Udp_BugC2_Controller.parsePacket();
-	// if (udplength) {
-	// 	char udpdata[udplength];
-	// 	Udp_BugC2_Controller.read(udpdata, udplength);
-	// 	IPAddress udp_client = Udp_BugC2_Controller.remoteIP();
-
-	// 	// if ((udpdata[0] == 0xAA) && (udpdata[1] == 0x55) &&
-	// 	// 	(udpdata[7] == 0xee)) {
-	// 	// 	for (int i = 0; i < 8; i++) {
-	// 	// 		Serial.printf("%02X ", udpdata[i]);
-	// 	// 	}
-	// 	// 	Serial.println();
-	// 	// 	if (udpdata[6] == 0x01) {
-	// 	// 		IIC_ReState = Setspeed(udpdata[3] - 100, udpdata[4] - 100,
-	// 	// 							   udpdata[5] - 100);
-	// 	// 	} else {
-	// 	// 		IIC_ReState = Setspeed(0, 0, 0);
-	// 	// 	}
-	// 	// } else {
-	// 	// 	IIC_ReState = Setspeed(0, 0, 0);
-	// 	// }
-	// }
 
 	delay(200);
 }

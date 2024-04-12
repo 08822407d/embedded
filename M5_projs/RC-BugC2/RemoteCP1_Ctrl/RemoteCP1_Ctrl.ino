@@ -2,10 +2,9 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-// #include "EEPROM.h"
-
 
 #define	LOACAL_IP		IPAddress(192, 168, 4, 100 + SYSNUM)
+#define	SERVER_IP		IPAddress(192, 168, 4, 1)
 #define GATWAY_ADDR		IPAddress(192, 168, 4, 1)
 // #define SUBNET_ADDR		IPAddress(255, 255, 255, 0)
 #define SUBNET_ADDR		IPAddress(255, 255, 0, 0)
@@ -14,7 +13,75 @@
 #define AP_SSID			"M5SticC-P2 AP"
 #define AP_PASSWD		"77777777"
 
-#define EEPROM_SIZE 64
+// #define EEPROM_SIZE 64
+#define SERVER_PORT		1003
+#define UDP_PACK_SIZE	8
+
+
+
+const char *ssid		= AP_SSID;
+const char *password	= AP_PASSWD;
+
+uint64_t counter = 0;
+
+
+WiFiUDP Udp;
+uint32_t send_count  = 0;
+uint8_t system_state = 0;
+uint8_t SendBuff[UDP_PACK_SIZE];
+void SendUDP(const uint8_t *Buffer) {
+	if (WiFi.status() == WL_CONNECTED) {
+		Udp.beginPacket(SERVER_IP, SERVER_PORT);
+		Udp.write(Buffer, UDP_PACK_SIZE);
+		Udp.endPacket();
+	}
+}
+
+
+void setup() {
+	// put your setup code here, to run once:
+	Serial.begin(115200);
+}
+
+
+void loop() {
+
+	delay(2000);
+	Serial.printf("\nDisconnecting to %s", ssid);
+	WiFi.disconnect(true);  // Disconnect wifi.  断开wifi连接
+	WiFi.mode(WIFI_OFF);  // Set the wifi mode to off.  设置wifi模式为关闭
+	Serial.println("\nDISCONNECTED!");
+	delay(2000);
+
+
+	Serial.printf("\nConnecting to %s", ssid);
+	WiFi.begin(ssid, password);
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+	}
+	Serial.println("\nCONNECTED!");
+
+	Udp.begin(2000);
+
+	counter++;
+	*((uint64_t *)SendBuff) = counter;
+	SendUDP(SendBuff);
+
+	Udp.stop();
+}
+
+
+// #define	LOACAL_IP		IPAddress(192, 168, 4, 100 + SYSNUM)
+// #define GATWAY_ADDR		IPAddress(192, 168, 4, 1)
+// // #define SUBNET_ADDR		IPAddress(255, 255, 255, 0)
+// #define SUBNET_ADDR		IPAddress(255, 255, 0, 0)
+// #define PRIMARY_DNS		IPAddress(8, 8, 8, 8)
+// #define SECONDARY_DNS	IPAddress(8, 8, 4, 4)
+// #define AP_SSID			"M5SticC-P2 AP"
+// #define AP_PASSWD		"77777777"
+
+// #define EEPROM_SIZE 64
 
 
 // TFT_eSprite Disbuff = TFT_eSprite(&M5.Lcd);
@@ -28,8 +95,8 @@
 // uint32_t key_count = 0;
 
 
-const char *ssid		= AP_SSID;
-const char *password	= AP_PASSWD;
+// const char *ssid		= AP_SSID;
+// const char *password	= AP_PASSWD;
 
 // WiFiUDP Udp;
 // uint32_t send_count  = 0;
@@ -89,189 +156,189 @@ const char *password	= AP_PASSWD;
 // String WfifAPBuff[16];
 // uint32_t count_bn_a = 0, choose = 0;
 // String ssidname;
-void setup() {
-	// put your setup code here, to run once:
-	M5.begin();
-	// Wire.begin(0, 26, 100000UL);
-	// EEPROM.begin(EEPROM_SIZE);
+// void setup() {
+// 	// put your setup code here, to run once:
+// 	M5.begin();
+// 	// Wire.begin(0, 26, 100000UL);
+// 	// EEPROM.begin(EEPROM_SIZE);
 
-	M5.Lcd.setRotation(3);
-	M5.Lcd.setTextSize(2);;
-	M5.Lcd.setCursor(0, 4);;
-	// M5.Lcd.setSwapBytes(false);
-	// Disbuff.createSprite(80, 160);
-	// Disbuff.setSwapBytes(true);
+// 	M5.Lcd.setRotation(3);
+// 	M5.Lcd.setTextSize(2);;
+// 	M5.Lcd.setCursor(0, 4);;
+// 	// M5.Lcd.setSwapBytes(false);
+// 	// Disbuff.createSprite(80, 160);
+// 	// Disbuff.setSwapBytes(true);
 
-	// Disbuff.fillRect(0, 0, 80, 20, Disbuff.color565(50, 50, 50));
-	// Disbuff.setTextSize(2);
-	// Disbuff.setTextColor(GREEN);
-	// Disbuff.setCursor(55, 6);
-	// // Disbuff.printf("%03d",SYSNUM);
+// 	// Disbuff.fillRect(0, 0, 80, 20, Disbuff.color565(50, 50, 50));
+// 	// Disbuff.setTextSize(2);
+// 	// Disbuff.setTextColor(GREEN);
+// 	// Disbuff.setCursor(55, 6);
+// 	// // Disbuff.printf("%03d",SYSNUM);
 
-	// Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_off);
-	// Disbuff.pushSprite(0, 0);
+// 	// Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_off);
+// 	// Disbuff.pushSprite(0, 0);
 
-	// uint8_t res = I2CRead8bit(0x32);
-	// Serial.printf("Res0 = %02X \r\n", res);
-	// /*
-	// if( res & 0x02 )
-	// {
-	// 	I2CWrite1Byte(0x10,0x02);
-	// }
-	// else
-	// {
-	// 	Disbuff.setTextSize(1);
-	// 	Disbuff.setTextColor(GREEN);
-	// 	Disbuff.fillRect(0,0,80,20,Disbuff.color565(50,50,50));
-	// 	Disbuff.setCursor(5,20);
-	// 	Disbuff.printf("calibration");
-	// 	Disbuff.pushSprite(0,0);
-	// 	I2CWrite1Byte( 0x32 , 0x01 );
-	// }
-	// */
-	// M5.update();
-	// if ((EEPROM.read(0) != 0x56) || (M5.BtnA.read() == 1)) {
-	// 	WiFi.mode(WIFI_STA);
-	// 	int n = WiFi.scanNetworks();
-	// 	Disbuff.setTextSize(1);
-	// 	Disbuff.setTextColor(GREEN);
-	// 	Disbuff.fillRect(0, 0, 80, 20, Disbuff.color565(50, 50, 50));
+// 	// uint8_t res = I2CRead8bit(0x32);
+// 	// Serial.printf("Res0 = %02X \r\n", res);
+// 	// /*
+// 	// if( res & 0x02 )
+// 	// {
+// 	// 	I2CWrite1Byte(0x10,0x02);
+// 	// }
+// 	// else
+// 	// {
+// 	// 	Disbuff.setTextSize(1);
+// 	// 	Disbuff.setTextColor(GREEN);
+// 	// 	Disbuff.fillRect(0,0,80,20,Disbuff.color565(50,50,50));
+// 	// 	Disbuff.setCursor(5,20);
+// 	// 	Disbuff.printf("calibration");
+// 	// 	Disbuff.pushSprite(0,0);
+// 	// 	I2CWrite1Byte( 0x32 , 0x01 );
+// 	// }
+// 	// */
+// 	// M5.update();
+// 	// if ((EEPROM.read(0) != 0x56) || (M5.BtnA.read() == 1)) {
+// 	// 	WiFi.mode(WIFI_STA);
+// 	// 	int n = WiFi.scanNetworks();
+// 	// 	Disbuff.setTextSize(1);
+// 	// 	Disbuff.setTextColor(GREEN);
+// 	// 	Disbuff.fillRect(0, 0, 80, 20, Disbuff.color565(50, 50, 50));
 
-	// 	if (n == 0) {
-	// 		Disbuff.setCursor(5, 20);
-	// 		Disbuff.printf("no networks");
+// 	// 	if (n == 0) {
+// 	// 		Disbuff.setCursor(5, 20);
+// 	// 		Disbuff.printf("no networks");
 
-	// 	} else {
-	// 		int count = 0;
-	// 		for (int i = 0; i < n; ++i) {
-	// 			if (WiFi.SSID(i).indexOf("M5AP") != -1) {
-	// 				if (count == 0) {
-	// 					Disbuff.setTextColor(GREEN);
-	// 				} else {
-	// 					Disbuff.setTextColor(WHITE);
-	// 				}
-	// 				Disbuff.setCursor(5, 25 + count * 10);
-	// 				String str = WiFi.SSID(i);
-	// 				Disbuff.printf(str.c_str());
-	// 				WfifAPBuff[count] = WiFi.SSID(i);
-	// 				count++;
-	// 			}
-	// 		}
-	// 		Disbuff.pushSprite(0, 0);
-	// 		while (1) {
-	// 			if (M5.BtnA.read() == 1) {
-	// 				if (count_bn_a >= 200) {
-	// 					count_bn_a = 201;
-	// 					EEPROM.writeUChar(0, 0x56);
-	// 					EEPROM.writeString(1, WfifAPBuff[choose]);
-	// 					ssidname = WfifAPBuff[choose];
-	// 					break;
-	// 				}
-	// 				count_bn_a++;
-	// 				Serial.printf("count_bn_a %d \n", count_bn_a);
-	// 			} else if ((M5.BtnA.isReleased()) && (count_bn_a != 0)) {
-	// 				Serial.printf("count_bn_a %d", count_bn_a);
-	// 				if (count_bn_a > 200) {
-	// 				} else {
-	// 					choose++;
-	// 					if (choose >= count) {
-	// 						choose = 0;
-	// 					}
-	// 					Disbuff.fillRect(0, 0, 80, 20,
-	// 									 Disbuff.color565(50, 50, 50));
-	// 					for (int i = 0; i < count; i++) {
-	// 						Disbuff.setCursor(5, 25 + i * 10);
-	// 						if (choose == i) {
-	// 							Disbuff.setTextColor(GREEN);
-	// 						} else {
-	// 							Disbuff.setTextColor(WHITE);
-	// 						}
-	// 						Disbuff.printf(WfifAPBuff[i].c_str());
-	// 					}
-	// 					Disbuff.pushSprite(0, 0);
-	// 				}
-	// 				count_bn_a = 0;
-	// 			}
-	// 			delay(10);
-	// 			M5.update();
-	// 		}
-	// 		// EEPROM.writeString(1,WfifAPBuff[0]);
-	// 	}
-	// } else if (EEPROM.read(0) == 0x56) {
-	// 	ssidname = EEPROM.readString(1);
-	// 	EEPROM.readString(1, APName, 16);
-	// }
+// 	// 	} else {
+// 	// 		int count = 0;
+// 	// 		for (int i = 0; i < n; ++i) {
+// 	// 			if (WiFi.SSID(i).indexOf("M5AP") != -1) {
+// 	// 				if (count == 0) {
+// 	// 					Disbuff.setTextColor(GREEN);
+// 	// 				} else {
+// 	// 					Disbuff.setTextColor(WHITE);
+// 	// 				}
+// 	// 				Disbuff.setCursor(5, 25 + count * 10);
+// 	// 				String str = WiFi.SSID(i);
+// 	// 				Disbuff.printf(str.c_str());
+// 	// 				WfifAPBuff[count] = WiFi.SSID(i);
+// 	// 				count++;
+// 	// 			}
+// 	// 		}
+// 	// 		Disbuff.pushSprite(0, 0);
+// 	// 		while (1) {
+// 	// 			if (M5.BtnA.read() == 1) {
+// 	// 				if (count_bn_a >= 200) {
+// 	// 					count_bn_a = 201;
+// 	// 					EEPROM.writeUChar(0, 0x56);
+// 	// 					EEPROM.writeString(1, WfifAPBuff[choose]);
+// 	// 					ssidname = WfifAPBuff[choose];
+// 	// 					break;
+// 	// 				}
+// 	// 				count_bn_a++;
+// 	// 				Serial.printf("count_bn_a %d \n", count_bn_a);
+// 	// 			} else if ((M5.BtnA.isReleased()) && (count_bn_a != 0)) {
+// 	// 				Serial.printf("count_bn_a %d", count_bn_a);
+// 	// 				if (count_bn_a > 200) {
+// 	// 				} else {
+// 	// 					choose++;
+// 	// 					if (choose >= count) {
+// 	// 						choose = 0;
+// 	// 					}
+// 	// 					Disbuff.fillRect(0, 0, 80, 20,
+// 	// 									 Disbuff.color565(50, 50, 50));
+// 	// 					for (int i = 0; i < count; i++) {
+// 	// 						Disbuff.setCursor(5, 25 + i * 10);
+// 	// 						if (choose == i) {
+// 	// 							Disbuff.setTextColor(GREEN);
+// 	// 						} else {
+// 	// 							Disbuff.setTextColor(WHITE);
+// 	// 						}
+// 	// 						Disbuff.printf(WfifAPBuff[i].c_str());
+// 	// 					}
+// 	// 					Disbuff.pushSprite(0, 0);
+// 	// 				}
+// 	// 				count_bn_a = 0;
+// 	// 			}
+// 	// 			delay(10);
+// 	// 			M5.update();
+// 	// 		}
+// 	// 		// EEPROM.writeString(1,WfifAPBuff[0]);
+// 	// 	}
+// 	// } else if (EEPROM.read(0) == 0x56) {
+// 	// 	ssidname = EEPROM.readString(1);
+// 	// 	EEPROM.readString(1, APName, 16);
+// 	// }
 
-	// Disbuff.fillRect(0, 20, 80, 140, BLACK);
+// 	// Disbuff.fillRect(0, 20, 80, 140, BLACK);
 
-	// if (!WiFi.config(LOACAL_IP, GATWAY_ADDR, SUBNET_ADDR, PRIMARY_DNS, SECONDARY_DNS)) {
-	// 	Serial.println("STA Failed to configure");
-	// }
+// 	// if (!WiFi.config(LOACAL_IP, GATWAY_ADDR, SUBNET_ADDR, PRIMARY_DNS, SECONDARY_DNS)) {
+// 	// 	Serial.println("STA Failed to configure");
+// 	// }
 
-	M5.Lcd.printf("\nConnecting to %s", ssid);
-	WiFi.begin(ssid, password);
+// 	M5.Lcd.printf("\nConnecting to %s", ssid);
+// 	WiFi.begin(ssid, password);
 
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
-	}
+// 	while (WiFi.status() != WL_CONNECTED) {
+// 		delay(500);
+// 		Serial.print(".");
+// 	}
 
-	// Udp.begin(2000);
+// 	// Udp.begin(2000);
 
-	// Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_on);
-	// Disbuff.pushSprite(0, 0);
-}
+// 	// Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_on);
+// 	// Disbuff.pushSprite(0, 0);
+// }
 
-uint8_t adc_value[5] = {0};
-uint16_t AngleBuff[4];
-uint32_t count = 0;
-void loop() {
-	// for (int i = 0; i < 5; i++) {
-	// 	adc_value[i] = I2CRead8bit(0x60 + i);
-	// }
+// uint8_t adc_value[5] = {0};
+// uint16_t AngleBuff[4];
+// uint32_t count = 0;
+// void loop() {
+// 	// for (int i = 0; i < 5; i++) {
+// 	// 	adc_value[i] = I2CRead8bit(0x60 + i);
+// 	// }
 
-	// for (int i = 0; i < 4; i++) {
-	// 	AngleBuff[i] = I2CRead16bit(0x50 + i * 2);
-	// }
+// 	// for (int i = 0; i < 4; i++) {
+// 	// 	AngleBuff[i] = I2CRead16bit(0x50 + i * 2);
+// 	// }
 
-	delay(1000);
+// 	delay(1000);
 
-	// if (WiFi.status() != WL_CONNECTED) {
-	// 	Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_off);
-	// 	Disbuff.pushSprite(0, 0);
+// 	// if (WiFi.status() != WL_CONNECTED) {
+// 	// 	Disbuff.pushImage(0, 0, 20, 20, (uint16_t *)connect_off);
+// 	// 	Disbuff.pushSprite(0, 0);
 
-	// 	count++;
-	// 	if (count > 500) {
-	// 		WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS);
-	// 		count = 0;
-	// 	}
-	// } else {
-	// 	SendBuff[3] = map(AngleBuff[0], 0, 4000, 0, 200);
-	// 	SendBuff[4] = map(AngleBuff[1], 0, 4000, 0, 200);
-	// 	SendBuff[5] = map(AngleBuff[2], 0, 4000, 0, 200);
-	// 	/*
-	// 	Disbuff.pushImage(0,0,20,20,(uint16_t *)connect_on);
-	// 	Disbuff.pushSprite(0,0);
-	// 	count = 0;
-	// 	*/
-	// 	if ((SendBuff[3] > 110) || (SendBuff[3] < 90) || (SendBuff[4] > 110) ||
-	// 		(SendBuff[4] < 90) || (SendBuff[5] > 110) || (SendBuff[5] < 90)) {
-	// 		SendBuff[6] = 0x01;
-	// 	} else {
-	// 		SendBuff[6] = 0x00;
-	// 	}
-	// 	SendUDP();
-	// }
+// 	// 	count++;
+// 	// 	if (count > 500) {
+// 	// 		WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS);
+// 	// 		count = 0;
+// 	// 	}
+// 	// } else {
+// 	// 	SendBuff[3] = map(AngleBuff[0], 0, 4000, 0, 200);
+// 	// 	SendBuff[4] = map(AngleBuff[1], 0, 4000, 0, 200);
+// 	// 	SendBuff[5] = map(AngleBuff[2], 0, 4000, 0, 200);
+// 	// 	/*
+// 	// 	Disbuff.pushImage(0,0,20,20,(uint16_t *)connect_on);
+// 	// 	Disbuff.pushSprite(0,0);
+// 	// 	count = 0;
+// 	// 	*/
+// 	// 	if ((SendBuff[3] > 110) || (SendBuff[3] < 90) || (SendBuff[4] > 110) ||
+// 	// 		(SendBuff[4] < 90) || (SendBuff[5] > 110) || (SendBuff[5] < 90)) {
+// 	// 		SendBuff[6] = 0x01;
+// 	// 	} else {
+// 	// 		SendBuff[6] = 0x00;
+// 	// 	}
+// 	// 	SendUDP();
+// 	// }
 
-	// Disbuff.fillRect(0, 30, 80, 130, BLACK);
-	// Disbuff.setCursor(10, 30);
-	// Disbuff.printf("%04d", SendBuff[3]);
-	// Disbuff.setCursor(10, 45);
-	// Disbuff.printf("%04d", SendBuff[4]);
-	// Disbuff.setCursor(10, 60);
-	// Disbuff.printf("%04d", SendBuff[5]);
+// 	// Disbuff.fillRect(0, 30, 80, 130, BLACK);
+// 	// Disbuff.setCursor(10, 30);
+// 	// Disbuff.printf("%04d", SendBuff[3]);
+// 	// Disbuff.setCursor(10, 45);
+// 	// Disbuff.printf("%04d", SendBuff[4]);
+// 	// Disbuff.setCursor(10, 60);
+// 	// Disbuff.printf("%04d", SendBuff[5]);
 
-	// Disbuff.setCursor(10, 100);
-	// Disbuff.printf("%04X", adc_value[4]);
-	// Disbuff.pushSprite(0, 0);
-}
+// 	// Disbuff.setCursor(10, 100);
+// 	// Disbuff.printf("%04X", adc_value[4]);
+// 	// Disbuff.pushSprite(0, 0);
+// }
