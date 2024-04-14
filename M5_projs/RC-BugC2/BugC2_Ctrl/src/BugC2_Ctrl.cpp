@@ -134,6 +134,8 @@ void setBugC2_Speed(int udplength) {
 
 	float udpdata[udplength / sizeof(float)];
 	Udp_BugC2_Controller.read((uint8_t *)udpdata, udplength);
+	udpdata[0] = radians(udpdata[0]);
+	udpdata[2] = radians(udpdata[2]);
 
 	StickCP2.Display.setTextColor(GREEN);
 	StickCP2.Display.setCursor(0, 84);
@@ -154,15 +156,19 @@ void setBugC2_Speed(int udplength) {
 MotorSpeeds_s calcAngleLength_to_MotorSpeeds(float leftAngle,
 		float leftLength, float rightAngle, float rightLength) {
 	MotorSpeeds_s speeds;
-	speeds.FrontLeft = (int8_t)(leftAngle * leftLength / 3600);
-	speeds.FrontRight = (int8_t)(rightAngle * rightLength / 3600);
-	speeds.BackLeft = (int8_t)(leftAngle * leftLength / 3600);
-	speeds.BackRight = (int8_t)(rightAngle * rightLength / 3600);
 
-	// speeds.FrontLeft = (int8_t)(leftAngle / 3.6);
-	// speeds.FrontRight = (int8_t)(rightAngle / 3.6);
-	// speeds.BackLeft = (int8_t)(leftLength / 1.0);
-	// speeds.BackRight = (int8_t)(rightLength / 1.0);
+	float speed = cos(leftAngle) * leftLength;
+	float angle = sin(rightAngle) * rightLength;
+
+	// speeds.FrontLeft = speed / 5;
+	// speeds.FrontRight = -speed / 5;
+	// speeds.BackLeft = speed / 5;
+	// speeds.BackRight = -speed / 5;
+
+	speeds.FrontLeft = speed /5 + angle / 10;
+	speeds.FrontRight = -speed /5 + angle / 10;
+	speeds.BackLeft = speed /5 + angle / 10;
+	speeds.BackRight = -speed /5 + angle / 10;
 
 	return speeds;
 }
