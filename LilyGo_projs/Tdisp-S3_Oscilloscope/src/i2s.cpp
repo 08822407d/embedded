@@ -45,11 +45,11 @@ void ADC_Sampling(uint16_t *i2s_buff){
 		uint32_t raw = analogRead(PIN_BAT_VOLT);
 		uint32_t v1 = esp_adc_cal_raw_to_voltage(raw, &adc_chars) * 2; //The partial pressure is one-half
 		
-		i2s_buff[i * NUM_SAMPLES] = v1;
+		i2s_buff[i * NUM_SAMPLES] = (uint16_t)v1;
 
-		tft.setCursor(4, 5);
-		tft.setTextSize(2);
-		tft.setTextColor(TFT_GREEN, TFT_BLACK);
-		tft.printf("%d", v1);
+		// tft.setCursor(4, 5);
+		// tft.setTextSize(2);
+		// tft.setTextColor(TFT_GREEN, TFT_BLACK);
+		// tft.printf("%d", v1);
 	}
 }

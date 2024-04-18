@@ -93,16 +93,8 @@ void update_screen(uint16_t *i2s_buff, float sample_rate) {
 	draw_sprite(freq, period, mean, max_v, min_v, trigger0, sample_rate, digital_data, true);
 }
 
-void draw_sprite(float freq,
-								 float period,
-								 float mean,
-								 float max_v,
-								 float min_v,
-								 uint32_t trigger,
-								 float sample_rate,
-								 bool digital_data,
-								 bool new_data
-								) {
+void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
+		uint32_t trigger, float sample_rate, bool digital_data, bool new_data ) {
 
 	max_v = to_voltage(max_v);
 	min_v = to_voltage(min_v);
@@ -172,7 +164,7 @@ void draw_sprite(float freq,
 
 	int shift = 150;
 	if (menu) {
-		spr.drawLine( 0, 120, 280, 120, TFT_WHITE); //center line
+		spr.drawLine( 0, 120, EXAMPLE_LCD_H_RES, 120, TFT_WHITE); //center line
 		spr.fillRect(shift, 0, 102, 135, TFT_BLACK);
 		spr.drawRect(shift, 0, 102, 135, TFT_WHITE);
 		spr.fillRect(shift + 1, 3 + 10 * (opt - 1), 100, 11, TFT_RED);
@@ -215,7 +207,7 @@ void draw_sprite(float freq,
 		}
 	}
 	else if (info) {
-		spr.drawLine( 0, 120, 280, 120, TFT_WHITE); //center line
+		spr.drawLine( 0, 120, EXAMPLE_LCD_H_RES, 120, TFT_WHITE); //center line
 		//spr.drawRect(shift + 10, 0, 280 - shift - 20, 30, TFT_WHITE);
 		spr.drawString("P-P: " + String(max_v - min_v) + "V",  shift + 15, 5);
 		spr.drawString(frequency,  shift + 15, 15);
@@ -234,15 +226,15 @@ void draw_sprite(float freq,
 
 void draw_grid() {
 
-	for (int i = 0; i < 28; i++) {
+	for (int i = 0; i < EXAMPLE_LCD_H_RES / 10; i++) {
 		spr.drawPixel(i * 10, 40, TFT_WHITE);
 		spr.drawPixel(i * 10, 80, TFT_WHITE);
 		spr.drawPixel(i * 10, 120, TFT_WHITE);
 		spr.drawPixel(i * 10, 160, TFT_WHITE);
 		spr.drawPixel(i * 10, 200, TFT_WHITE);
 	}
-	for (int i = 0; i < 240; i += 10) {
-		for (int j = 0; j < 280; j += 40) {
+	for (int i = 0; i < EXAMPLE_LCD_V_RES; i += 10) {
+		for (int j = 0; j < EXAMPLE_LCD_H_RES; j += 40) {
 			spr.drawPixel(j, i, TFT_WHITE);
 		}
 	}

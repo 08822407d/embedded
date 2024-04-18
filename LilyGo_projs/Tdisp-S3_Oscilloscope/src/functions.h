@@ -64,8 +64,6 @@
 #define I2S_NUM			(0)
 #define BUFF_SIZE		50000
 #define B_MULT			BUFF_SIZE/NUM_SAMPLES
-#define BUTTON_Ok		PIN_BUTTON_1
-#define BUTTON_Back		PIN_BUTTON_2
 #define BtnLongPressMs	250
 // #define Enable_longPress_Continuous
 

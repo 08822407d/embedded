@@ -54,15 +54,10 @@ bool digital_analog(uint16_t *i2s_buffer, uint32_t max_v, uint32_t min_v) {
 	return false;
 }
 
-void trigger_freq_analog(uint16_t *i2s_buffer,
-												 float sample_rate,
-												 float mean,
-												 uint32_t max_v,
-												 uint32_t min_v,
-												 float *pt_freq,
-												 float *pt_period,
-												 uint32_t *pt_trigger0,
-												 uint32_t *pt_trigger1) {
+
+extern void trigger_freq_analog(uint16_t *i2s_buffer, float sample_rate, float mean, uint32_t max_v,
+		uint32_t min_v, float *pt_freq, float *pt_period, uint32_t *pt_trigger0, uint32_t *pt_trigger1) {
+
 	float freq = 0;
 	float period = 0;
 	bool signal_side = false;
@@ -149,14 +144,8 @@ void trigger_freq_analog(uint16_t *i2s_buffer,
 }
 
 
-void trigger_freq_digital(uint16_t *i2s_buffer,
-													float sample_rate,
-													float mean,
-													uint32_t max_v,
-													uint32_t min_v,
-													float *pt_freq,
-													float *pt_period,
-													uint32_t *pt_trigger0) {
+void trigger_freq_digital(uint16_t *i2s_buffer, float sample_rate, float mean, uint32_t max_v,
+		uint32_t min_v, float *pt_freq, float *pt_period, uint32_t *pt_trigger0) {
 
 	float freq = 0;
 	float period = 0;
