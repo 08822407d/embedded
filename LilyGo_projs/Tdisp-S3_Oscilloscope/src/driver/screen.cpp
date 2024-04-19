@@ -1,4 +1,4 @@
-#include "../functions.h"
+#include "../headers.h"
 
 
 TFT_eSPI	tft		= TFT_eSPI();         // Declare object "tft"
@@ -15,7 +15,7 @@ bool full_pix		= true;
 bool single_trigger	= false;
 bool data_trigger	= false;
 
-uint16_t i2s_buff[BUFF_SIZE];
+uint32_t AdcSample_Buffer[BUFF_SIZE];
 int data[280] = {0};
 
 void setup_screen() {
@@ -63,35 +63,19 @@ uint32_t from_voltage(float voltage) {
 	return uint32_t(voltage / 3.3 * 4095 + 20480.0);
 }
 
-void update_screen(uint16_t *i2s_buff, float sample_rate) {
 
+void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
 	float mean = 0;
 	float max_v, min_v;
 
-	peak_mean(i2s_buff, BUFF_SIZE, &max_v, &min_v, &mean);
+	peak_mean(AdcDataBuf, BUFF_SIZE, &max_v, &min_v, &mean);
 
 	float freq = 0;
 	float period = 0;
 	uint32_t trigger0 = 0;
 	uint32_t trigger1 = 0;
-
-	//if analog mode OR auto mode and wave recognized as analog
-	bool digital_data = false;
-	if (digital_wave_option == 1) {
-		trigger_freq_analog(i2s_buff, sample_rate, mean, max_v, min_v, &freq, &period, &trigger0, &trigger1);
-	}
-	else if (digital_wave_option == 0) {
-		digital_data = digital_analog(i2s_buff, max_v, min_v);
-		if (!digital_data) {
-			trigger_freq_analog(i2s_buff, sample_rate, mean, max_v, min_v, &freq, &period, &trigger0, &trigger1);
-		}
-		else {
-			trigger_freq_digital(i2s_buff, sample_rate, mean, max_v, min_v, &freq, &period, &trigger0);
-		}
-	}
-	else {
-		trigger_freq_digital(i2s_buff, sample_rate, mean, max_v, min_v, &freq, &period, &trigger0);
-	}
+	bool digital_data =
+		trigger_freq(AdcDataBuf, sample_rate, mean, max_v, min_v, &freq, &period, &trigger0, &trigger1);
 
 	draw_sprite(freq, period, mean, max_v, min_v, trigger0, sample_rate, digital_data, true);
 }
@@ -162,7 +146,7 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 
 		//only draw digital data if a trigger was in the data
 		if (!(digital_wave_option == 2 && trigger == 0))
-			draw_channel1(trigger, 0, i2s_buff, sample_rate);
+			draw_channel1(trigger, 0, AdcSample_Buffer, sample_rate);
 	}
 
 	int shift = 210;
@@ -230,37 +214,70 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 	int y_off = heigh / 2;
 	uint point_off = 4;
 	uint grid_size = 40;
+	uint cross_size = 2;
+	uint dash_color = TFT_SILVER;
+	uint axis_color = TFT_YELLOW;
+	uint cross_color = TFT_YELLOW;
 	// make sure the dash-lines exactly overlap at each cross point
 	assert((grid_size % point_off) == 0);
+	int centerX = x_off + startX;
+	int centerY = y_off + startY;
 
-	// draw rows
-	for (int row = 0; row < heigh / 2; row += grid_size)
+	// draw horizontal dash-lines symmetrically from center to 4 Diagonals
+	for (int row = 0; row <= heigh / 2; row += grid_size)
 		for (int pix_idx = 0; pix_idx <= width / 2; pix_idx += point_off) {
-			spr.drawPixel(x_off + startX + pix_idx, y_off + startY + row, TFT_WHITE);
-			spr.drawPixel(x_off + startX + pix_idx, y_off + startY - row, TFT_WHITE);
-			spr.drawPixel(x_off + startX - pix_idx, y_off + startY + row, TFT_WHITE);
-			spr.drawPixel(x_off + startX - pix_idx, y_off + startY - row, TFT_WHITE);
+			int x_left = centerX - pix_idx;
+			int x_right = centerX + pix_idx;
+			int y_top = centerY - row;
+			int y_bottom = centerY + row;
+			spr.drawPixel(x_right, y_top, dash_color);
+			spr.drawPixel(x_right, y_bottom, dash_color);
+			spr.drawPixel(x_left, y_bottom, dash_color);
+			spr.drawPixel(x_left, y_top, dash_color);
+			if ((pix_idx % grid_size) == 0) {
+				spr.drawLine(x_left - cross_size, y_top, x_left + cross_size, y_top, cross_color);
+				spr.drawLine(x_left - cross_size, y_bottom, x_left + cross_size, y_bottom, cross_color);
+				spr.drawLine(x_right - cross_size, y_bottom, x_right + cross_size, y_bottom, cross_color);
+				spr.drawLine(x_right - cross_size, y_top, x_right + cross_size, y_top, cross_color);
+			}
 		}
-	// draw columns
-	for (int col = 0; col < width / 2; col += grid_size)
+	// draw vertical dash-lines symmetrically from center to 4 Diagonals
+	for (int col = 0; col <= width / 2; col += grid_size)
 		for (int pix_idx = 0; pix_idx <= heigh / 2; pix_idx += point_off) {
-			spr.drawPixel(x_off + startX + col, y_off + startY + pix_idx, TFT_WHITE);
-			spr.drawPixel(x_off + startX + col, y_off + startY - pix_idx, TFT_WHITE);
-			spr.drawPixel(x_off + startX - col, y_off + startY + pix_idx, TFT_WHITE);
-			spr.drawPixel(x_off + startX - col, y_off + startY - pix_idx, TFT_WHITE);
+			int x_left = centerX - col;
+			int x_right = centerX + col;
+			int y_top = centerY - pix_idx;
+			int y_bottom = centerY + pix_idx;
+			spr.drawPixel(x_left, y_top, dash_color);
+			spr.drawPixel(x_left, y_bottom, dash_color);
+			spr.drawPixel(x_right, y_bottom, dash_color);
+			spr.drawPixel(x_right, y_top, dash_color);
+			if ((pix_idx % grid_size) == 0) {
+				spr.drawLine(x_left, y_top - cross_size, x_left, y_top + cross_size, cross_color);
+				spr.drawLine(x_left, y_bottom - cross_size, x_left, y_bottom + cross_size, cross_color);
+				spr.drawLine(x_right, y_bottom - cross_size, x_right, y_bottom + cross_size, cross_color);
+				spr.drawLine(x_right, y_top - cross_size, x_right, y_top + cross_size, cross_color);
+			}
 		}
-
-	spr.drawLine( 0, y_off, width, y_off, TFT_WHITE); //center line
+	
+	// draw two Axis
+	spr.drawLine(0, centerY, width, centerY, axis_color); // X-axis
+	// spr.drawLine(centerX, 0, centerX, heigh, axis_color); // Y-axis
 }
 
-void draw_channel1(uint32_t trigger0, uint32_t trigger1, uint16_t *i2s_buff, float sample_rate) {
+void draw_channel1(uint32_t trigger0, uint32_t trigger1, uint32_t *AdcDataBuf, float sample_rate) {
 	//screen wave drawing
-	data[0] = to_scale(i2s_buff[trigger0]);
+	data[0] = to_scale(AdcDataBuf[trigger0]);
 	low_pass filter(0.99);
 	mean_filter mfilter(5);
-	mfilter.init(i2s_buff[trigger0]);
-	filter._value = i2s_buff[trigger0];
+	mfilter.init(AdcDataBuf[trigger0]);
+	filter._value = AdcDataBuf[trigger0];
 	float data_per_pixel = (s_div / 40.0) / (sample_rate / 1000);
+
+	Serial.printf("s_div %d, sample_rate %d, data_per_pixel %d\n", s_div, sample_rate, data_per_pixel);
+	// Serial.printf("buf_datas: %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+	// 		AdcDataBuf[0], AdcDataBuf[10], AdcDataBuf[20], AdcDataBuf[30], AdcDataBuf[40],
+	// 		AdcDataBuf[50], AdcDataBuf[60], AdcDataBuf[70], AdcDataBuf[80], AdcDataBuf[90]);
 
 	//  uint32_t cursor = (trigger1-trigger0)/data_per_pixel;
 	//  spr.drawLine(cursor, 0, cursor, 135, TFT_RED);
@@ -268,37 +285,35 @@ void draw_channel1(uint32_t trigger0, uint32_t trigger1, uint16_t *i2s_buff, flo
 	uint32_t index_offset = (uint32_t)(toffset / data_per_pixel);
 	trigger0 += index_offset;  
 	uint32_t old_index = trigger0;
-	float n_data = 0, o_data = to_scale(i2s_buff[trigger0]);
-	for (uint32_t i = 1; i < 280; i++) {
+	float n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
+	for (uint32_t i = 1; i < ScreenWidth; i++) {
 		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
 		if (index < BUFF_SIZE) {
 			if (full_pix && s_div > 40 && current_filter == 0) {
-				uint32_t max_val = i2s_buff[old_index];
-				uint32_t min_val = i2s_buff[old_index];
+				uint32_t max_val = AdcDataBuf[old_index];
+				uint32_t min_val = AdcDataBuf[old_index];
 				for (int j = old_index; j < index; j++) {
 					//draw lines for all this data points on pixel i
-					if (i2s_buff[j] > max_val)
-						max_val = i2s_buff[j];
-					else if (i2s_buff[j] < min_val)
-						min_val = i2s_buff[j];
+					if (AdcDataBuf[j] > max_val)
+						max_val = AdcDataBuf[j];
+					else if (AdcDataBuf[j] < min_val)
+						min_val = AdcDataBuf[j];
 
 				}
 				spr.drawLine(i, to_scale(min_val), i, to_scale(max_val), TFT_BLUE);
-			}
-			else {
+			} else {
 				if (current_filter == 2)
-					n_data = to_scale(mfilter.filter((float)i2s_buff[index]));
+					n_data = to_scale(mfilter.filter((float)AdcDataBuf[index]));
 				else if (current_filter == 3)
-					n_data = to_scale(filter.filter((float)i2s_buff[index]));
+					n_data = to_scale(filter.filter((float)AdcDataBuf[index]));
 				else
-					n_data = to_scale(i2s_buff[index]);
+					n_data = to_scale(AdcDataBuf[index]);
 
 				spr.drawLine(i - 1, o_data, i, n_data, TFT_BLUE);
 				o_data = n_data;
 			}
 
-		}
-		else {
+		} else {
 			break;
 		}
 		old_index = index;

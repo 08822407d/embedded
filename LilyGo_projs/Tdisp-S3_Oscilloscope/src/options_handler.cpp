@@ -1,4 +1,5 @@
-#include "functions.h"
+#include "headers.h"
+
 
 uint8_t opt				= None;
 int8_t volts_index		= 0;
@@ -10,7 +11,7 @@ bool info				= true;
 bool set_value			= false;
 bool menu_action		= false;
 
-uint8_t digital_wave_option	= 0; //0-auto | 1-analog | 2-digital data (SERIAL/SPI/I2C/etc)
+uint8_t digital_wave_option	= 0; // 0-auto | 1-analog | 2-digital data (SERIAL/SPI/I2C/etc)
 
 int voltage_division[6] = { //screen has 4 divisions, 31 pixels each (125 pixels of height)
 	550, //fullscreen 3.3V peak-peak
@@ -45,16 +46,10 @@ float time_division[9] = { //screen has 4 divisions, 60 pixel each (240 pixel of
 
 
 void menu_handler() {
-	button();
-}
-
-void button() {
-	if ( btnok == 1 || btnbk == 1 || btnpl == 1 || btnmn == 1)
-	{
+	if ( btnok == 1 || btnbk == 1 || btnpl == 1 || btnmn == 1) {
 		menu_action = true;
 	}
-	if (menu == true)
-	{
+	if (menu == true) {
 		if (set_value) {
 			switch (opt) {
 				case Vdiv:
@@ -130,27 +125,21 @@ void button() {
 					break;
 
 			}
-			if (btnbk == 1)
-			{
+			if (btnbk == 1) {
 				set_value = 0;
 				btnbk = 0;
 			}
-		}
-		else
-		{
-			if (btnpl == 1)
-			{
+		} else {
+			if (btnpl == 1) {
 				opt++;
-				if (opt > Single)
-				{
+				if (opt > Single) {
 					opt = 1;
 				}
 				Serial.print("option : ");
 				Serial.println(opt);
 				btnpl = 0;
 			}
-			if (btnmn == 1)
-			{
+			if (btnmn == 1) {
 				opt--;
 				if (opt < 1)
 				{
@@ -160,8 +149,7 @@ void button() {
 				Serial.println(opt);
 				btnmn = 0;
 			}
-			if (btnbk == 1)
-			{
+			if (btnbk == 1) {
 				hide_menu();
 				btnbk = 0;
 			}
@@ -231,23 +219,16 @@ void button() {
 				btnok = 0;
 			}
 		}
-	}
-	else
-	{
-		if (btnok == 1)
-		{
+	} else {
+		if (btnok == 1) {
 			opt = 1;
 			show_menu();
 			btnok = 0;
 		}
-		if (btnbk == 1)
-		{
-			if (info == true)
-			{
+		if (btnbk == 1) {
+			if (info == true) {
 				hide_all();
-			}
-			else
-			{
+			} else {
 				info = true;
 			}
 			btnbk = 0;
@@ -283,40 +264,4 @@ void hide_all() {
 
 void show_menu() {
 	menu = true;
-}
-
-String strings_vdiv() {
-	return "";
-}
-
-String strings_sdiv() {
-	return "";
-}
-
-String strings_offset() {
-	return "";
-}
-
-String strings_toffset() {
-	return "";
-}
-
-String strings_freq() {
-	return "";
-}
-
-String strings_peak() {
-	return "";
-}
-
-String strings_vmax() {
-	return "";
-}
-
-String strings_vmin() {
-	return "";
-}
-
-String strings_filter() {
-	return "";
 }
