@@ -1,22 +1,10 @@
 #include "functions.h"
 
-
-OneButton BtnEnter(PIN_BUTTON_2, true);
-OneButton BtnBack(PIN_BUTTON_1, true);
-Timer<1> BtnEnter_AckLongPressTimer;
-Timer<1> BtnBack_AckLongPressTimer;
-unsigned long BtnEnter_PressStartTime = 0;
-unsigned long BtnBack_PressStartTime = 0;
-
 uint8_t opt				= None;
 int8_t volts_index		= 0;
 int8_t tscale_index		= 0;
 uint8_t	current_filter	= 1;
 
-int btnok,
-	btnpl,
-	btnmn,
-	btnbk;
 bool menu				= false;
 bool info				= true;
 bool set_value			= false;
@@ -54,78 +42,6 @@ float time_division[9] = { //screen has 4 divisions, 60 pixel each (240 pixel of
 //  50000,  //100khz  350ms/500ms of data
 //  100000  //50khz   700ms/1000ms of data
 //};
-
-
-bool BtnEnter_AckLongPress(void *args) {
-	btnok = 1;
-#ifdef Enable_longPress_Continuous
-	BtnEnter.reset();
-#endif
-	return true;
-}
-void IRAM_ATTR BtnEnter_CheckTicks() {
-	// include all buttons here to be checked
-	BtnEnter.tick(); // just call tick() to check the state.
-}
-// this function will be called when the button was pressed 1 time only.
-void BtnEnter_SingleClick() {
-	btnpl = 1;
-	Serial.println("BtnEnter_SingleClick() detected.");
-} // singleClick
-void BtnEnter_PressStart() {
-	// BtnEnter_PressStartTime = millis() - 1000; // as set in setPressMs()
-	BtnEnter_AckLongPressTimer.at(millis() + BtnLongPressMs, BtnEnter_AckLongPress);
-} // pressStart()
-// this function will be called when the button was released after a long hold.
-void BtnEnter_PressStop() {
-	// btnok = 1;
-} // pressStop()
-
-
-bool BtnBack_AckLongPress(void *args) {
-	btnbk = 1;
-#ifdef Enable_longPress_Continuous
-	BtnBack.reset();
-#endif
-	return true;
-}
-void IRAM_ATTR BtnBack_CheckTicks() {
-	// include all buttons here to be checked
-	BtnBack.tick(); // just call tick() to check the state.
-}
-// this function will be called when the button was pressed 1 time only.
-void BtnBack_SingleClick() {
-	btnmn = 1;
-	Serial.println("BtnBack_SingleClick() detected.");
-} // singleClick
-void BtnBack_PressStart() {
-	// BtnBack_PressStartTime = millis() - 1000; // as set in setPressMs()
-	BtnBack_AckLongPressTimer.at(millis() + BtnLongPressMs, BtnBack_AckLongPress);
-} // pressStart()
-// this function will be called when the button was released after a long hold.
-void BtnBack_PressStop() {
-	// btnbk = 1;
-} // pressStop()
-
-
-
-void InitUserButton() {
-	attachInterrupt(digitalPinToInterrupt(BtnEnter.pin()), BtnEnter_CheckTicks, FALLING);
-	BtnEnter.setClickMs(100);
-	BtnEnter.attachClick(BtnEnter_SingleClick);
-	BtnEnter.setPressMs(BtnLongPressMs);
-	BtnEnter.attachLongPressStart(BtnEnter_PressStart);
-	BtnEnter.attachLongPressStop(BtnEnter_PressStop);
-
-	attachInterrupt(digitalPinToInterrupt(BtnBack.pin()), BtnBack_CheckTicks, FALLING);
-	BtnBack.setClickMs(100);
-	BtnBack.attachClick(BtnBack_SingleClick);
-	BtnBack.setPressMs(BtnLongPressMs);
-	BtnBack.attachLongPressStart(BtnBack_PressStart);
-	BtnBack.attachLongPressStop(BtnBack_PressStop);
-}
-
-
 
 
 void menu_handler() {

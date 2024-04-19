@@ -2,20 +2,14 @@
 #include <driver/adc.h>
 #include <soc/syscon_reg.h>
 #include <SPI.h>
-#include <OneButton.h>
-#include <arduino-timer.h>
-#include "TFT_eSPI.h"
+#include <TFT_eSPI.h>
 #include "esp_adc_cal.h"
 #include "filters.h"
 
+#include "board_defs.h"
 
-/* LCD CONFIG */
-// Too low or too high pixel clock may cause screen mosaic
-#define EXAMPLE_LCD_PIXEL_CLOCK_HZ	(16 * 1000 * 1000)
-// The pixel number in horizontal and vertical
-#define EXAMPLE_LCD_H_RES			320
-#define EXAMPLE_LCD_V_RES			170
-#define LVGL_LCD_BUF_SIZE			(EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES)
+#include "dev/buttons.h"
+
 
 /*ESP32S3*/
 #define PIN_LCD_BL					38
@@ -37,9 +31,6 @@
 #define PIN_LCD_WR					8
 #define PIN_LCD_RD					9
 
-#define PIN_BUTTON_1				0
-#define PIN_BUTTON_2				14
-#define PIN_BAT_VOLT				4
 
 #define PIN_IIC_SCL					17
 #define PIN_IIC_SDA					18
@@ -53,19 +44,12 @@
 #define PIN_SD_D0					12
 
 
-
-
 //#define DEBUG_SERIAL
 //#define DEBUG_BUFF
-#define DELAY			1000
-
 #define ADC_CHANNEL		ADC1_CHANNEL_5  // GPIO33
 #define NUM_SAMPLES		1000            // number of samples
-#define I2S_NUM			(0)
 #define BUFF_SIZE		50000
 #define B_MULT			BUFF_SIZE/NUM_SAMPLES
-#define BtnLongPressMs	250
-// #define Enable_longPress_Continuous
 
 
 
@@ -94,10 +78,7 @@ extern void ADC_Sampling(uint16_t *i2s_buff);
 
 
 /* options_handler.cpp */
-extern OneButton BtnBack;
-extern OneButton BtnEnter;
-extern Timer<1> BtnEnter_AckLongPressTimer;
-extern Timer<1> BtnBack_AckLongPressTimer;
+
 extern uint8_t current_filter;
 extern bool menu;
 extern bool info;
@@ -143,7 +124,7 @@ extern uint32_t from_voltage(float voltage);
 extern void update_screen(uint16_t *i2s_buff, float sample_rate);
 void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 		uint32_t trigger, float sample_rate, bool digital_data, bool new_data );
-extern void draw_grid(void);
+extern void draw_grid(int startX, int startY, uint width, uint heigh);
 extern void draw_channel1(uint32_t trigger0, uint32_t trigger1, uint16_t *i2s_buff, float sample_rate);
 
 
