@@ -46,56 +46,53 @@ float time_division[9] = { //screen has 4 divisions, 60 pixel each (240 pixel of
 
 
 void menu_handler() {
-	if ( btnok == 1 || btnbk == 1 || btnpl == 1 || btnmn == 1) {
+	if (btnok || btnbk || btnpl || btnmn) {
 		menu_action = true;
 	}
-	if (menu == true) {
+	if (menu) {
 		if (set_value) {
 			switch (opt) {
 				case Vdiv:
-					if (btnpl == 1) {
+					if (btnpl > 0) {
 						volts_index++;
 						if (volts_index >= sizeof(voltage_division) / sizeof(*voltage_division)) {
 							volts_index = 0;
 						}
-						btnpl = 0;
-					}
-					else if (btnmn == 1) {
+						btnpl--;
+					} else if (btnmn > 0) {
 						volts_index--;
 						if (volts_index < 0) {
 							volts_index = sizeof(voltage_division) / sizeof(*voltage_division) - 1;
 						}
-						btnmn = 0;
+						btnmn--;
 					}
 
 					v_div = voltage_division[volts_index];
 					break;
 
 				case Sdiv:
-					if (btnmn == 1) {
+					if (btnmn > 0) {
 						tscale_index++;
 						if (tscale_index >= sizeof(time_division) / sizeof(*time_division)) {
 							tscale_index = 0;
 						}
-						btnmn = 0;
-					}
-					else if (btnpl == 1) {
+						btnmn--;
+					} else if (btnpl > 0) {
 						tscale_index--;
 						if (tscale_index < 0) {
 							tscale_index = sizeof(time_division) / sizeof(*time_division) - 1;
 						}
-						btnpl = 0;
+						btnpl--;
 					}
 
 					s_div = time_division[tscale_index];
 					break;
 
 				case Offset:
-					if (btnmn == 1) {
+					if (btnmn > 0) {
 						offset += 0.1 * (v_div * 4) / 3300;
-						btnmn = 0;
-					}
-					else if (btnpl == 1) {
+						btnmn--;
+					} else if (btnpl > 0) {
 						offset -= 0.1 * (v_div * 4) / 3300;
 						btnpl = 0;
 					}
@@ -108,15 +105,12 @@ void menu_handler() {
 					break;
 
 				case TOffset:
-					if (btnpl == 1)
-					{
+					if (btnpl > 0) {
 						toffset += 0.1 * s_div;
-						btnpl = 0;
-					}
-					else if (btnmn == 1)
-					{
+						btnpl--;
+					} else if (btnmn > 0) {
 						toffset -= 0.1 * s_div;
-						btnmn = 0;
+						btnmn--;
 					}
 
 					break;
@@ -125,21 +119,21 @@ void menu_handler() {
 					break;
 
 			}
-			if (btnbk == 1) {
+			if (btnbk) {
 				set_value = 0;
-				btnbk = 0;
+				btnbk = false;
 			}
 		} else {
-			if (btnpl == 1) {
+			if (btnpl > 0) {
 				opt++;
 				if (opt > Single) {
 					opt = 1;
 				}
 				Serial.print("option : ");
 				Serial.println(opt);
-				btnpl = 0;
+				btnpl--;
 			}
-			if (btnmn == 1) {
+			if (btnmn > 0) {
 				opt--;
 				if (opt < 1)
 				{
@@ -147,13 +141,13 @@ void menu_handler() {
 				}
 				Serial.print("option : ");
 				Serial.println(opt);
-				btnmn = 0;
+				btnmn--;
 			}
-			if (btnbk == 1) {
+			if (btnbk) {
 				hide_menu();
-				btnbk = 0;
+				btnbk = false;
 			}
-			if (btnok == 1) {
+			if (btnok) {
 				switch (opt) {
 					case Autoscale:
 						auto_scale = !auto_scale;
@@ -216,41 +210,40 @@ void menu_handler() {
 
 				}
 
-				btnok = 0;
+				btnok = false;
 			}
 		}
 	} else {
-		if (btnok == 1) {
+		if (btnok) {
 			opt = 1;
 			show_menu();
-			btnok = 0;
+			btnok = false;
 		}
-		if (btnbk == 1) {
+		if (btnbk) {
 			if (info == true) {
 				hide_all();
 			} else {
 				info = true;
 			}
-			btnbk = 0;
+			btnbk = false;
 		}
-		if (btnpl == 1) {
+		if (btnpl > 0) {
 			volts_index++;
 			if (volts_index >= sizeof(voltage_division) / sizeof(*voltage_division)) {
 				volts_index = 0;
 			}
-			btnpl = 0;
+			btnpl--;
 			v_div = voltage_division[volts_index];
 		}
-		if (btnmn == 1) {
+		if (btnmn > 0) {
 			tscale_index++;
 			if (tscale_index >= sizeof(time_division) / sizeof(*time_division)) {
 				tscale_index = 0;
 			}
-			btnmn = 0;
+			btnmn--;
 			s_div = time_division[tscale_index];
 		}
 	}
-
 }
 
 void hide_menu() {

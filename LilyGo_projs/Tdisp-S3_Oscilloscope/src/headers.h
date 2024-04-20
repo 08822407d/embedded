@@ -1,10 +1,7 @@
 #include <Arduino.h>
-#include <driver/adc.h>
-#include <soc/syscon_reg.h>
-#include "esp_adc_cal.h"
-
 
 #include "board_defs.h"
+#include "configs.h"
 
 #include "driver/buttons.h"
 #include "driver/screen.h"
@@ -15,15 +12,12 @@
 /*ESP32S3*/
 #define PIN_POWER_ON	15
 
-#define NUM_SAMPLES		10				// number of samples
-#define BUFF_SIZE		1000
-#define B_MULT			(BUFF_SIZE / NUM_SAMPLES)
+#define BUFF_SIZE		4096U
 
 
 /* adc.cpp */
-extern esp_adc_cal_characteristics_t	adc_chars;
 extern void characterize_adc(void);
-extern void ADC_Sampling(uint32_t *AdcDataBuf);
+extern unsigned long ADC_Sampling(uint16_t *AdcDataBuf);
 
 
 /* debug_routines.cpp */

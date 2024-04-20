@@ -1,1 +1,1 @@
-// #define Enable_longPress_Continuous
+#define Enable_longPress_Continuous

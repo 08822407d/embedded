@@ -56,7 +56,6 @@ void core0_task( void * pvParameters ) {
 			updating_screen = false;
 
 			vTaskDelay(pdMS_TO_TICKS(10));
-			// Serial.println("CORE0");
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
@@ -74,7 +73,7 @@ void core1_task( void * pvParameters ) {
 				if (stop_change)
 					stop_change = false;
 
-				ADC_Sampling(AdcSample_Buffer);
+				RATE = ADC_Sampling(AdcSample_Buffer);
 				new_data = true;
 			} else {
 				if (!stop_change)
@@ -85,7 +84,7 @@ void core1_task( void * pvParameters ) {
 			float old_mean = 0;
 			while (single_trigger) {
 				stop = true;
-				ADC_Sampling(AdcSample_Buffer);
+				RATE = ADC_Sampling(AdcSample_Buffer);
 				float mean = 0;
 				float max_v, min_v;
 				peak_mean(AdcSample_Buffer, BUFF_SIZE, &max_v, &min_v, &mean);

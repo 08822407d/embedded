@@ -12,17 +12,17 @@ Timer<1> BtnBack_AckLongPressTimer;
 unsigned long BtnEnter_PressStartTime = 0;
 unsigned long BtnBack_PressStartTime = 0;
 
-int btnok,
-	btnpl,
-	btnmn,
-	btnbk;
+bool	btnok = false,
+		btnbk = false;
+uint	btnpl = 0,
+		btnmn = 0;
 
 
 /// @brief Button on Pin-14 Functions
 /// @param args 
 /// @return 
 bool BtnEnter_AckLongPress(void *args) {
-	btnok = 1;
+	btnok = true;
 #ifdef Enable_longPress_Continuous
 	BtnEnter.reset();
 #endif
@@ -32,9 +32,10 @@ void IRAM_ATTR BtnEnter_CheckTicks() {
 	BtnEnter.tick(); // just call tick() to check the state.
 }
 void BtnEnter_SingleClick() {
-	btnpl = 1;
+	btnpl++;
 }
 void BtnEnter_PressStart() {
+	// btnok = true;
 	BtnEnter_AckLongPressTimer.at(millis() + BtnLongPressMs, BtnEnter_AckLongPress);
 }
 void BtnEnter_PressStop() {
@@ -45,7 +46,7 @@ void BtnEnter_PressStop() {
 /// @param args 
 /// @return 
 bool BtnBack_AckLongPress(void *args) {
-	btnbk = 1;
+	btnbk = true;
 #ifdef Enable_longPress_Continuous
 	BtnBack.reset();
 #endif
@@ -55,14 +56,15 @@ void IRAM_ATTR BtnBack_CheckTicks() {
 	BtnBack.tick(); // just call tick() to check the state.
 }
 void BtnBack_SingleClick() {
-	btnmn = 1;
+	btnmn++;
 }
 void BtnBack_MultiClick() {
 	int n = BtnBack.getNumberClicks();
-	if (n >= 4)
+	if (n >= 3)
 		esp_deep_sleep_start();
 }
 void BtnBack_PressStart() {
+	// btnbk = true;
 	BtnBack_AckLongPressTimer.at(millis() + BtnLongPressMs, BtnBack_AckLongPress);
 }
 void BtnBack_PressStop() {
@@ -71,7 +73,7 @@ void BtnBack_PressStop() {
 
 void InitUserButton() {
 	attachInterrupt(digitalPinToInterrupt(BtnEnter.pin()), BtnEnter_CheckTicks, FALLING);
-	BtnEnter.setClickMs(100);
+	BtnEnter.setClickMs(50);
 	BtnEnter.attachClick(BtnEnter_SingleClick);
 	BtnEnter.setPressMs(BtnLongPressMs);
 	BtnEnter.attachLongPressStart(BtnEnter_PressStart);
