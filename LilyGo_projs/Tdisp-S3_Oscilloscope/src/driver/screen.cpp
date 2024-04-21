@@ -1,5 +1,9 @@
 #include "../headers.h"
 
+#define AA_FONT_SMALL "NotoSansBold15"
+#define AA_FONT_LARGE "NotoSansBold36"
+#define AA_FONT_MONO  "NotoSansMonoSCB20" // NotoSansMono-SemiCondensedBold 20pt
+
 
 TFT_eSPI	tft		= TFT_eSPI();         // Declare object "tft"
 TFT_eSprite	spr		= TFT_eSprite(&tft);  // Declare Sprite object "spr" with pointer to "tft" object
@@ -26,26 +30,30 @@ void setup_screen() {
 	// Initialise the TFT registers
 	tft.begin();
 	tft.setRotation(1);
+	tft.setTextSize(2);
 	ScreenWidth = tft.width();
 	ScreenHeight = tft.height();
 
 	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
-	spr.setColorDepth(8);
+	spr.setColorDepth(16);
+	spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
 	// Create a sprite of defined size
 	spr.createSprite(ScreenWidth, ScreenHeight);
-	spr.setSwapBytes(true);
+	spr.setTextColor(TFT_GREEN, TFT_BLACK);
+	// spr.setTextSize(2);
+	// spr.setSwapBytes(true);
 	// Clear the TFT screen to blue
 	tft.fillScreen(TFT_BLACK);
 }
 
 float to_scale(float reading) {
-	return ScreenWidth -
-				((reading + offset) / (v_div * 6)) *
-					(ScreenWidth - 1) - 1;
+	return ScreenHeight -
+				((reading + offset) / (v_div * 15)) *
+					(ScreenHeight - 1) - 1;
 }
 
 float to_voltage(float reading) {
-	return reading / 1000;
+	return reading / 1000.0;
 }
 
 
@@ -53,6 +61,8 @@ float to_voltage(float reading) {
 void update_screen(uint16_t *AdcDataBuf, float sample_rate) {
 	float mean = 0;
 	float max_v, min_v;
+
+	unsigned long draw_start = micros();
 
 	peak_mean(AdcDataBuf, BUFF_SIZE, &max_v, &min_v, &mean);
 
@@ -66,6 +76,9 @@ void update_screen(uint16_t *AdcDataBuf, float sample_rate) {
 
 	draw_sprite(freq, period, mean, max_v, min_v,
 			trigger0, sample_rate, digital_data, true);
+	
+	unsigned long draw_timespan = micros() - draw_start;
+	Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
 }
 
 void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
@@ -180,6 +193,8 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 			spr.drawLine(231, 129, 238, 129, TFT_WHITE);
 		}
 	} else if (info) {
+		spr.drawString(String(min_v) + " - " + String(max_v), 4, 4);
+
 		//spr.drawRect(shift + 10, 0, 280 - shift - 20, 30, TFT_WHITE);
 		spr.drawString("P-P: " + String(max_v - min_v) + "V",  shift + 15, 5);
 		spr.drawString(frequency,  shift + 15, 15);
@@ -219,16 +234,16 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_top, dash_color);
-			if ((pix_idx % grid_size) == 0) {
-				spr.drawLine(x_left - cross_size, y_top,
-						x_left + cross_size, y_top, cross_color);
-				spr.drawLine(x_left - cross_size, y_bottom,
-						x_left + cross_size, y_bottom, cross_color);
-				spr.drawLine(x_right - cross_size, y_bottom,
-						x_right + cross_size, y_bottom, cross_color);
-				spr.drawLine(x_right - cross_size, y_top,
-						x_right + cross_size, y_top, cross_color);
-			}
+			// if ((pix_idx % grid_size) == 0) {
+			// 	spr.drawLine(x_left - cross_size, y_top,
+			// 			x_left + cross_size, y_top, cross_color);
+			// 	spr.drawLine(x_left - cross_size, y_bottom,
+			// 			x_left + cross_size, y_bottom, cross_color);
+			// 	spr.drawLine(x_right - cross_size, y_bottom,
+			// 			x_right + cross_size, y_bottom, cross_color);
+			// 	spr.drawLine(x_right - cross_size, y_top,
+			// 			x_right + cross_size, y_top, cross_color);
+			// }
 		}
 	// draw vertical dash-lines symmetrically from center to 4 Diagonals
 	for (int col = 0; col <= width / 2; col += grid_size)
@@ -241,16 +256,16 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_top, dash_color);
-			if ((pix_idx % grid_size) == 0) {
-				spr.drawLine(x_left, y_top - cross_size,
-						x_left, y_top + cross_size, cross_color);
-				spr.drawLine(x_left, y_bottom - cross_size,
-						x_left, y_bottom + cross_size, cross_color);
-				spr.drawLine(x_right, y_bottom - cross_size,
-						x_right, y_bottom + cross_size, cross_color);
-				spr.drawLine(x_right, y_top - cross_size,
-						x_right, y_top + cross_size, cross_color);
-			}
+			// if ((pix_idx % grid_size) == 0) {
+			// 	spr.drawLine(x_left, y_top - cross_size,
+			// 			x_left, y_top + cross_size, cross_color);
+			// 	spr.drawLine(x_left, y_bottom - cross_size,
+			// 			x_left, y_bottom + cross_size, cross_color);
+			// 	spr.drawLine(x_right, y_bottom - cross_size,
+			// 			x_right, y_bottom + cross_size, cross_color);
+			// 	spr.drawLine(x_right, y_top - cross_size,
+			// 			x_right, y_top + cross_size, cross_color);
+			// }
 		}
 	
 	// draw two Axis
@@ -300,7 +315,6 @@ void draw_channel1(uint32_t trigger0, uint32_t trigger1,
 				spr.drawLine(i - 1, o_data, i, n_data, curve_color);
 				o_data = n_data;
 			}
-
 		} else {
 			break;
 		}

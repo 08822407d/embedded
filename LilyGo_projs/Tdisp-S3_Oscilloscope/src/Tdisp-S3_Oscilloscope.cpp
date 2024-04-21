@@ -54,8 +54,6 @@ void core0_task( void * pvParameters ) {
 			updating_screen = true;
 			update_screen(AdcSample_Buffer, RATE);
 			updating_screen = false;
-
-			vTaskDelay(pdMS_TO_TICKS(10));
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
@@ -79,7 +77,7 @@ void core1_task( void * pvParameters ) {
 				if (!stop_change)
 					stop_change = true;
 			}
-			vTaskDelay(pdMS_TO_TICKS(300));
+			vTaskDelay(pdMS_TO_TICKS(100));
 		} else {
 			float old_mean = 0;
 			while (single_trigger) {
@@ -106,7 +104,7 @@ void core1_task( void * pvParameters ) {
 				}
 				vTaskDelay(pdMS_TO_TICKS(1));   //time for the other task to start (low priorit)
 			}
-			vTaskDelay(pdMS_TO_TICKS(300));
+			vTaskDelay(pdMS_TO_TICKS(250));
 		}
 	}
 }

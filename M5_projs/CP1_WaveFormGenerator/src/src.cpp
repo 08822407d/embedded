@@ -11,7 +11,9 @@
 
 uint32_t buf[128];
 
-char mode = 'R';
+char mode = 'S';
+// char modes[] = { 'S', 'R', 'T' };
+uint mode_idx = 0;
 float frequency = 1000;
 uint8_t ratio = 50;
 
@@ -164,8 +166,10 @@ double sinusSetFrequency(double frequency)
 	return frequency;
 }
 
-void controlGenerator()
+void controlGenerator(char mode)
 {
+	stopAll();
+
 	switch (mode)
 	{
 		case 'S':
@@ -191,46 +195,56 @@ void controlGenerator()
 
 void setup()
 {
+	M5.begin();
+	M5.Lcd.setTextColor(YELLOW);
+	M5.Lcd.setTextSize(2); 
+
 	Serial.begin(115200);
-	controlGenerator();
+	controlGenerator('S');
 	Serial.println("Use Pin 26 / Benutze Pin 26");
 	Serial.print("Commands / Kommandos: M (Mode / Betriebsart): S (Sinus), T (Triangle), R (Rectangle), F (Frequency / Frequenz), R (Ratio / Tastverhältnis)");
+
 }
 
 void loop()
 {
+	if (M5.BtnA.wasPressed()) {
+		// mode_idx++;
+		// mode = modes[mode_idx % 3];
+		// statChanged = true;
+		Serial.print("Btn A pressed\n");
+	}
+
 	if (Serial.available() > 0) {
 		String inp = Serial.readStringUntil('\n');
-		Serial.println(inp);
 		char cmd = inp[0];
-		if ((cmd == 'M') || (cmd == 'm')) {
-			char newMode = inp[1];
-			if (newMode != mode) {
-				stopAll();
-				mode = newMode;
-				controlGenerator();
-			}
-		} else {
-			String dat = inp.substring(1);
-			switch (cmd)
-			{
-			case 'F':
-			case 'f':
-				frequency = dat.toDouble();
-				break; // Frequency
-			case 'R':
-			case 'r':
-				ratio = dat.toInt();
-				break; // Ratio
-			}
-			if (ratio > 100)
-				ratio = 100;
-			if (frequency < 20)
-				frequency = 20;
-			if (frequency > 20000)
-				frequency = 20000;
-			controlGenerator();
+		String dat = inp.substring(2);
+
+		Serial.println("cmd: " + String(cmd) + ", data: " + dat);
+
+		switch (cmd)
+		{
+		case 'M':
+		case 'm':
+			mode = dat[0];
+			break;
+		case 'F':
+		case 'f':
+			frequency = dat.toDouble();
+			break; // Frequency
+		case 'R':
+		case 'r':
+			ratio = dat.toInt();
+			break; // Ratio
 		}
+		if (ratio > 100)
+			ratio = 100;
+		if (frequency < 20)
+			frequency = 20;
+		if (frequency > 20000)
+			frequency = 20000;
+
+		controlGenerator(mode);
 		String ba;
 		switch (mode)
 		{

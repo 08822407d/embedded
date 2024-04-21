@@ -12,7 +12,7 @@
 /*ESP32S3*/
 #define PIN_POWER_ON	15
 
-#define BUFF_SIZE		4096U
+#define BUFF_SIZE		1024U
 
 
 /* adc.cpp */

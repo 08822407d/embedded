@@ -59,8 +59,10 @@ bool digital_analog(uint16_t *adc_buffer, uint32_t max_v, uint32_t min_v) {
 void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
 		uint32_t min_v, float *pt_freq, float *pt_period, uint32_t *pt_trigger0, uint32_t *pt_trigger1) {
 
-	float freq = 0;
+	float positive_phase = 0;
+	float negative_phase = 0;
 	float period = 0;
+	float freq = 0;
 	bool signal_side = false;
 	uint32_t trigger_count = 0;
 	uint32_t trigger_num = 10;
@@ -68,18 +70,17 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 	uint32_t trigger_index = 0;
 
 	//get initial signal relative to the mean
-	if (to_voltage(adc_buffer[0]) > mean) {
+	if (to_voltage(adc_buffer[0]) > mean)
 		signal_side = true;
-	}
 
 	//waveform repetitions calculation + get triggers time
 	uint32_t wave_center = (max_v + min_v) / 2;
 	for (uint32_t i = 1 ; i < BUFF_SIZE; i++) {
 		if (signal_side && adc_buffer[i] < wave_center - (wave_center - min_v) * 0.2) {
 			signal_side = false;
-		}
-		else if (!signal_side && adc_buffer[i] > wave_center + (max_v - wave_center) * 0.2) {
-			freq++;
+			negative_phase++;
+		} else if (!signal_side && adc_buffer[i] > wave_center + (max_v - wave_center) * 0.2) {
+			positive_phase++;
 			if (trigger_count < trigger_num) {
 				trigger_temp[trigger_count] = i;
 				trigger_count++;
@@ -92,26 +93,29 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 	if (trigger_count < 2) {
 		trigger_temp[0] = 0;
 		trigger_index = 0;
-		freq = 0;
+		positive_phase = 0;
 		period = 0;
 	} else {
-		//simple frequency calculation fair enough for frequencies over 2khz (20hz resolution)
-		freq = freq * 1000 / 50;
-		period = (float)(sample_rate * 1000.0) / freq; //us
+		// period = total time / triggers
+		// in seconds
+		period = (BUFF_SIZE / sample_rate) /
+					((positive_phase + negative_phase) / 2);
+		
+		freq = 1 / period;
 
-		//from 2000 to 80 hz -> uses mean of the periods for precision
-		if (freq < 2000 && freq > 80) {
-			period = 0;
-			for (uint32_t i = 1; i < trigger_count; i++) {
-				period += trigger_temp[i] - trigger_temp[i - 1];
-			}
-			period /= (trigger_count - 1);
-			freq = sample_rate * 1000 / period;
-		} else if (trigger_count > 1 && freq <= 80) {
-		//under 80hz, single period for frequency calculation
-			period = trigger_temp[1] - trigger_temp[0];
-			freq = sample_rate * 1000 / period;
-		}
+		// //from 2000 to 80 hz -> uses mean of the periods for precision
+		// if (positive_phase < 2000 && positive_phase > 80) {
+		// 	period = 0;
+		// 	for (uint32_t i = 1; i < trigger_count; i++) {
+		// 		period += trigger_temp[i] - trigger_temp[i - 1];
+		// 	}
+		// 	period /= (trigger_count - 1);
+		// 	positive_phase = sample_rate * 1000 / period;
+		// } else if (trigger_count > 1 && positive_phase <= 80) {
+		// //under 80hz, single period for frequency calculation
+		// 	period = trigger_temp[1] - trigger_temp[0];
+		// 	positive_phase = sample_rate * 1000 / period;
+		// }
 	}
 
 	//setting triggers offset and getting second trigger for debug cursor on drawn_channel1
@@ -130,10 +134,10 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 			trigger2 = trigger_temp[2] - period * 0.05;
 	}
 
-	pt_trigger0[0] = trigger_index;
-	pt_trigger1[0] = trigger2;
-	pt_freq[0] = freq;
-	pt_period[0] = period;
+	*pt_trigger0 = trigger_index;
+	*pt_trigger1 = trigger2;
+	*pt_freq = freq;
+	*pt_period = period;
 }
 
 
@@ -203,9 +207,9 @@ void trigger_freq_digital(uint16_t *adc_buffer, float sample_rate, float mean, u
 			trigger_index = 0;
 	}
 
-	pt_trigger0[0] = trigger_index;
-	pt_freq[0] = freq;
-	pt_period[0] = period;
+	*pt_trigger0 = trigger_index;
+	*pt_freq = freq;
+	*pt_period = period;
 }
 
 

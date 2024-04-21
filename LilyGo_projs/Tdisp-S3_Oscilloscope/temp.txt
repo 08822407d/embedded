@@ -1,0 +1,3 @@
+rate = times / second
+total_time = n_samples / rate
+one_time = total_time / n_period
