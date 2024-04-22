@@ -60,7 +60,7 @@ void BtnBack_SingleClick() {
 }
 void BtnBack_MultiClick() {
 	int n = BtnBack.getNumberClicks();
-	if (n >= 3)
+	if (n >= 4)
 		esp_deep_sleep_start();
 }
 void BtnBack_PressStart() {

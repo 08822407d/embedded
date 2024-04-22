@@ -65,7 +65,7 @@ void core1_task( void * pvParameters ) {
 	for (;;) {
 		if (!single_trigger) {
 			while (updating_screen)
-				vTaskDelay(pdMS_TO_TICKS(1));
+				vTaskDelay(pdMS_TO_TICKS(10));
 
 			if (!stop) {
 				if (stop_change)
@@ -77,7 +77,7 @@ void core1_task( void * pvParameters ) {
 				if (!stop_change)
 					stop_change = true;
 			}
-			vTaskDelay(pdMS_TO_TICKS(100));
+			vTaskDelay(pdMS_TO_TICKS(10));
 		} else {
 			float old_mean = 0;
 			while (single_trigger) {

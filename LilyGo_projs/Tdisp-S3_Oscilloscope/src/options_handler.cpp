@@ -13,10 +13,11 @@ bool menu_action		= false;
 
 uint8_t digital_wave_option	= 0; // 0-auto | 1-analog | 2-digital data (SERIAL/SPI/I2C/etc)
 
-int voltage_division[6] = { //screen has 4 divisions, 31 pixels each (125 pixels of height)
-	550, //fullscreen 3.3V peak-peak
-	500,
+int voltage_division[7] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
+	850, //fullscreen 3.3V peak-peak
+	550,
 	375,
+	250,
 	180,
 	100,
 	50
@@ -26,7 +27,7 @@ int voltage_division[6] = { //screen has 4 divisions, 31 pixels each (125 pixels
 	 thus, the time division is the number
 	 of samples per screen division
 */
-float time_division[9] = { //screen has 4 divisions, 60 pixel each (240 pixel of width)
+float time_division[7] = { //screen has 8 divisions, 40 pixel each (280 pixel of width)
 	10,
 	25,
 	50,
@@ -34,15 +35,10 @@ float time_division[9] = { //screen has 4 divisions, 60 pixel each (240 pixel of
 	250,
 	500,
 	1000,
-	2500,
-	5000
 };
-//,   //1Mhz    35ms of data (of 50ms possible)
-//  10000,  //100khz  70ms/500ms
-//  25000,  //100khz  175ms/500ms of data
-//  50000,  //100khz  350ms/500ms of data
-//  100000  //50khz   700ms/1000ms of data
-//};
+// 	2500,
+// 	5000
+// };
 
 
 void menu_handler() {
@@ -129,7 +125,7 @@ void menu_handler() {
 				if (opt > Single) {
 					opt = 1;
 				}
-				Serial.print("option : ");
+				// Serial.print("option : ");
 				Serial.println(opt);
 				btnpl--;
 			}
@@ -139,7 +135,7 @@ void menu_handler() {
 				{
 					opt = 9;
 				}
-				Serial.print("option : ");
+				// Serial.print("option : ");
 				Serial.println(opt);
 				btnmn--;
 			}

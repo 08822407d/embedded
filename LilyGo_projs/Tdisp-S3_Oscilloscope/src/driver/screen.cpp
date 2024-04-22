@@ -3,6 +3,7 @@
 #define AA_FONT_SMALL "NotoSansBold15"
 #define AA_FONT_LARGE "NotoSansBold36"
 #define AA_FONT_MONO  "NotoSansMonoSCB20" // NotoSansMono-SemiCondensedBold 20pt
+#define BACK_GROUND_COLOR 0x2104
 
 
 TFT_eSPI	tft		= TFT_eSPI();         // Declare object "tft"
@@ -20,7 +21,12 @@ bool single_trigger	= false;
 bool data_trigger	= false;
 
 uint16_t AdcSample_Buffer[BUFF_SIZE];
-// int data[320] = {0};
+
+#define DRAW_SCREEN_TIMES_COUNT	60
+unsigned long DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT] = { 0 };
+float ScreenFPS = 0;
+
+
 
 void setup_screen() {
 	// (POWER ON)IO15 must be set to HIGH before starting, otherwise the screen will not display when using battery
@@ -39,11 +45,11 @@ void setup_screen() {
 	spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
 	// Create a sprite of defined size
 	spr.createSprite(ScreenWidth, ScreenHeight);
-	spr.setTextColor(TFT_GREEN, TFT_BLACK);
+	spr.setTextColor(TFT_GREEN, BACK_GROUND_COLOR);
 	// spr.setTextSize(2);
 	// spr.setSwapBytes(true);
 	// Clear the TFT screen to blue
-	tft.fillScreen(TFT_BLACK);
+	tft.fillScreen(BACK_GROUND_COLOR);
 }
 
 float to_scale(float reading) {
@@ -77,8 +83,16 @@ void update_screen(uint16_t *AdcDataBuf, float sample_rate) {
 	draw_sprite(freq, period, mean, max_v, min_v,
 			trigger0, sample_rate, digital_data, true);
 	
-	unsigned long draw_timespan = micros() - draw_start;
+	// draw screen performance
+	unsigned long draw_end = micros();
+	unsigned long draw_timespan = draw_end - draw_start;
 	Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
+	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
+			(DRAW_SCREEN_TIMES_COUNT - 1) * sizeof(typeof(DrawScreenTimes[0])));
+	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_end;
+	if (DrawScreenTimes[0] >= 0)
+		ScreenFPS =  (1000000.0 * (DRAW_SCREEN_TIMES_COUNT - 1)) /
+						(draw_end - DrawScreenTimes[0]);
 }
 
 void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
@@ -131,7 +145,7 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 
 	if (new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
-		spr.fillSprite(TFT_BLACK);
+		spr.fillSprite(BACK_GROUND_COLOR);
 
 		draw_grid(0, 0, ScreenWidth, ScreenHeight);
 
@@ -150,36 +164,36 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 			draw_channel1(trigger, 0, AdcSample_Buffer, sample_rate);
 	}
 
-	int shift = 210;
+	int Xshift = 250;
+	int Yshift = 10;
 	if (menu) {
-		spr.fillRect(shift, 0, 102, 135, TFT_BLACK);
-		spr.drawRect(shift, 0, 102, 135, TFT_WHITE);
-		spr.fillRect(shift + 1, 3 + 10 * (opt - 1), 100, 11, TFT_RED);
+		spr.fillRect(Xshift, 0, 102, 135, BACK_GROUND_COLOR);
+		spr.drawRect(Xshift, 0, 102, 135, TFT_WHITE);
+		spr.fillRect(Xshift + 1, 3 + 10 * (opt - 1), 100, 11, TFT_RED);
 
-		spr.drawString("AUTOSCALE",  shift + 5, 5);
-		spr.drawString(String(int(v_div)) + "mV/div",  shift + 5, 15);
-		spr.drawString(String(int(s_div)) + "uS/div",  shift + 5, 25);
-		spr.drawString("Offset: " + String(offset) + "V",  shift + 5, 35);
-		spr.drawString("T-Off: " + String((uint32_t)toffset) + "uS",  shift + 5, 45);
-		spr.drawString("Filter: " + str_filter, shift + 5, 55);
-		spr.drawString(str_stop, shift + 5, 65);
-		spr.drawString(wave_option, shift + 5, 75);
-		spr.drawString("Single " + String(single_trigger ? "ON" : "OFF"), shift + 5, 85);
+		spr.drawString("AUTOSCALE",  Xshift + 5, 5);
+		spr.drawString(String(int(v_div)) + "mV/div",  Xshift + 5, 15);
+		spr.drawString(String(int(s_div)) + "uS/div",  Xshift + 5, 25);
+		spr.drawString("Offset: " + String(offset) + "V",  Xshift + 5, 35);
+		spr.drawString("T-Off: " + String((uint32_t)toffset) + "uS",  Xshift + 5, 45);
+		spr.drawString("Filter: " + str_filter, Xshift + 5, 55);
+		spr.drawString(str_stop, Xshift + 5, 65);
+		spr.drawString(wave_option, Xshift + 5, 75);
+		spr.drawString("Single " + String(single_trigger ? "ON" : "OFF"), Xshift + 5, 85);
 
-		spr.drawLine(shift, 103, shift + 100, 103, TFT_WHITE);
+		spr.drawLine(Xshift, 103, Xshift + 100, 103, TFT_WHITE);
 
-		spr.drawString("Vmax: " + String(max_v) + "V",  shift + 5, 105);
-		spr.drawString("Vmin: " + String(min_v) + "V",  shift + 5, 115);
-		spr.drawString(s_mean,  shift + 5, 125);
+		spr.drawString("Vmax: " + String(max_v) + "V",  Xshift + 5, 105);
+		spr.drawString("Vmin: " + String(min_v) + "V",  Xshift + 5, 115);
+		spr.drawString(s_mean,  Xshift + 5, 125);
 
-		shift -= 70;
+		Xshift -= 70;
 
-		//spr.fillRect(shift, 0, 70, 30, TFT_BLACK);
-		spr.drawRect(shift, 0, 70, 30, TFT_WHITE);
-		spr.drawString("P-P: " + String(max_v - min_v) + "V",  shift + 5, 5);
-		spr.drawString(frequency,  shift + 5, 15);
+		spr.drawRect(Xshift, 0, 70, 30, TFT_WHITE);
+		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift + 5, 5);
+		spr.drawString(frequency,  Xshift + 5, 15);
 		String offset_line = String((2.0 * v_div) / 1000.0 - offset) + "V";
-		spr.drawString(offset_line,  shift + 40, 59);
+		spr.drawString(offset_line,  Xshift + 40, 59);
 
 		if (set_value) {
 			spr.fillRect(229, 0, 11, 11, TFT_BLUE);
@@ -193,15 +207,17 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 			spr.drawLine(231, 129, 238, 129, TFT_WHITE);
 		}
 	} else if (info) {
-		spr.drawString(String(min_v) + " - " + String(max_v), 4, 4);
+		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift, Yshift);
+		spr.drawString(frequency, Xshift, Yshift + 10);
 
-		//spr.drawRect(shift + 10, 0, 280 - shift - 20, 30, TFT_WHITE);
-		spr.drawString("P-P: " + String(max_v - min_v) + "V",  shift + 15, 5);
-		spr.drawString(frequency,  shift + 15, 15);
-		spr.drawString(String(int(v_div)) + "mV/div",  shift - 100, 5);
-		spr.drawString(String(int(s_div)) + "uS/div",  shift - 100, 15);
+		spr.drawString(String(int(v_div)) + "mV/div", Xshift, Yshift + 25);
+		spr.drawString(String(int(s_div)) + "uS/div", Xshift, Yshift + 35);
+
 		String offset_line = String((2.0 * v_div) / 1000.0 - offset) + "V";
-		spr.drawString(offset_line,  shift + 80, ScreenHeight / 2 - 15);
+		spr.drawString(offset_line, Xshift + 40, ScreenHeight / 2 + 5);
+
+		spr.drawString(String(ScreenFPS) + "FPS", 5, 5);
+		spr.drawString(String(min_v) + " - " + String(max_v), Xshift, ScreenHeight - 15);
 	}
 
 	//push the drawed sprite to the screen
@@ -215,7 +231,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 	uint point_off = 4;
 	uint grid_size = 40;
 	uint cross_size = 2;
-	uint dash_color = TFT_SILVER;
+	uint dash_color = TFT_WHITE;
 	uint axis_color = TFT_YELLOW;
 	uint cross_color = TFT_YELLOW;
 	// make sure the dash-lines exactly overlap at each cross point
@@ -234,16 +250,16 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_top, dash_color);
-			// if ((pix_idx % grid_size) == 0) {
-			// 	spr.drawLine(x_left - cross_size, y_top,
-			// 			x_left + cross_size, y_top, cross_color);
-			// 	spr.drawLine(x_left - cross_size, y_bottom,
-			// 			x_left + cross_size, y_bottom, cross_color);
-			// 	spr.drawLine(x_right - cross_size, y_bottom,
-			// 			x_right + cross_size, y_bottom, cross_color);
-			// 	spr.drawLine(x_right - cross_size, y_top,
-			// 			x_right + cross_size, y_top, cross_color);
-			// }
+			if ((pix_idx % grid_size) == 0) {
+				spr.drawLine(x_left - cross_size, y_top,
+						x_left + cross_size, y_top, cross_color);
+				spr.drawLine(x_left - cross_size, y_bottom,
+						x_left + cross_size, y_bottom, cross_color);
+				spr.drawLine(x_right - cross_size, y_bottom,
+						x_right + cross_size, y_bottom, cross_color);
+				spr.drawLine(x_right - cross_size, y_top,
+						x_right + cross_size, y_top, cross_color);
+			}
 		}
 	// draw vertical dash-lines symmetrically from center to 4 Diagonals
 	for (int col = 0; col <= width / 2; col += grid_size)
@@ -256,16 +272,16 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_top, dash_color);
-			// if ((pix_idx % grid_size) == 0) {
-			// 	spr.drawLine(x_left, y_top - cross_size,
-			// 			x_left, y_top + cross_size, cross_color);
-			// 	spr.drawLine(x_left, y_bottom - cross_size,
-			// 			x_left, y_bottom + cross_size, cross_color);
-			// 	spr.drawLine(x_right, y_bottom - cross_size,
-			// 			x_right, y_bottom + cross_size, cross_color);
-			// 	spr.drawLine(x_right, y_top - cross_size,
-			// 			x_right, y_top + cross_size, cross_color);
-			// }
+			if ((pix_idx % grid_size) == 0) {
+				spr.drawLine(x_left, y_top - cross_size,
+						x_left, y_top + cross_size, cross_color);
+				spr.drawLine(x_left, y_bottom - cross_size,
+						x_left, y_bottom + cross_size, cross_color);
+				spr.drawLine(x_right, y_bottom - cross_size,
+						x_right, y_bottom + cross_size, cross_color);
+				spr.drawLine(x_right, y_top - cross_size,
+						x_right, y_top + cross_size, cross_color);
+			}
 		}
 	
 	// draw two Axis
