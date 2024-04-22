@@ -2,9 +2,13 @@
 
 #include <esp_sleep.h>
 
-
-OneButton BtnEnter(PIN_BUTTON_2, true);
-OneButton BtnBack(PIN_BUTTON_1, true);
+#if SCREEN_ROTATION == 1
+	OneButton BtnEnter(PIN_BUTTON_2, true);
+	OneButton BtnBack(PIN_BUTTON_1, true);
+#else
+	OneButton BtnEnter(PIN_BUTTON_1, true);
+	OneButton BtnBack(PIN_BUTTON_2, true);
+#endif
 
 Timer<1> BtnEnter_AckLongPressTimer;
 Timer<1> BtnBack_AckLongPressTimer;

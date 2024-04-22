@@ -27,7 +27,7 @@ int voltage_division[7] = { //screen has 4 divisions, 40 pixels each (170 pixels
 	 thus, the time division is the number
 	 of samples per screen division
 */
-float time_division[7] = { //screen has 8 divisions, 40 pixel each (280 pixel of width)
+float time_division[9] = { //screen has 8 divisions, 40 pixel each (280 pixel of width)
 	10,
 	25,
 	50,
@@ -35,10 +35,10 @@ float time_division[7] = { //screen has 8 divisions, 40 pixel each (280 pixel of
 	250,
 	500,
 	1000,
-};
-// 	2500,
-// 	5000
 // };
+	2500,
+	5000
+};
 
 
 void menu_handler() {

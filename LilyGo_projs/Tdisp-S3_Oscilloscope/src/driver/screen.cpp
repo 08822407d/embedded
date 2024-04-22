@@ -38,7 +38,7 @@ void setup_screen() {
 
 	// Initialise the TFT registers
 	tft.begin();
-	tft.setRotation(1);
+	tft.setRotation(SCREEN_ROTAION);
 	tft.setTextSize(2);
 	ScreenWidth = tft.width();
 	ScreenHeight = tft.height();
