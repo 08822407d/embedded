@@ -11,13 +11,23 @@
 
 uint32_t buf[128];
 
-char mode = 'S';
-// char modes[] = { 'S', 'R', 'T' };
+char Sinous[] = "Sinous";
+char Rectangle[] = "Rectangle";
+char Triangle[] = "Triangle";
+char *modes[] = { Sinous, Triangle, Rectangle };
 uint mode_idx = 0;
-float frequency = 1000;
+
+uint frequency = 100;
+uint freqs[] = { 100, 250, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000 };
+uint freq_idx = 0;
+
 uint8_t ratio = 50;
 
+bool statChanged = true;
 bool initDone = false;
+
+int width = 0;
+int height = 0;
 
 i2s_config_t i2s_config = {
 	.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN),
@@ -81,7 +91,7 @@ void startRectangle()
 	Serial.println("Rectangle Started");
 }
 
-void rectangleSetFrequency(double frequency, uint8_t ratio)
+void rectangleSetFrequency(uint frequency, uint8_t ratio)
 {
 	ledcSetup(2, frequency, 7);
 	ledcWrite(2, 127.0 * ratio / 100);
@@ -95,7 +105,7 @@ void startTriangle()
 	Serial.println("Triangle Started");
 }
 
-double triangleSetFrequency(double frequency, uint8_t ratio)
+double triangleSetFrequency(uint frequency, uint8_t ratio)
 {
 	int size = 64;
 	if (frequency < 5000)
@@ -138,7 +148,7 @@ void startSinus()
 	Serial.println("Sinus Started");
 }
 
-double sinusSetFrequency(double frequency)
+double sinusSetFrequency(uint frequency)
 {
 	double f, delta, delta_min = 999999999.0;
 	uint16_t divi = 0, step = 1, s;
@@ -166,26 +176,25 @@ double sinusSetFrequency(double frequency)
 	return frequency;
 }
 
-void controlGenerator(char mode)
+void controlGenerator()
 {
 	stopAll();
 
-	switch (mode)
+	switch (mode_idx)
 	{
-		case 'S':
-		case 's':
+		case 0:
 			if (!initDone)
 				startSinus();
 			frequency = sinusSetFrequency(frequency);
 			break;
-		case 'T':
-		case 't':
+
+		case 1:
 			if (!initDone)
 				startTriangle();
 			frequency = triangleSetFrequency(frequency, ratio);
 			break;
-		case 'R':
-		case 'r':
+
+		case 2:
 			if (!initDone)
 				startRectangle();
 			rectangleSetFrequency(frequency, ratio);
@@ -193,26 +202,58 @@ void controlGenerator(char mode)
 	}
 }
 
+void printSettings()
+{
+	M5.Lcd.fillRect(0, 20, width, height - 20, BLACK);
+	M5.Lcd.setCursor(4, 34);
+
+	M5.Lcd.setTextColor(GREEN);
+	M5.Lcd.printf("Mode:  ");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf(" %s\n", modes[mode_idx]);
+
+	M5.Lcd.setTextColor(GREEN);
+	M5.Lcd.printf("Freq:  ");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf(" %u\n", frequency);
+
+	M5.Lcd.setTextColor(GREEN);
+	M5.Lcd.printf("Ratio: ");
+	M5.Lcd.setTextColor(ORANGE);
+	M5.Lcd.printf(" %d\n", ratio);
+}
+
 void setup()
 {
 	M5.begin();
-	M5.Lcd.setTextColor(YELLOW);
-	M5.Lcd.setTextSize(2); 
 
 	Serial.begin(115200);
-	controlGenerator('S');
-	Serial.println("Use Pin 26 / Benutze Pin 26");
-	Serial.print("Commands / Kommandos: M (Mode / Betriebsart): S (Sinus), T (Triangle), R (Rectangle), F (Frequency / Frequenz), R (Ratio / Tastverhältnis)");
+	Serial.println("Use Pin 26");
+	Serial.print("Commands: M (Mode): S (Sinus), T (Triangle), R (Rectangle), F (Frequency), R (Ratio)");
 
+	M5.Lcd.setRotation(3);
+	width = M5.Lcd.width();
+	height = M5.Lcd.height();
+
+	M5.Lcd.setTextSize(2); 
+	M5.Lcd.setCursor(4, 4);
+	M5.Lcd.setTextColor(GREEN);
+	M5.Lcd.println("Waveform Generator");
+	// M5.Lcd.printf("%d, %d", (sizeof(modes) / sizeof(typeof(modes[0]))), (sizeof(freqs) / sizeof(typeof(freqs[0]))));
 }
 
 void loop()
 {
-	if (M5.BtnA.wasPressed()) {
-		// mode_idx++;
-		// mode = modes[mode_idx % 3];
-		// statChanged = true;
-		Serial.print("Btn A pressed\n");
+	char mode;
+
+	M5.update();  // Read the press state of the key.  读取按键 A, B, C 的状态
+	if (M5.BtnA.wasReleased()) {
+		mode_idx = (mode_idx + 1) % (sizeof(modes) / sizeof(typeof(modes[0])));
+		statChanged = true;
+	} else if (M5.BtnB.wasReleased()) {
+		freq_idx = (freq_idx + 1) % (sizeof(freqs) / sizeof(typeof(freqs[0])));
+		frequency = freqs[freq_idx];
+		statChanged = true;
 	}
 
 	if (Serial.available() > 0) {
@@ -224,18 +265,38 @@ void loop()
 
 		switch (cmd)
 		{
-		case 'M':
-		case 'm':
-			mode = dat[0];
+			case 'M':
+			case 'm':
+				mode = dat[0];
+				break;
+			case 'F':
+			case 'f':
+				frequency = dat.toDouble();
+				break; // Frequency
+			case 'R':
+			case 'r':
+				ratio = dat.toInt();
+				break; // Ratio
+		}
+		switch (mode)
+		{
+		case 'S':
+		case 's':
+			mode_idx = 0;
 			break;
-		case 'F':
-		case 'f':
-			frequency = dat.toDouble();
-			break; // Frequency
+		
+		case 'T':
+		case 't':
+			mode_idx = 1;
+			break;
+	
 		case 'R':
 		case 'r':
-			ratio = dat.toInt();
-			break; // Ratio
+			mode_idx = 2;
+			break;
+		
+		default:
+			break;
 		}
 		if (ratio > 100)
 			ratio = 100;
@@ -244,33 +305,42 @@ void loop()
 		if (frequency > 20000)
 			frequency = 20000;
 
-		controlGenerator(mode);
+		statChanged = true;
+	}
+
+	if (statChanged) {
+		controlGenerator();
 		String ba;
 		switch (mode)
 		{
 			case 'S':
 			case 's':
-				ba = "Sine / Sinus";
+				ba = "Sine";
 				break;
 			case 'T':
 			case 't':
-				ba = " Triangle / Dreieck";
+				ba = " Triangle";
 				break;
 			case 'R':
 			case 'r':
-				ba = "Rectangle / Rechteck";
+				ba = "Rectangle";
 				break;
 		}
+
 		Serial.println("**************** Adjusted Values / Eingestellte Werte ********************");
-		Serial.print("Mode / Betriebsart     = ");
+		Serial.print("Mode		= ");
 		Serial.println(ba);
-		Serial.print("Frequncy / Frequenz    = ");
+		Serial.print("Frequncy	= ");
 		Serial.print(frequency);
 		Serial.println("Hz");
-		Serial.print("Ratio / Tastverhältnis = ");
+		Serial.print("Ratio		= ");
 		Serial.print(ratio);
 		Serial.println("%");
 		Serial.println();
 		Serial.print("Commands / Kommandos: M (Mode), F (Frequency), R (Ratio) : ");
+
+		printSettings();
+
+		statChanged = false;
 	}
 }
