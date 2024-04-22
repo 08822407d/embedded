@@ -81,7 +81,7 @@ void menu_handler() {
 						btnpl--;
 					}
 
-					s_div = time_division[tscale_index];
+					t_div = time_division[tscale_index];
 					break;
 
 				case Offset:
@@ -102,10 +102,10 @@ void menu_handler() {
 
 				case TOffset:
 					if (btnpl > 0) {
-						toffset += 0.1 * s_div;
+						toffset += 0.1 * t_div;
 						btnpl--;
 					} else if (btnmn > 0) {
-						toffset -= 0.1 * s_div;
+						toffset -= 0.1 * t_div;
 						btnmn--;
 					}
 
@@ -181,7 +181,7 @@ void menu_handler() {
 					case Reset:
 						offset = 0;
 						v_div = 550;
-						s_div = 10;
+						t_div = 10;
 						tscale_index = 0;
 						volts_index = 0;
 						break;
@@ -237,7 +237,7 @@ void menu_handler() {
 				tscale_index = 0;
 			}
 			btnmn--;
-			s_div = time_division[tscale_index];
+			t_div = time_division[tscale_index];
 		}
 	}
 }

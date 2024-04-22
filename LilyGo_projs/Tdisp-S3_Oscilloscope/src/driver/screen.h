@@ -10,7 +10,7 @@
 extern TFT_eSPI tft;
 extern TFT_eSprite spr;
 extern float v_div;
-extern float s_div;
+extern float t_div;
 extern float offset;
 extern float toffset;
 extern bool auto_scale;
