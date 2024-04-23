@@ -4,7 +4,7 @@
 TaskHandle_t	task_menu;
 TaskHandle_t	task_adc;
 
-float RATE				= 1000; //in ksps --> 1000 = 1Msps
+float RATE				= ADC_SAMPLE_RATE; //in ksps --> 1000 = 1Msps
 bool stop				= false;
 bool stop_change		= false;
 bool updating_screen	= false;
@@ -14,14 +14,17 @@ bool new_data			= false;
 void setup() {
 	Serial.begin(115200);
 
-	// delay(500);
+	delay(500);
+
 	setup_screen();
-	// delay(500);
 
 	InitUserButton();
-	// delay(500);
 
-	characterize_adc();
+	delay(500);
+
+	config_adc();
+
+	delay(500);
 
 	xTaskCreatePinnedToCore(
 		core0_task,
@@ -30,7 +33,8 @@ void setup() {
 		NULL,			/* Task input parameter */
 		0,				/* Priority of the task */
 		&task_menu,		/* Task handle. */
-		0);				/* Core where the task should run */
+		0
+	);				/* Core where the task should run */
 
 	xTaskCreatePinnedToCore(
 		core1_task,
@@ -39,7 +43,8 @@ void setup() {
 		NULL,			/* Task input parameter */
 		3,				/* Priority of the task */
 		&task_adc,		/* Task handle. */
-		1);				/* Core where the task should run */
+		1
+	);				/* Core where the task should run */
 }
 
 
@@ -55,7 +60,7 @@ void core0_task( void * pvParameters ) {
 			update_screen(AdcSample_Buffer, RATE);
 			updating_screen = false;
 		}
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 }
 
@@ -71,24 +76,20 @@ void core1_task( void * pvParameters ) {
 				if (stop_change)
 					stop_change = false;
 
-				RATE = ADC_Sampling(AdcSample_Buffer);
-				new_data = true;
+				new_data = ADC_Sampling(AdcSample_Buffer);
 			} else {
 				if (!stop_change)
 					stop_change = true;
 			}
-			vTaskDelay(pdMS_TO_TICKS(10));
+			vTaskDelay(pdMS_TO_TICKS(1));
 		} else {
 			float old_mean = 0;
 			while (single_trigger) {
 				stop = true;
-				RATE = ADC_Sampling(AdcSample_Buffer);
-				float mean = 0;
-				float max_v, min_v;
-				peak_mean(AdcSample_Buffer, BUFF_SIZE, &max_v, &min_v, &mean);
 
 				//signal captured (pp > 0.4V || changing mean > 0.2V) -> DATA ANALYSIS
-				if ((old_mean != 0 && fabs(mean - old_mean) > 0.2) || to_voltage(max_v) - to_voltage(min_v) > 0.05) {
+				if (ADC_Sampling(AdcSample_Buffer) && 
+						(old_mean != 0 && fabs(mean - old_mean) > 0.2) || to_voltage(max_v) - to_voltage(min_v) > 0.05) {
 					float freq = 0;
 					float period = 0;
 					uint32_t trigger0 = 0;
@@ -108,6 +109,7 @@ void core1_task( void * pvParameters ) {
 		}
 	}
 }
+
 
 void loop() {
 	BtnBack.tick();

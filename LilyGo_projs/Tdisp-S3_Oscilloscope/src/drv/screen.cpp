@@ -23,8 +23,6 @@ uint GND_Ypos;	// Y-position of the votage 0 on screen
 float v_div;
 float t_div;
 
-uint16_t AdcSample_Buffer[BUFF_SIZE];
-
 #define DRAW_SCREEN_TIMES_COUNT	60
 unsigned long DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT] = { 0 };
 float ScreenFPS = 0;
@@ -57,8 +55,8 @@ void setup_screen() {
 
 	// Init Global variables related to draw screen
 	GND_Ypos = ScreenHeight - ((ScreenHeight / 2) % grid_size);
-	v_div = voltage_division[0];
-	t_div = time_division[3];
+	v_div = voltage_division[volts_index];
+	t_div = time_division[tscale_index];
 }
 
 float to_scale(float reading) {
@@ -67,19 +65,10 @@ float to_scale(float reading) {
 					(v_div / grid_size);
 }
 
-float to_voltage(float reading) {
-	return reading / 1000.0;
-}
 
-
-
-void update_screen(uint16_t *AdcDataBuf, float sample_rate) {
-	float mean = 0;
-	float max_v, min_v;
-
+void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
 	unsigned long draw_start = micros();
 
-	peak_mean(AdcDataBuf, BUFF_SIZE, &max_v, &min_v, &mean);
 
 	float freq = 0;
 	float period = 0;
@@ -95,7 +84,7 @@ void update_screen(uint16_t *AdcDataBuf, float sample_rate) {
 	// draw screen performance
 	unsigned long draw_end = micros();
 	unsigned long draw_timespan = draw_end - draw_start;
-	Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
+	// Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
 	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
 			(DRAW_SCREEN_TIMES_COUNT - 1) * sizeof(typeof(DrawScreenTimes[0])));
 	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_end;
@@ -298,7 +287,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 }
 
 void draw_channel1(uint32_t trigger0, uint32_t trigger1,
-		uint16_t *AdcDataBuf, float sample_rate) {
+		uint32_t *AdcDataBuf, float sample_rate) {
 	uint curve_color = TFT_SKYBLUE;
 	//screen wave drawing
 	low_pass filter(0.99);
@@ -314,7 +303,7 @@ void draw_channel1(uint32_t trigger0, uint32_t trigger1,
 	float n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
 	for (uint32_t i = 1; i < ScreenWidth; i++) {
 		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
-		if (index < BUFF_SIZE) {
+		if (index < SampleNum) {
 			if (full_pix && t_div > 40 && current_filter == 0) {
 				uint32_t max_val = AdcDataBuf[old_index];
 				uint32_t min_val = AdcDataBuf[old_index];

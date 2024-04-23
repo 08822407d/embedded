@@ -1,7 +1,9 @@
 #include "headers.h"
 
 
-void peak_mean(uint16_t *adc_buffer, uint32_t len,
+#define PERIOD_TRIG_SCALE	0.2
+
+void peak_mean(uint32_t *adc_buffer, uint32_t len,
 		float *max_value, float *min_value, float *pt_mean) {
 	*max_value = adc_buffer[0];
 	*min_value = adc_buffer[0];
@@ -10,7 +12,6 @@ void peak_mean(uint16_t *adc_buffer, uint32_t len,
 
 	float mean = 0;
 	for (uint32_t i = 1; i < len; i++) {
-
 		float value = filter.filter((float)adc_buffer[i]);
 		if (value > *max_value)
 			*max_value = value;
@@ -19,19 +20,18 @@ void peak_mean(uint16_t *adc_buffer, uint32_t len,
 
 		mean += adc_buffer[i];
 	}
-	mean /= float(BUFF_SIZE);
-	mean = to_voltage(mean);
-	*pt_mean = mean;
+	mean /= float(len);
+	*pt_mean = to_voltage(mean);
 }
 
 
 //true if digital/ false if analog
-bool digital_analog(uint16_t *adc_buffer, uint32_t max_v, uint32_t min_v) {
+bool digital_analog(uint32_t *adc_buffer, uint32_t max_v, uint32_t min_v) {
 	uint32_t upper_threshold = max_v - 0.05 * (max_v - min_v);
 	uint32_t lower_threshold = min_v + 0.05 * (max_v - min_v);
 	uint32_t digital_data = 0;
 	uint32_t analog_data = 0;
-	for (uint32_t i = 0; i < BUFF_SIZE; i++) {
+	for (uint32_t i = 0; i < SampleNum; i++) {
 		if (adc_buffer[i] > lower_threshold) {
 			if (adc_buffer[i] > upper_threshold) {
 				//HIGH DIGITAL
@@ -56,7 +56,7 @@ bool digital_analog(uint16_t *adc_buffer, uint32_t max_v, uint32_t min_v) {
 }
 
 
-void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
+void trigger_freq_analog(uint32_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
 		uint32_t min_v, float *pt_freq, float *pt_period, uint32_t *pt_trigger0, uint32_t *pt_trigger1) {
 
 	float positive_phase = 0;
@@ -73,13 +73,15 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 	if (to_voltage(adc_buffer[0]) > mean)
 		signal_side = true;
 
-	//waveform repetitions calculation + get triggers time
+	// waveform repetitions calculation + get triggers time
 	uint32_t wave_center = (max_v + min_v) / 2;
-	for (uint32_t i = 1 ; i < BUFF_SIZE; i++) {
-		if (signal_side && adc_buffer[i] < wave_center - (wave_center - min_v) * 0.2) {
+	for (uint32_t i = 1 ; i < SampleNum; i++) {
+		if (signal_side && adc_buffer[i] <
+				wave_center - (wave_center - min_v) * PERIOD_TRIG_SCALE) {
 			signal_side = false;
 			negative_phase++;
-		} else if (!signal_side && adc_buffer[i] > wave_center + (max_v - wave_center) * 0.2) {
+		} else if (!signal_side && adc_buffer[i] >
+				wave_center + (max_v - wave_center) * PERIOD_TRIG_SCALE) {
 			positive_phase++;
 			if (trigger_count < trigger_num) {
 				trigger_temp[trigger_count] = i;
@@ -98,24 +100,24 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 	} else {
 		// period = total time / triggers
 		// in seconds
-		period = (BUFF_SIZE / sample_rate) /
+		period = (SampleNum / sample_rate) /
 					((positive_phase + negative_phase) / 2);
 		
 		freq = 1 / period;
 
-		// //from 2000 to 80 hz -> uses mean of the periods for precision
-		// if (positive_phase < 2000 && positive_phase > 80) {
-		// 	period = 0;
-		// 	for (uint32_t i = 1; i < trigger_count; i++) {
-		// 		period += trigger_temp[i] - trigger_temp[i - 1];
-		// 	}
-		// 	period /= (trigger_count - 1);
-		// 	positive_phase = sample_rate * 1000 / period;
-		// } else if (trigger_count > 1 && positive_phase <= 80) {
-		// //under 80hz, single period for frequency calculation
-		// 	period = trigger_temp[1] - trigger_temp[0];
-		// 	positive_phase = sample_rate * 1000 / period;
-		// }
+		//from 2000 to 80 hz -> uses mean of the periods for precision
+		if (positive_phase < 2000 && positive_phase > 80) {
+			period = 0;
+			for (uint32_t i = 1; i < trigger_count; i++) {
+				period += trigger_temp[i] - trigger_temp[i - 1];
+			}
+			period /= (trigger_count - 1);
+			positive_phase = sample_rate * 1000 / period;
+		} else if (trigger_count > 1 && positive_phase <= 80) {
+		//under 80hz, single period for frequency calculation
+			period = trigger_temp[1] - trigger_temp[0];
+			positive_phase = sample_rate * 1000 / period;
+		}
 	}
 
 	//setting triggers offset and getting second trigger for debug cursor on drawn_channel1
@@ -141,7 +143,7 @@ void trigger_freq_analog(uint16_t *adc_buffer, float sample_rate, float mean, ui
 }
 
 
-void trigger_freq_digital(uint16_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
+void trigger_freq_digital(uint32_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
 		uint32_t min_v, float *pt_freq, float *pt_period, uint32_t *pt_trigger0) {
 
 	float freq = 0;
@@ -161,7 +163,7 @@ void trigger_freq_digital(uint16_t *adc_buffer, float sample_rate, float mean, u
 	uint32_t wave_center = (max_v + min_v) / 2;
 	bool normal_high = (mean > to_voltage(wave_center)) ? true : false;
 	if (max_v - min_v > 4095 * (0.4 / 3.3)) {
-		for (uint32_t i = 1 ; i < BUFF_SIZE; i++) {
+		for (uint32_t i = 1 ; i < SAMPLE_BUFFLEN; i++) {
 			if (signal_side && adc_buffer[i] < wave_center - (wave_center - min_v) * 0.2) {
 				//signal was high, fell -> trigger if normal high
 				if (trigger_count < trigger_num && normal_high) {
@@ -213,7 +215,7 @@ void trigger_freq_digital(uint16_t *adc_buffer, float sample_rate, float mean, u
 }
 
 
-bool trigger_freq(uint16_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
+bool trigger_freq(uint32_t *adc_buffer, float sample_rate, float mean, uint32_t max_v,
 		uint32_t min_v, float *freq, float *period, uint32_t *trigger0, uint32_t *trigger1) {
 	//if analog mode OR auto mode and wave recognized as analog
 	bool digital_data = digital_analog(adc_buffer, max_v, min_v);

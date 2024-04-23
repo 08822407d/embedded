@@ -84,7 +84,7 @@ void InitUserButton() {
 	BtnEnter.attachLongPressStop(BtnEnter_PressStop);
 
 	attachInterrupt(digitalPinToInterrupt(BtnBack.pin()), BtnBack_CheckTicks, FALLING);
-	BtnBack.setClickMs(250);
+	BtnBack.setClickMs(100);
 	BtnBack.attachClick(BtnBack_SingleClick);
 	BtnBack.attachMultiClick(BtnBack_MultiClick);
 	BtnBack.setPressMs(BtnLongPressMs);

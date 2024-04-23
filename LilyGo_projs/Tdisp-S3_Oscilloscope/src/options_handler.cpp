@@ -2,8 +2,8 @@
 
 
 uint8_t opt				= None;
-int8_t volts_index		= 0;
-int8_t tscale_index		= 0;
+int8_t volts_index		= 1;
+int8_t tscale_index		= 5;
 uint8_t	current_filter	= 1;
 
 bool menu				= false;
@@ -13,8 +13,9 @@ bool menu_action		= false;
 
 uint8_t digital_wave_option	= 0; // 0-auto | 1-analog | 2-digital data (SERIAL/SPI/I2C/etc)
 
-int voltage_division[7] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
-	850, //fullscreen 3.3V peak-peak
+int voltage_division[8] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
+	1250,
+	ADC_VOLTREAD_CAP / 4, //fullscreen 3.3V peak-peak
 	550,
 	375,
 	250,

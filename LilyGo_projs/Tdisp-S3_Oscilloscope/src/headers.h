@@ -3,21 +3,15 @@
 #include "board_defs.h"
 #include "configs.h"
 
-#include "driver/buttons.h"
-#include "driver/screen.h"
+#include "drv/adc.h"
+#include "drv/buttons.h"
+#include "drv/screen.h"
 #include "algo/data_analysis.h"
 #include "algo/filters.h"
 
 
 /*ESP32S3*/
 #define PIN_POWER_ON	15
-
-#define BUFF_SIZE		1024U
-
-
-/* adc.cpp */
-extern void characterize_adc(void);
-extern unsigned long ADC_Sampling(uint16_t *AdcDataBuf);
 
 
 /* debug_routines.cpp */
@@ -30,6 +24,8 @@ enum WaveOpt {
 	Analog,
 	Digital,
 };
+extern int8_t volts_index;
+extern int8_t tscale_index;
 extern uint8_t current_filter;
 extern bool menu;
 extern bool info;
