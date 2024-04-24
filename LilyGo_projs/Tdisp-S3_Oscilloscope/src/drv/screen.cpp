@@ -60,31 +60,26 @@ void setup_screen() {
 }
 
 float to_scale(float reading) {
-	return GND_Ypos -
-				(reading + offset * 1000) /
-					(v_div / grid_size);
+	return GND_Ypos - (to_voltage(reading) + offset) * grid_size * 1000 / v_div;
 }
 
 
 void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
 	unsigned long draw_start = micros();
 
-
 	float freq = 0;
 	float period = 0;
 	uint32_t trigger0 = 0;
 	uint32_t trigger1 = 0;
 	bool digital_data =
-		trigger_freq(AdcDataBuf, sample_rate, mean, max_v,
-				min_v, &freq, &period, &trigger0, &trigger1);
+		trigger_freq(AdcDataBuf, sample_rate, &CurrentWave);
 
-	draw_sprite(freq, period, mean, max_v, min_v,
-			trigger0, sample_rate, digital_data, true);
+	draw_sprite(&CurrentWave, sample_rate, digital_data, true);
 	
 	// draw screen performance
 	unsigned long draw_end = micros();
 	unsigned long draw_timespan = draw_end - draw_start;
-	// Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
+	Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
 	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
 			(DRAW_SCREEN_TIMES_COUNT - 1) * sizeof(typeof(DrawScreenTimes[0])));
 	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_end;
@@ -93,11 +88,14 @@ void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
 						(draw_end - DrawScreenTimes[0]);
 }
 
-void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
-		uint32_t trigger, float sample_rate, bool digital_data, bool new_data ) {
+void draw_sprite(SignalInfo *Wave, float sample_rate, bool digital_data, bool new_data) {
 
-	max_v = to_voltage(max_v);
-	min_v = to_voltage(min_v);
+	float max_v = to_voltage(Wave->MaxVal);
+	float min_v = to_voltage(Wave->MinVal);
+	float mean = Wave->MeanVolt;
+	float freq = Wave->Freq;
+	float period = Wave->Period;
+	uint32_t trigger = Wave->TrigIdx_0;
 
 	String frequency = "";
 	if (freq < 1000)
@@ -150,7 +148,7 @@ void draw_sprite(float freq, float period, float mean, float max_v, float min_v,
 		if (auto_scale) {
 			auto_scale = false;
 			v_div = 1000.0 * max_v / 6.0;
-			t_div = period / 3.5;
+			t_div = period / 8;
 			if (t_div > 7000 || t_div <= 0)
 				t_div = 7000;
 			if (v_div <= 0)

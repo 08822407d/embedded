@@ -19,7 +19,7 @@ uint32_t AdcSample_Buffer[SAMPLE_BUFFLEN];
 uint32_t SampleNum = 0;
 float cal_to_volt_factor = ADC_VOLTREAD_CAP / (1000.0 * ADC_READ_MAX_VAL);
 
-float mean, max_v, min_v;
+SignalInfo CurrentWave;
 
 // esp_adc_cal_characteristics_t	adc1_chars;
 
@@ -92,7 +92,7 @@ bool ADC_Sampling(uint32_t *adc_buffer){
 		SampleNum = ret_num / ADC_RESULT_BYTE;
 		sample_valid = SampleNum > (3 * ScreenWidth);
 	} while (!sample_valid);
-	peak_mean(adc_buffer, SampleNum, &max_v, &min_v, &mean);
+	peak_mean(adc_buffer, SampleNum, &CurrentWave);
 
 	timespan = micros() - time_start;
 

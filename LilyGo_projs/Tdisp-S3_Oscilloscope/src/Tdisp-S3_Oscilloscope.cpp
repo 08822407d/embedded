@@ -14,17 +14,17 @@ bool new_data			= false;
 void setup() {
 	Serial.begin(115200);
 
-	delay(500);
+	// delay(500);
 
 	setup_screen();
 
 	InitUserButton();
 
-	delay(500);
+	// delay(500);
 
 	config_adc();
 
-	delay(500);
+	// delay(500);
 
 	xTaskCreatePinnedToCore(
 		core0_task,
@@ -48,7 +48,7 @@ void setup() {
 }
 
 
-void core0_task( void * pvParameters ) {
+void core0_task(void * pvParameters) {
 	(void) pvParameters;
 	for (;;) {
 		menu_handler();
@@ -64,7 +64,7 @@ void core0_task( void * pvParameters ) {
 	}
 }
 
-void core1_task( void * pvParameters ) {
+void core1_task(void * pvParameters) {
 	(void) pvParameters;
 
 	for (;;) {
@@ -89,14 +89,15 @@ void core1_task( void * pvParameters ) {
 
 				//signal captured (pp > 0.4V || changing mean > 0.2V) -> DATA ANALYSIS
 				if (ADC_Sampling(AdcSample_Buffer) && 
-						(old_mean != 0 && fabs(mean - old_mean) > 0.2) || to_voltage(max_v) - to_voltage(min_v) > 0.05) {
+						(old_mean != 0 && fabs(CurrentWave.MeanVolt - old_mean) > 0.2) ||
+						to_voltage(CurrentWave.MaxVal) - to_voltage(CurrentWave.MinVal) > 0.05) {
 					float freq = 0;
 					float period = 0;
 					uint32_t trigger0 = 0;
 					uint32_t trigger1 = 0;
 
 					//if analog mode OR auto mode and wave recognized as analog
-					trigger_freq(AdcSample_Buffer, RATE, mean, max_v, min_v, &freq, &period, &trigger0, &trigger1);
+					trigger_freq(AdcSample_Buffer, RATE, &CurrentWave);
 
 					single_trigger = false;
 					new_data = true;
