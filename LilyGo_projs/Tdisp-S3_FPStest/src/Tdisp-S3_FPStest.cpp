@@ -25,7 +25,7 @@ int16_t ScreenHeight;
 float ScreenFPS;
 unsigned long DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT] = { 0 };
 
-bool Run_In_Task = !true;
+bool Run_In_Task = true;
 TaskHandle_t Screen_flush;
 void core0_task(void * pvParameters);
 
@@ -59,18 +59,23 @@ void testMaxFPS()
 {
 	spr.fillSprite(colors[color_idx++]);
 	spr.drawString(String(ScreenFPS) + "FPS", 5, 5);
+
+	unsigned long draw_start = micros();
+
 	spr.pushSprite(0, 0);
 
+	unsigned long draw_end = micros();
+	unsigned long draw_timespan = draw_end - draw_start;
+	Serial.println("Push Sprite Time: " + String(draw_timespan / 1000.0) + "ms\n");
+
+
 	// draw screen performance
-	unsigned long draw_timestamp = micros();
 	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
 			(DRAW_SCREEN_TIMES_COUNT - 1) * sizeof(typeof(DrawScreenTimes[0])));
-
-	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_timestamp;
-
+	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_end;
 	if (DrawScreenTimes[0] >= 0)
 		ScreenFPS =  (1000000.0 * (DRAW_SCREEN_TIMES_COUNT - 1)) /
-						(draw_timestamp - DrawScreenTimes[0]);
+						(draw_end - DrawScreenTimes[0]);
 }
 
 
@@ -101,6 +106,6 @@ void core0_task(void * pvParameters) {
 	(void) pvParameters;
 	for (;;) {
 		testMaxFPS();
-		// vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 }

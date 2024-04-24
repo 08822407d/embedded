@@ -1,7 +1,7 @@
 #include "headers.h"
 
 
-
+#define SAMPLE_VALID_FACTOR	(((SAMPLE_BUFFLEN / SAMPLE_BUFFLEN_BASE) * 2 + 1))
 #define ONE_SAMPLE_TIMES	((SAMPLE_BUFFLEN * 4))
 #define ONE_SAMPLE_BUFFLEN	((ONE_SAMPLE_TIMES * ADC_RESULT_BYTE))
 #define ADC_RESULT_BYTE		4
@@ -14,27 +14,15 @@ static const char *TAG = "ADC DMA";
 static uint16_t adc1_chan_mask = BIT(0);
 static adc_channel_t channel[2] = { ADC_CHANNEL_0 };
 
-// unsigned long Sample_Wait_Ms = (1000 * ONE_SAMPLE_BUFFLEN) / ADC_SAMPLE_RATE;
-uint32_t AdcSample_Buffer[SAMPLE_BUFFLEN];
-uint32_t SampleNum = 0;
 float cal_to_volt_factor = ADC_VOLTREAD_CAP / (1000.0 * ADC_READ_MAX_VAL);
 
 SignalInfo CurrentWave;
 
-// esp_adc_cal_characteristics_t	adc1_chars;
 
 void config_adc() {
 	esp_wifi_stop();
 
 	esp_err_t ret;
-
-	// ret = esp_adc_cal_characterize(
-	// 	ADC_UNIT_1,
-	// 	ADC_ATTEN_DB_11,
-	// 	ADC_WIDTH_BIT_12,
-	// 	1100,
-	// 	&adc1_chars
-	// );
 
 	adc_digi_init_config_t adc_dma_config = {
 		.max_store_buf_size = ONE_SAMPLE_BUFFLEN,
@@ -61,9 +49,9 @@ void config_adc() {
 		adc_pattern[i].unit = unit;
 		adc_pattern[i].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
 
-		ESP_LOGI(TAG, "adc_pattern[%d].atten is :%x", i, adc_pattern[i].atten);
-		ESP_LOGI(TAG, "adc_pattern[%d].channel is :%x", i, adc_pattern[i].channel);
-		ESP_LOGI(TAG, "adc_pattern[%d].unit is :%x", i, adc_pattern[i].unit);
+		// ESP_LOGI(TAG, "adc_pattern[%d].atten is :%x", i, adc_pattern[i].atten);
+		// ESP_LOGI(TAG, "adc_pattern[%d].channel is :%x", i, adc_pattern[i].channel);
+		// ESP_LOGI(TAG, "adc_pattern[%d].unit is :%x", i, adc_pattern[i].unit);
 	}
 	dig_cfg.adc_pattern = adc_pattern;
 	ESP_ERROR_CHECK(ret = adc_digi_controller_configure(&dig_cfg));
@@ -71,32 +59,39 @@ void config_adc() {
 
 
 
-float to_voltage(float reading) {
+float to_voltage(uint32_t reading) {
 	return reading * cal_to_volt_factor;
 }
 
 // return sample rate in Hz
-bool ADC_Sampling(uint32_t *adc_buffer){
-	esp_err_t ret;
+bool ADC_Sampling(SignalInfo *Wave){
 	bool sample_valid;
-	unsigned long timespan;
 
 	unsigned long time_start = micros();
 
 	do {
+		esp_err_t ret;
 		uint32_t ret_num = 0;
+
 		adc_digi_start();
-		ret = adc_digi_read_bytes((uint8_t *)adc_buffer, ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
+		ret = adc_digi_read_bytes((uint8_t *)(Wave->SampleBuff),
+					ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
 		adc_digi_stop();
 
-		SampleNum = ret_num / ADC_RESULT_BYTE;
-		sample_valid = SampleNum > (3 * ScreenWidth);
+		Wave->SampleNum = ret_num / ADC_RESULT_BYTE;
+		sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * ScreenWidth);
 	} while (!sample_valid);
-	peak_mean(adc_buffer, SampleNum, &CurrentWave);
 
-	timespan = micros() - time_start;
+	unsigned long sample_timespan = micros() - time_start;
 
-	Serial.printf("Sample time: %.4f ms; per 1024-samples: %.4f ms\n", (timespan / 1000.0), (timespan / 1000.0) * 1024 / SampleNum);
+	peak_mean(Wave);
+	trigger_freq(Wave);
+	genDrawBuffer(Wave);
+
+	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
+
+	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+	// 		(sample_timespan / 1000.0), analyze_timespan);
 
 	return sample_valid;
 }

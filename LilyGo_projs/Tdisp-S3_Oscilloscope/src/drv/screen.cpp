@@ -13,15 +13,16 @@ uint grid_size		= 40;
 float offset		= 0;
 float toffset		= 0;
 bool auto_scale		= false;
-bool full_pix		= true;
 bool single_trigger	= false;
 bool data_trigger	= false;
 
 int16_t ScreenWidth;
 int16_t ScreenHeight;
-uint GND_Ypos;	// Y-position of the votage 0 on screen
+uint GND_Ypos;				// Y-position of the votage 0 on screen
 float v_div;
 float t_div;
+uint16_t *CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
+
 
 #define DRAW_SCREEN_TIMES_COUNT	60
 unsigned long DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT] = { 0 };
@@ -30,7 +31,8 @@ float ScreenFPS = 0;
 
 
 void setup_screen() {
-	// (POWER ON)IO15 must be set to HIGH before starting, otherwise the screen will not display when using battery
+	// (POWER ON)IO15 must be set to HIGH before starting,
+	// otherwise the screen will not display when using battery
 	pinMode(PIN_POWER_ON, OUTPUT);
 	digitalWrite(PIN_POWER_ON, HIGH);
 
@@ -57,6 +59,7 @@ void setup_screen() {
 	GND_Ypos = ScreenHeight - ((ScreenHeight / 2) % grid_size);
 	v_div = voltage_division[volts_index];
 	t_div = time_division[tscale_index];
+	CurveDrawBuff = new uint16_t[ScreenWidth];
 }
 
 float to_scale(float reading) {
@@ -64,22 +67,19 @@ float to_scale(float reading) {
 }
 
 
-void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
+void update_screen(SignalInfo *Wave) {
+	draw_sprite(Wave, true);
+	
 	unsigned long draw_start = micros();
 
-	float freq = 0;
-	float period = 0;
-	uint32_t trigger0 = 0;
-	uint32_t trigger1 = 0;
-	bool digital_data =
-		trigger_freq(AdcDataBuf, sample_rate, &CurrentWave);
+	//push the drawed sprite to the screen
+	spr.pushSprite(0, 0);
 
-	draw_sprite(&CurrentWave, sample_rate, digital_data, true);
-	
 	// draw screen performance
 	unsigned long draw_end = micros();
 	unsigned long draw_timespan = draw_end - draw_start;
-	Serial.println("Draw Screen Time: " + String(draw_timespan / 1000.0) + "ms\n");
+	Serial.println("Push Sprite Time: " + String(draw_timespan / 1000.0) + "ms\n");
+
 	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
 			(DRAW_SCREEN_TIMES_COUNT - 1) * sizeof(typeof(DrawScreenTimes[0])));
 	DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT - 1] = draw_end;
@@ -88,7 +88,7 @@ void update_screen(uint32_t *AdcDataBuf, float sample_rate) {
 						(draw_end - DrawScreenTimes[0]);
 }
 
-void draw_sprite(SignalInfo *Wave, float sample_rate, bool digital_data, bool new_data) {
+void draw_sprite(SignalInfo *Wave, bool new_data) {
 
 	float max_v = to_voltage(Wave->MaxVal);
 	float min_v = to_voltage(Wave->MinVal);
@@ -129,7 +129,7 @@ void draw_sprite(SignalInfo *Wave, float sample_rate, bool digital_data, bool ne
 
 	String wave_option = "";
 	if (digital_wave_option == 0)
-		if (digital_data )
+		if (Wave->IsDigital)
 			wave_option = "AUTO:Dig./data";
 		else
 			wave_option = "AUTO:Analog";
@@ -157,7 +157,7 @@ void draw_sprite(SignalInfo *Wave, float sample_rate, bool digital_data, bool ne
 
 		//only draw digital data if a trigger was in the data
 		if (!(digital_wave_option == 2 && trigger == 0))
-			draw_channel1(trigger, 0, AdcSample_Buffer, sample_rate);
+			draw_channel1(Wave);
 	}
 
 	int Xshift = 250;
@@ -215,10 +215,6 @@ void draw_sprite(SignalInfo *Wave, float sample_rate, bool digital_data, bool ne
 		spr.drawString(String(ScreenFPS) + "FPS", 5, 5);
 		spr.drawString(String(min_v) + " - " + String(max_v), Xshift, ScreenHeight - 15);
 	}
-
-	//push the drawed sprite to the screen
-	spr.pushSprite(0, 0);
-	yield(); // Stop watchdog reset
 }
 
 void draw_grid(int startX, int startY, uint width, uint heigh) {
@@ -284,50 +280,53 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 	// spr.drawLine(centerX, 0, centerX, heigh, axis_color); // Y-axis
 }
 
-void draw_channel1(uint32_t trigger0, uint32_t trigger1,
-		uint32_t *AdcDataBuf, float sample_rate) {
+
+void genDrawBuffer(SignalInfo *Wave) 
+{
+	memset(CurveDrawBuff, 0, sizeof(CurveDrawBuff[0]) * ScreenWidth);
+
 	uint curve_color = TFT_SKYBLUE;
+	uint32_t trigger0 = Wave->TrigIdx_0;
+	uint32_t *AdcDataBuf = Wave->SampleBuff;
 	//screen wave drawing
 	low_pass filter(0.99);
 	mean_filter mfilter(5);
 	mfilter.init(AdcDataBuf[trigger0]);
 	filter._value = AdcDataBuf[trigger0];
-	float data_per_pixel = (t_div / grid_size) / (sample_rate / 1000);
+	float data_per_pixel = (t_div / grid_size) / (Wave->SampleRate / 1000);
 
 
 	uint32_t index_offset = (uint32_t)(toffset / data_per_pixel);
 	trigger0 += index_offset;  
 	uint32_t old_index = trigger0;
 	float n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
+	CurveDrawBuff[0] = o_data;
 	for (uint32_t i = 1; i < ScreenWidth; i++) {
 		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
-		if (index < SampleNum) {
-			if (full_pix && t_div > 40 && current_filter == 0) {
-				uint32_t max_val = AdcDataBuf[old_index];
-				uint32_t min_val = AdcDataBuf[old_index];
-				for (int j = old_index; j < index; j++) {
-					//draw lines for all this data points on pixel i
-					if (AdcDataBuf[j] > max_val)
-						max_val = AdcDataBuf[j];
-					else if (AdcDataBuf[j] < min_val)
-						min_val = AdcDataBuf[j];
+		if (index < Wave->SampleNum) {
+			if (current_filter == 2)
+				n_data = to_scale(mfilter.filter((float)AdcDataBuf[index]));
+			else if (current_filter == 3)
+				n_data = to_scale(filter.filter((float)AdcDataBuf[index]));
+			else
+				n_data = to_scale(AdcDataBuf[index]);
 
-				}
-				spr.drawLine(i, to_scale(min_val), i, to_scale(max_val), curve_color);
-			} else {
-				if (current_filter == 2)
-					n_data = to_scale(mfilter.filter((float)AdcDataBuf[index]));
-				else if (current_filter == 3)
-					n_data = to_scale(filter.filter((float)AdcDataBuf[index]));
-				else
-					n_data = to_scale(AdcDataBuf[index]);
-
-				spr.drawLine(i - 1, o_data, i, n_data, curve_color);
-				o_data = n_data;
-			}
+			CurveDrawBuff[i] = (uint16_t)n_data;
 		} else {
 			break;
 		}
 		old_index = index;
+	}
+}
+
+void draw_channel1(SignalInfo *Wave) {
+	uint curve_color = TFT_SKYBLUE;
+	uint16_t
+		currY,
+		prevY = CurveDrawBuff[0];
+	for (uint32_t i = 1; i < ScreenWidth; i++) {
+		currY = CurveDrawBuff[i];
+		spr.drawLine(i - 1, prevY, i, currY, curve_color);
+		prevY = currY;
 	}
 }

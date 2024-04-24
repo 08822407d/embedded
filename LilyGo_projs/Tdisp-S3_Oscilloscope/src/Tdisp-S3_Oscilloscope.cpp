@@ -4,7 +4,6 @@
 TaskHandle_t	task_menu;
 TaskHandle_t	task_adc;
 
-float RATE				= ADC_SAMPLE_RATE; //in ksps --> 1000 = 1Msps
 bool stop				= false;
 bool stop_change		= false;
 bool updating_screen	= false;
@@ -29,7 +28,7 @@ void setup() {
 	xTaskCreatePinnedToCore(
 		core0_task,
 		"menu_handle",
-		10000,			/* Stack size in words */
+		16384,			/* Stack size in words */
 		NULL,			/* Task input parameter */
 		0,				/* Priority of the task */
 		&task_menu,		/* Task handle. */
@@ -39,7 +38,7 @@ void setup() {
 	xTaskCreatePinnedToCore(
 		core1_task,
 		"adc_handle",
-		10000,			/* Stack size in words */
+		16384,			/* Stack size in words */
 		NULL,			/* Task input parameter */
 		3,				/* Priority of the task */
 		&task_adc,		/* Task handle. */
@@ -57,7 +56,7 @@ void core0_task(void * pvParameters) {
 			menu_action = false;
 
 			updating_screen = true;
-			update_screen(AdcSample_Buffer, RATE);
+			update_screen(&CurrentWave);
 			updating_screen = false;
 		}
 		vTaskDelay(pdMS_TO_TICKS(1));
@@ -76,19 +75,19 @@ void core1_task(void * pvParameters) {
 				if (stop_change)
 					stop_change = false;
 
-				new_data = ADC_Sampling(AdcSample_Buffer);
+				new_data = ADC_Sampling(&CurrentWave);
 			} else {
 				if (!stop_change)
 					stop_change = true;
 			}
-			vTaskDelay(pdMS_TO_TICKS(1));
+			vTaskDelay(pdMS_TO_TICKS(10));
 		} else {
 			float old_mean = 0;
 			while (single_trigger) {
 				stop = true;
 
 				//signal captured (pp > 0.4V || changing mean > 0.2V) -> DATA ANALYSIS
-				if (ADC_Sampling(AdcSample_Buffer) && 
+				if (ADC_Sampling(&CurrentWave) && 
 						(old_mean != 0 && fabs(CurrentWave.MeanVolt - old_mean) > 0.2) ||
 						to_voltage(CurrentWave.MaxVal) - to_voltage(CurrentWave.MinVal) > 0.05) {
 					float freq = 0;
@@ -97,7 +96,7 @@ void core1_task(void * pvParameters) {
 					uint32_t trigger1 = 0;
 
 					//if analog mode OR auto mode and wave recognized as analog
-					trigger_freq(AdcSample_Buffer, RATE, &CurrentWave);
+					trigger_freq(&CurrentWave);
 
 					single_trigger = false;
 					new_data = true;
