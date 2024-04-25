@@ -7,23 +7,18 @@ TaskHandle_t	task_adc;
 bool stop				= false;
 bool stop_change		= false;
 bool updating_screen	= false;
-bool new_data			= false;
+bool new_data			= true;
 
 
 void setup() {
 	Serial.begin(115200);
 
-	// delay(500);
-
 	setup_screen();
 
 	InitUserButton();
 
-	// delay(500);
-
 	config_adc();
 
-	// delay(500);
 
 	xTaskCreatePinnedToCore(
 		core0_task,

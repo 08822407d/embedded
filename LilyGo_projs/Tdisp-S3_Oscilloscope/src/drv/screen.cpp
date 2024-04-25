@@ -1,5 +1,6 @@
 #include "../headers.h"
 
+
 #define AA_FONT_SMALL "NotoSansBold15"
 #define AA_FONT_LARGE "NotoSansBold36"
 #define AA_FONT_MONO  "NotoSansMonoSCB20" // NotoSansMono-SemiCondensedBold 20pt
@@ -28,31 +29,58 @@ uint16_t *CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
 unsigned long DrawScreenTimes[DRAW_SCREEN_TIMES_COUNT] = { 0 };
 float ScreenFPS = 0;
 
+void screen_init()
+{
+	#ifdef AMOLED
+		/*
+		 * Compatible with touch version
+		 * Touch version, IO38 is the screen power enable
+		 * Non-touch version, IO38 is an onboard LED light
+		 * * */
+		// pinMode(PIN_LED, OUTPUT);
+		// digitalWrite(PIN_LED, HIGH);
+		rm67162_init();
+		lcd_setRotation(SCREEN_ROTAION);
+		ScreenWidth = lcd_width();
+		ScreenHeight = lcd_height();
+	#else
+		// (POWER ON)IO15 must be set to HIGH before starting, otherwise the screen will not display when using battery
+		pinMode(PIN_POWER_ON, OUTPUT);
+		digitalWrite(PIN_POWER_ON, HIGH);
+		// Initialise the TFT registers
+		tft.begin();
+		tft.setAttribute(PSRAM_ENABLE, false);
+		tft.setRotation(SCREEN_ROTAION);
+		ScreenWidth = tft.width();
+		ScreenHeight = tft.height();
+	#endif
+
+	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
+	// spr.setColorDepth(8);
+	spr.createSprite(ScreenWidth, ScreenHeight);
+	spr.setSwapBytes(1);
+}
+
+void pushScreenBuffer() {
+	#ifdef AMOLED
+		lcd_PushColors(0, 0, ScreenWidth, ScreenHeight, (uint16_t *)spr.getPointer());
+	#else
+		spr.pushSprite(0, 0);
+	#endif
+}
 
 
 void setup_screen() {
-	// (POWER ON)IO15 must be set to HIGH before starting,
-	// otherwise the screen will not display when using battery
-	pinMode(PIN_POWER_ON, OUTPUT);
-	digitalWrite(PIN_POWER_ON, HIGH);
+	screen_init();
 
-	// Initialise the TFT registers
-	tft.begin();
-	tft.setRotation(SCREEN_ROTAION);
-	tft.setTextSize(2);
-	ScreenWidth = tft.width();
-	ScreenHeight = tft.height();
-
-	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
-	spr.setColorDepth(16);
-	spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
+	// // Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
+	// spr.setColorDepth(16);
+	// spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
 	// Create a sprite of defined size
-	spr.createSprite(ScreenWidth, ScreenHeight);
 	spr.setTextColor(TFT_GREEN, BACK_GROUND_COLOR);
-	// spr.setTextSize(2);
-	// spr.setSwapBytes(true);
-	// Clear the TFT screen to blue
-	tft.fillScreen(BACK_GROUND_COLOR);
+	spr.setTextSize(2);
+	spr.fillSprite(TFT_DARKGREY);
+	pushScreenBuffer();
 
 
 	// Init Global variables related to draw screen
@@ -73,7 +101,8 @@ void update_screen(SignalInfo *Wave) {
 	unsigned long draw_start = micros();
 
 	//push the drawed sprite to the screen
-	spr.pushSprite(0, 0);
+	pushScreenBuffer();
+	// delay(100);
 
 	// draw screen performance
 	unsigned long draw_end = micros();

@@ -1,6 +1,11 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 
+#ifdef AMOLED
+#  include "rm67162.h"
+#endif
+
+
 #include "algo/data_analysis.h"
 
 

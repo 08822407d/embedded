@@ -1,18 +1,10 @@
 #include "headers.h"
 
 
-#define SAMPLE_VALID_FACTOR	(((SAMPLE_BUFFLEN / SAMPLE_BUFFLEN_BASE) * 2 + 1))
-#define ONE_SAMPLE_TIMES	((SAMPLE_BUFFLEN * 4))
-#define ONE_SAMPLE_BUFFLEN	((ONE_SAMPLE_TIMES * ADC_RESULT_BYTE))
-#define ADC_RESULT_BYTE		4
-#define ADC_CONV_LIMIT_EN	0
-#define GET_UNIT(x)			((x>>3) & 0x1)
-
 static const char *TAG = "ADC DMA";
 
-
 static uint16_t adc1_chan_mask = BIT(0);
-static adc_channel_t channel[2] = { ADC_CHANNEL_0 };
+static adc_channel_t channel[1] = { ADC_CHANNEL_0 };
 
 float cal_to_volt_factor = ADC_VOLTREAD_CAP / (1000.0 * ADC_READ_MAX_VAL);
 
@@ -65,12 +57,12 @@ float to_voltage(uint32_t reading) {
 
 // return sample rate in Hz
 bool ADC_Sampling(SignalInfo *Wave){
+	esp_err_t ret;
 	bool sample_valid;
 
 	unsigned long time_start = micros();
 
 	do {
-		esp_err_t ret;
 		uint32_t ret_num = 0;
 
 		adc_digi_start();
@@ -80,7 +72,7 @@ bool ADC_Sampling(SignalInfo *Wave){
 
 		Wave->SampleNum = ret_num / ADC_RESULT_BYTE;
 		sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * ScreenWidth);
-	} while (!sample_valid);
+	} while (ret != ESP_OK  || !sample_valid);
 
 	unsigned long sample_timespan = micros() - time_start;
 
@@ -90,8 +82,8 @@ bool ADC_Sampling(SignalInfo *Wave){
 
 	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 
-	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
-	// 		(sample_timespan / 1000.0), analyze_timespan);
+	Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+			(sample_timespan / 1000.0), analyze_timespan);
 
 	return sample_valid;
 }

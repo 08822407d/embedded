@@ -1,6 +1,7 @@
 #include "../headers.h"
 
 #include <esp_sleep.h>
+#include "pins_config.h"
 
 #if SCREEN_ROTATION == 1
 	OneButton BtnEnter(PIN_BUTTON_2, true);

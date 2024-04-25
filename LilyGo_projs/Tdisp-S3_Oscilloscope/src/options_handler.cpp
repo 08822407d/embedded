@@ -15,7 +15,7 @@ uint8_t digital_wave_option	= 0; // 0-auto | 1-analog | 2-digital data (SERIAL/S
 
 int voltage_division[8] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
 	1250,
-	ADC_VOLTREAD_CAP / 4, //fullscreen 3.3V peak-peak
+	ADC_VOLTREAD_CAP / 6, //fullscreen 3.3V peak-peak
 	550,
 	375,
 	250,
