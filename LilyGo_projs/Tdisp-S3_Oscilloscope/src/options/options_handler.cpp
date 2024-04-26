@@ -56,7 +56,7 @@ void menu_handler() {
 						BtnStat.btnmn--;
 					}
 
-					Canvas.v_div = voltage_division[GlobOpts.volts_index];
+					CurveArea.v_div = voltage_division[GlobOpts.volts_index];
 					break;
 
 				case Sdiv:
@@ -74,31 +74,31 @@ void menu_handler() {
 						BtnStat.btnpl--;
 					}
 
-					Canvas.t_div = time_division[GlobOpts.tscale_index];
+					CurveArea.t_div = time_division[GlobOpts.tscale_index];
 					break;
 
 				case Offset:
 					if (BtnStat.btnmn > 0) {
-						Canvas.offset += 0.1 * (Canvas.v_div * 4) / 3300;
+						CurveArea.offset += 0.1 * (CurveArea.v_div * 4) / 3300;
 						BtnStat.btnmn--;
 					} else if (BtnStat.btnpl > 0) {
-						Canvas.offset -= 0.1 * (Canvas.v_div * 4) / 3300;
+						CurveArea.offset -= 0.1 * (CurveArea.v_div * 4) / 3300;
 						BtnStat.btnpl = 0;
 					}
 
-					if (Canvas.offset > 3.3)
-						Canvas.offset = 3.3;
-					if (Canvas.offset < -3.3)
-						Canvas.offset = -3.3;
+					if (CurveArea.offset > 3.3)
+						CurveArea.offset = 3.3;
+					if (CurveArea.offset < -3.3)
+						CurveArea.offset = -3.3;
 
 					break;
 
 				case TOffset:
 					if (BtnStat.btnpl > 0) {
-						Canvas.toffset += 0.1 * Canvas.t_div;
+						CurveArea.toffset += 0.1 * CurveArea.t_div;
 						BtnStat.btnpl--;
 					} else if (BtnStat.btnmn > 0) {
-						Canvas.toffset -= 0.1 * Canvas.t_div;
+						CurveArea.toffset -= 0.1 * CurveArea.t_div;
 						BtnStat.btnmn--;
 					}
 
@@ -159,9 +159,9 @@ void menu_handler() {
 						break;
 
 					case Reset:
-						Canvas.offset = 0;
-						Canvas.v_div = 550;
-						Canvas.t_div = 10;
+						CurveArea.offset = 0;
+						CurveArea.v_div = 550;
+						CurveArea.t_div = 10;
 						GlobOpts.tscale_index = 0;
 						GlobOpts.volts_index = 0;
 						break;
@@ -206,7 +206,7 @@ void menu_handler() {
 				GlobOpts.volts_index = 0;
 
 			BtnStat.btnpl--;
-			Canvas.v_div = voltage_division[GlobOpts.volts_index];
+			CurveArea.v_div = voltage_division[GlobOpts.volts_index];
 		}
 		if (BtnStat.btnmn > 0) {
 			GlobOpts.tscale_index++;
@@ -214,7 +214,7 @@ void menu_handler() {
 				GlobOpts.tscale_index = 0;
 
 			BtnStat.btnmn--;
-			Canvas.t_div = time_division[GlobOpts.tscale_index];
+			CurveArea.t_div = time_division[GlobOpts.tscale_index];
 		}
 	}
 }

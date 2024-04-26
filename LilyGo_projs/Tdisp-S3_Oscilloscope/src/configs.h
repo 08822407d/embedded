@@ -8,3 +8,6 @@
 
 #define ADC_READ_MAX_VAL		4095
 #define ADC_VOLTREAD_CAP		3100
+
+
+#define GRID_SIZE               40
