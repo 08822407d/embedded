@@ -199,8 +199,8 @@ void trigger_freq_digital(SignalInfo *Wave) {
 void trigger_freq(SignalInfo *Wave) {
 	//if analog mode OR auto mode and wave recognized as analog
 	digital_analog(Wave);
-	if (digital_wave_option == 1 ||
-			(digital_wave_option == 0 && !Wave->IsDigital))
+	if (GlobOpts.digi_wave_opt == 1 ||
+			(GlobOpts.digi_wave_opt == 0 && !Wave->IsDigital))
 		trigger_freq_analog(Wave);
 	else
 		trigger_freq_digital(Wave);

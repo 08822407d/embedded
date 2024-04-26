@@ -7,7 +7,9 @@
 #include <driver/dac.h>
 #include <driver/i2s.h>
 
-#define SINFAKT 127.0
+#define SINFAKT			127.0
+#define ADC_MAX_VOLT	3.1
+#define VOLT_TO_DAC(v)	((uint8_t)(256 * v / 3.3))
 
 uint32_t buf[128];
 

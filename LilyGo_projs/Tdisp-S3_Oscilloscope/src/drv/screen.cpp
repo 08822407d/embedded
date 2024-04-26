@@ -10,18 +10,12 @@
 TFT_eSPI tft		= TFT_eSPI();         // Declare object "tft"
 TFT_eSprite spr		= TFT_eSprite(&tft);  // Declare Sprite object "spr" with pointer to "tft" object
 
-uint grid_size		= 40;
-float offset		= 0;
-float toffset		= 0;
-bool auto_scale		= false;
-bool single_trigger	= false;
-bool data_trigger	= false;
+DisplayParameters Canvas;
 
-int16_t ScreenWidth;
-int16_t ScreenHeight;
+bool single_trigger	= false;
+
+
 uint GND_Ypos;				// Y-position of the votage 0 on screen
-float v_div;
-float t_div;
 uint16_t *CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
 
 
@@ -41,8 +35,8 @@ void screen_init()
 		// digitalWrite(PIN_LED, HIGH);
 		rm67162_init();
 		lcd_setRotation(SCREEN_ROTAION);
-		ScreenWidth = lcd_width();
-		ScreenHeight = lcd_height();
+		Canvas.ScreenWidth = lcd_width();
+		Canvas.ScreenHeight = lcd_height();
 	#else
 		// (POWER ON)IO15 must be set to HIGH before starting, otherwise the screen will not display when using battery
 		pinMode(PIN_POWER_ON, OUTPUT);
@@ -57,13 +51,13 @@ void screen_init()
 
 	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
 	// spr.setColorDepth(8);
-	spr.createSprite(ScreenWidth, ScreenHeight);
+	spr.createSprite(Canvas.ScreenWidth, Canvas.ScreenHeight);
 	spr.setSwapBytes(1);
 }
 
 void pushScreenBuffer() {
 	#ifdef AMOLED
-		lcd_PushColors(0, 0, ScreenWidth, ScreenHeight, (uint16_t *)spr.getPointer());
+		lcd_PushColors(0, 0, Canvas.ScreenWidth, Canvas.ScreenHeight, (uint16_t *)spr.getPointer());
 	#else
 		spr.pushSprite(0, 0);
 	#endif
@@ -84,14 +78,15 @@ void setup_screen() {
 
 
 	// Init Global variables related to draw screen
-	GND_Ypos = ScreenHeight - ((ScreenHeight / 2) % grid_size);
-	v_div = voltage_division[volts_index];
-	t_div = time_division[tscale_index];
-	CurveDrawBuff = new uint16_t[ScreenWidth];
+	Canvas.grid_size = 40;
+	GND_Ypos = Canvas.ScreenHeight - ((Canvas.ScreenHeight / 2) % Canvas.grid_size);
+	Canvas.v_div = voltage_division[GlobOpts.volts_index];
+	Canvas.t_div = time_division[GlobOpts.tscale_index];
+	CurveDrawBuff = new uint16_t[Canvas.ScreenWidth];
 }
 
 float to_scale(float reading) {
-	return GND_Ypos - (to_voltage(reading) + offset) * grid_size * 1000 / v_div;
+	return GND_Ypos - (to_voltage(reading) + Canvas.offset) * Canvas.grid_size * 1000 / Canvas.v_div;
 }
 
 
@@ -102,7 +97,6 @@ void update_screen(SignalInfo *Wave) {
 
 	//push the drawed sprite to the screen
 	pushScreenBuffer();
-	// delay(100);
 
 	// draw screen performance
 	unsigned long draw_end = micros();
@@ -141,13 +135,13 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		s_mean = "Avg: " + String(mean * 1000.0) + "mV";
 
 	String str_filter = "";
-	if (current_filter == 0)
+	if (GlobOpts.current_filter == 0)
 		str_filter = "None";
-	else if (current_filter == 1)
+	else if (GlobOpts.current_filter == 1)
 		str_filter = "Pixel";
-	else if (current_filter == 2)
+	else if (GlobOpts.current_filter == 2)
 		str_filter = "Mean-5";
-	else if (current_filter == 3)
+	else if (GlobOpts.current_filter == 3)
 		str_filter = "Lpass9";
 
 	String str_stop = "";
@@ -157,12 +151,12 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		str_stop = "STOPPED";
 
 	String wave_option = "";
-	if (digital_wave_option == 0)
+	if (GlobOpts.digi_wave_opt == 0)
 		if (Wave->IsDigital)
 			wave_option = "AUTO:Dig./data";
 		else
 			wave_option = "AUTO:Analog";
-	else if (digital_wave_option == 1)
+	else if (GlobOpts.digi_wave_opt == 1)
 		wave_option = "MODE:Analog";
 	else
 		wave_option = "MODE:Dig./data";
@@ -172,35 +166,35 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
 		spr.fillSprite(BACK_GROUND_COLOR);
 
-		draw_grid(0, 0, ScreenWidth, ScreenHeight);
+		draw_grid(0, 0, Canvas.ScreenWidth, Canvas.ScreenHeight);
 
-		if (auto_scale) {
-			auto_scale = false;
-			v_div = 1000.0 * max_v / 6.0;
-			t_div = period / 8;
-			if (t_div > 7000 || t_div <= 0)
-				t_div = 7000;
-			if (v_div <= 0)
-				v_div = 550;
+		if (GlobOpts.auto_scale) {
+			GlobOpts.auto_scale = false;
+			Canvas.v_div = 1000.0 * max_v / 6.0;
+			Canvas.t_div = period / 8;
+			if (Canvas.t_div > 7000 || Canvas.t_div <= 0)
+				Canvas.t_div = 7000;
+			if (Canvas.v_div <= 0)
+				Canvas.v_div = 550;
 		}
 
 		//only draw digital data if a trigger was in the data
-		if (!(digital_wave_option == 2 && trigger == 0))
+		if (!(GlobOpts.digi_wave_opt == 2 && trigger == 0))
 			draw_channel1(Wave);
 	}
 
 	int Xshift = 250;
 	int Yshift = 10;
-	if (menu) {
+	if (GlobOpts.menu) {
 		spr.fillRect(Xshift, 0, 102, 135, BACK_GROUND_COLOR);
 		spr.drawRect(Xshift, 0, 102, 135, TFT_WHITE);
 		spr.fillRect(Xshift + 1, 3 + 10 * (opt - 1), 100, 11, TFT_RED);
 
 		spr.drawString("AUTOSCALE",  Xshift + 5, 5);
-		spr.drawString(String(int(v_div)) + "mV/div",  Xshift + 5, 15);
-		spr.drawString(String(int(t_div)) + "uS/div",  Xshift + 5, 25);
-		spr.drawString("Offset: " + String(offset) + "V",  Xshift + 5, 35);
-		spr.drawString("T-Off: " + String((uint32_t)toffset) + "uS",  Xshift + 5, 45);
+		spr.drawString(String(int(Canvas.v_div)) + "mV/div",  Xshift + 5, 15);
+		spr.drawString(String(int(Canvas.t_div)) + "uS/div",  Xshift + 5, 25);
+		spr.drawString("Offset: " + String(Canvas.offset) + "V",  Xshift + 5, 35);
+		spr.drawString("T-Off: " + String((uint32_t)Canvas.toffset) + "uS",  Xshift + 5, 45);
 		spr.drawString("Filter: " + str_filter, Xshift + 5, 55);
 		spr.drawString(str_stop, Xshift + 5, 65);
 		spr.drawString(wave_option, Xshift + 5, 75);
@@ -217,10 +211,10 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		spr.drawRect(Xshift, 0, 70, 30, TFT_WHITE);
 		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift + 5, 5);
 		spr.drawString(frequency,  Xshift + 5, 15);
-		String offset_line = String((2.0 * v_div) / 1000.0 - offset) + "V";
+		String offset_line = String((2.0 * Canvas.v_div) / 1000.0 - Canvas.offset) + "V";
 		spr.drawString(offset_line,  Xshift + 30, 59);
 
-		if (set_value) {
+		if (GlobOpts.set_value) {
 			spr.fillRect(229, 0, 11, 11, TFT_BLUE);
 			spr.drawRect(229, 0, 11, 11, TFT_WHITE);
 			spr.drawLine(231, 5, 238 , 5, TFT_WHITE);
@@ -231,36 +225,36 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 			spr.drawRect(229, 124, 11, 11, TFT_WHITE);
 			spr.drawLine(231, 129, 238, 129, TFT_WHITE);
 		}
-	} else if (info) {
+	} else if (GlobOpts.info) {
 		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift, Yshift);
 		spr.drawString(frequency, Xshift, Yshift + 10);
 
-		spr.drawString(String(int(v_div)) + "mV/div", Xshift, Yshift + 25);
-		spr.drawString(String(int(t_div)) + "uS/div", Xshift, Yshift + 35);
+		spr.drawString(String(int(Canvas.v_div)) + "mV/div", Xshift, Yshift + 25);
+		spr.drawString(String(int(Canvas.t_div)) + "uS/div", Xshift, Yshift + 35);
 
-		String offset_line = String((2.0 * v_div) / 1000.0 - offset) + "V";
-		spr.drawString(offset_line, Xshift + 40, ScreenHeight / 2 + 5);
+		String offset_line = String((2.0 * Canvas.v_div) / 1000.0 - Canvas.offset) + "V";
+		spr.drawString(offset_line, Xshift + 40, Canvas.ScreenHeight / 2 + 5);
 
-		spr.drawString(String(ScreenFPS) + "FPS", 5, 5);
-		spr.drawString(String(min_v) + " - " + String(max_v), Xshift, ScreenHeight - 15);
+		spr.drawString(String(ScreenFPS) + "FPS", 20, 5);
+		spr.drawString(String(min_v) + " - " + String(max_v), Xshift, Canvas.ScreenHeight - 15);
 	}
 }
 
 void draw_grid(int startX, int startY, uint width, uint heigh) {
 	int x_off = width / 2;
 	int y_off = heigh / 2;
-	uint point_off = grid_size / 10;
+	uint point_off = Canvas.grid_size / 10;
 	uint cross_size = 2;
 	uint dash_color = TFT_WHITE;
 	uint axis_color = TFT_YELLOW;
 	uint cross_color = TFT_YELLOW;
 	// make sure the dash-lines exactly overlap at each cross point
-	assert((grid_size % point_off) == 0);
+	assert((Canvas.grid_size % point_off) == 0);
 	int centerX = x_off + startX;
 	int centerY = y_off + startY;
 
 	// draw horizontal dash-lines symmetrically from center to 4 Diagonals
-	for (int row = 0; row <= heigh / 2; row += grid_size)
+	for (int row = 0; row <= heigh / 2; row += Canvas.grid_size)
 		for (int pix_idx = 0; pix_idx <= width / 2; pix_idx += point_off) {
 			int x_left = centerX - pix_idx;
 			int x_right = centerX + pix_idx;
@@ -270,7 +264,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_left, y_top, dash_color);
-			if ((pix_idx % grid_size) == 0) {
+			if ((pix_idx % Canvas.grid_size) == 0) {
 				spr.drawLine(x_left - cross_size, y_top,
 						x_left + cross_size, y_top, cross_color);
 				spr.drawLine(x_left - cross_size, y_bottom,
@@ -282,7 +276,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			}
 		}
 	// draw vertical dash-lines symmetrically from center to 4 Diagonals
-	for (int col = 0; col <= width / 2; col += grid_size)
+	for (int col = 0; col <= width / 2; col += Canvas.grid_size)
 		for (int pix_idx = 0; pix_idx <= heigh / 2; pix_idx += point_off) {
 			int x_left = centerX - col;
 			int x_right = centerX + col;
@@ -292,7 +286,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 			spr.drawPixel(x_left, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_bottom, dash_color);
 			spr.drawPixel(x_right, y_top, dash_color);
-			if ((pix_idx % grid_size) == 0) {
+			if ((pix_idx % Canvas.grid_size) == 0) {
 				spr.drawLine(x_left, y_top - cross_size,
 						x_left, y_top + cross_size, cross_color);
 				spr.drawLine(x_left, y_bottom - cross_size,
@@ -312,7 +306,7 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 
 void genDrawBuffer(SignalInfo *Wave) 
 {
-	memset(CurveDrawBuff, 0, sizeof(CurveDrawBuff[0]) * ScreenWidth);
+	memset(CurveDrawBuff, 0, sizeof(CurveDrawBuff[0]) * Canvas.ScreenWidth);
 
 	uint curve_color = TFT_SKYBLUE;
 	uint32_t trigger0 = Wave->TrigIdx_0;
@@ -322,20 +316,20 @@ void genDrawBuffer(SignalInfo *Wave)
 	mean_filter mfilter(5);
 	mfilter.init(AdcDataBuf[trigger0]);
 	filter._value = AdcDataBuf[trigger0];
-	float data_per_pixel = (t_div / grid_size) / (Wave->SampleRate / 1000);
+	float data_per_pixel = (Canvas.t_div / Canvas.grid_size) / (Wave->SampleRate / 1000);
 
 
-	uint32_t index_offset = (uint32_t)(toffset / data_per_pixel);
+	uint32_t index_offset = (uint32_t)(Canvas.toffset / data_per_pixel);
 	trigger0 += index_offset;  
 	uint32_t old_index = trigger0;
 	float n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
 	CurveDrawBuff[0] = o_data;
-	for (uint32_t i = 1; i < ScreenWidth; i++) {
+	for (uint32_t i = 1; i < Canvas.ScreenWidth; i++) {
 		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
 		if (index < Wave->SampleNum) {
-			if (current_filter == 2)
+			if (GlobOpts.current_filter == 2)
 				n_data = to_scale(mfilter.filter((float)AdcDataBuf[index]));
-			else if (current_filter == 3)
+			else if (GlobOpts.current_filter == 3)
 				n_data = to_scale(filter.filter((float)AdcDataBuf[index]));
 			else
 				n_data = to_scale(AdcDataBuf[index]);
@@ -353,7 +347,7 @@ void draw_channel1(SignalInfo *Wave) {
 	uint16_t
 		currY,
 		prevY = CurveDrawBuff[0];
-	for (uint32_t i = 1; i < ScreenWidth; i++) {
+	for (uint32_t i = 1; i < Canvas.ScreenWidth; i++) {
 		currY = CurveDrawBuff[i];
 		spr.drawLine(i - 1, prevY, i, currY, curve_color);
 		prevY = currY;

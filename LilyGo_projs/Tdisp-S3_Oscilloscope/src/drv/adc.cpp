@@ -55,37 +55,76 @@ float to_voltage(uint32_t reading) {
 	return reading * cal_to_volt_factor;
 }
 
-// return sample rate in Hz
-bool ADC_Sampling(SignalInfo *Wave){
-	esp_err_t ret;
-	bool sample_valid;
+#ifdef AMOLED
+	bool ADC_Sampling(SignalInfo *Wave){
+		esp_err_t ret;
+		bool sample_valid;
 
-	unsigned long time_start = micros();
+		unsigned long time_start = micros();
 
-	do {
-		uint32_t ret_num = 0;
+		volatile uint retry_times = 0;
+		do {
+			uint32_t total_read = 0;
+			retry_times++;
 
-		adc_digi_start();
-		ret = adc_digi_read_bytes((uint8_t *)(Wave->SampleBuff),
-					ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
-		adc_digi_stop();
+			adc_digi_start();
+			for (uint32_t ret_num = 0; (BUFFLEN_BYTES - total_read) >= ONE_SAMPLE_BUFFLEN; total_read+=ret_num)
+				ret = adc_digi_read_bytes(&((uint8_t *)(Wave->SampleBuff))[total_read],
+							ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
+			adc_digi_stop();
 
-		Wave->SampleNum = ret_num / ADC_RESULT_BYTE;
-		sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * ScreenWidth);
-	} while (ret != ESP_OK  || !sample_valid);
+			Wave->SampleNum = total_read / ADC_RESULT_BYTE;
+			sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * Canvas.ScreenWidth);
+		} while (!sample_valid);
 
-	unsigned long sample_timespan = micros() - time_start;
+		unsigned long sample_timespan = micros() - time_start;
 
-	peak_mean(Wave);
-	trigger_freq(Wave);
-	genDrawBuffer(Wave);
+		peak_mean(Wave);
+		trigger_freq(Wave);
+		genDrawBuffer(Wave);
 
-	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
+		unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 
-	Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
-			(sample_timespan / 1000.0), analyze_timespan);
+		Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+				(sample_timespan / 1000.0), analyze_timespan);
 
-	return sample_valid;
-}
+		return sample_valid;
+	}
+#else
+	bool ADC_Sampling(SignalInfo *Wave){
+		esp_err_t ret;
+		bool sample_valid;
+
+		unsigned long time_start = micros();
+
+		volatile uint retry_times = 0;
+		do {
+			uint32_t ret_num = 0;
+			retry_times++;
+
+			adc_digi_start();
+			ret = adc_digi_read_bytes((uint8_t *)(Wave->SampleBuff),
+						ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
+			adc_digi_stop();
+
+			Wave->SampleNum = ret_num / ADC_RESULT_BYTE;
+			sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * ScreenWidth);
+		} while (!sample_valid);
+		// } while (ret != ESP_OK  || !sample_valid);
+
+		unsigned long sample_timespan = micros() - time_start;
+
+		peak_mean(Wave);
+		trigger_freq(Wave);
+		genDrawBuffer(Wave);
+
+		unsigned long analyze_timespan = micros() - time_start - sample_timespan;
+
+		Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+				(sample_timespan / 1000.0), analyze_timespan);
+
+		return sample_valid;
+	}
+#endif
 
 

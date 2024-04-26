@@ -17,17 +17,14 @@ Timer<1> BtnBack_AckLongPressTimer;
 unsigned long BtnEnter_PressStartTime = 0;
 unsigned long BtnBack_PressStartTime = 0;
 
-bool	btnok = false,
-		btnbk = false;
-uint	btnpl = 0,
-		btnmn = 0;
+ButtonState BtnStat;
 
 
 /// @brief Button on Pin-14 Functions
 /// @param args 
 /// @return 
 bool BtnEnter_AckLongPress(void *args) {
-	btnok = true;
+	BtnStat.btnok = true;
 #ifdef Enable_longPress_Continuous
 	BtnEnter.reset();
 #endif
@@ -37,7 +34,7 @@ void IRAM_ATTR BtnEnter_CheckTicks() {
 	BtnEnter.tick(); // just call tick() to check the state.
 }
 void BtnEnter_SingleClick() {
-	btnpl++;
+	BtnStat.btnpl++;
 }
 void BtnEnter_PressStart() {
 	// btnok = true;
@@ -51,7 +48,7 @@ void BtnEnter_PressStop() {
 /// @param args 
 /// @return 
 bool BtnBack_AckLongPress(void *args) {
-	btnbk = true;
+	BtnStat.btnbk = true;
 #ifdef Enable_longPress_Continuous
 	BtnBack.reset();
 #endif
@@ -61,7 +58,7 @@ void IRAM_ATTR BtnBack_CheckTicks() {
 	BtnBack.tick(); // just call tick() to check the state.
 }
 void BtnBack_SingleClick() {
-	btnmn++;
+	BtnStat.btnmn++;
 }
 void BtnBack_MultiClick() {
 	int n = BtnBack.getNumberClicks();

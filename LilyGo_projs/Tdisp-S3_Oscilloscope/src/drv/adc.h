@@ -6,8 +6,16 @@
 	#include <esp_wifi.h>
 
 
-	#define SAMPLE_VALID_FACTOR	(((SAMPLE_BUFFLEN / SAMPLE_BUFFLEN_BASE) * 2 + 1))
-	#define ONE_SAMPLE_TIMES	((SAMPLE_BUFFLEN * 4))
+	#define SAMPLE_VALID_FACTOR	3
+
+	#define BUFFLEN_BYTES		((SAMPLE_BUFFLEN * ADC_RESULT_BYTE))
+	
+	#ifdef AMOLED
+	#  define ONE_SAMPLE_TIMES	((SAMPLE_BUFFLEN / 16))
+	#else
+	#  define ONE_SAMPLE_TIMES	((SAMPLE_BUFFLEN * 4))
+	#endif
+
 	#define ONE_SAMPLE_BUFFLEN	((ONE_SAMPLE_TIMES * ADC_RESULT_BYTE))
 	#define ADC_RESULT_BYTE		4
 	#define ADC_CONV_LIMIT_EN	0
@@ -27,7 +35,7 @@
 		bool		IsDigital;
 		uint32_t	SampleRate = ADC_SAMPLE_RATE;
 		uint32_t	SampleNum;
-		uint32_t	SampleBuff[ONE_SAMPLE_TIMES];
+		uint32_t	SampleBuff[SAMPLE_BUFFLEN];
 	};
 
 

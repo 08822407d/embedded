@@ -1,13 +1,14 @@
 #include "headers.h"
 
 
+
 TaskHandle_t	task_menu;
 TaskHandle_t	task_adc;
 
 bool stop				= false;
 bool stop_change		= false;
 bool updating_screen	= false;
-bool new_data			= true;
+bool new_data			= false;
 
 
 void setup() {
@@ -46,9 +47,9 @@ void core0_task(void * pvParameters) {
 	(void) pvParameters;
 	for (;;) {
 		menu_handler();
-		if (new_data || menu_action) {
+		if (new_data || GlobOpts.menu_action) {
 			new_data = false;
-			menu_action = false;
+			GlobOpts.menu_action = false;
 
 			updating_screen = true;
 			update_screen(&CurrentWave);

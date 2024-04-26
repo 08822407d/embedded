@@ -8,23 +8,25 @@
 
 #include "algo/data_analysis.h"
 
+class DisplayParameters {
+public:
+	int16_t		ScreenWidth		= TFT_WIDTH;
+	int16_t		ScreenHeight	= TFT_HEIGHT;
+	uint		grid_size;
+	uint32_t	v_div;
+	uint32_t	t_div;
+	float		offset;
+	float		toffset;
+};
 
 
-//#define DEBUG_SERIAL
-//#define DEBUG_BUFF
-#define ADC_CHANNEL		ADC1_CHANNEL_5  // GPIO33
 
 /* screen.cpp */
 extern TFT_eSPI tft;
 extern TFT_eSprite spr;
-extern int16_t ScreenWidth;
-extern int16_t ScreenHeight;
+extern DisplayParameters Canvas;
 
-extern float v_div;
-extern float t_div;
-extern float offset;
-extern float toffset;
-extern bool auto_scale;
+
 extern bool single_trigger;
 extern bool data_trigger;
 extern void setup_screen(void);
