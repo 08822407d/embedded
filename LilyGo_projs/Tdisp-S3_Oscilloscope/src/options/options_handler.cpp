@@ -6,25 +6,25 @@ WaveDiplayOptions GlobOpts;
 uint8_t opt				= None;
 
 
-int voltage_division[8] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
+int voltage_division[] = { //screen has 4 divisions, 40 pixels each (170 pixels of height)
 	1250,
-	ADC_VOLTREAD_CAP / 6, //fullscreen 3.3V peak-peak
+	ADC_VOLTREAD_CAP / 4, //fullscreen 3.3V peak-peak
 	550,
 	375,
 	250,
 	180,
 	100,
-	50
+	// 50
 };
 
 /*each sample represents 1us (1Msps),
 	 thus, the time division is the number
 	 of samples per screen division
 */
-float time_division[9] = { //screen has 8 divisions, 40 pixel each (280 pixel of width)
-	10,
-	25,
-	50,
+float time_division[] = { //screen has 8 divisions, 40 pixel each (280 pixel of width)
+	// 10,
+	// 25,
+	// 50,
 	100,
 	250,
 	500,

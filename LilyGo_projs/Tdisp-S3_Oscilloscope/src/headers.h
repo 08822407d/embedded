@@ -4,7 +4,7 @@
 
 #include "drv/adc.h"
 #include "drv/buttons.h"
-#include "drv/screen.h"
+#include "gui/screen.h"
 #include "algo/data_analysis.h"
 #include "algo/filters.h"
 #include "options/options.h"

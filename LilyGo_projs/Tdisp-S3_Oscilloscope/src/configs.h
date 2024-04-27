@@ -10,4 +10,8 @@
 #define ADC_VOLTREAD_CAP		3100
 
 
-#define GRID_SIZE               40
+#define GRID_SIZE               60
+
+
+#define BG_DARK_GRAY	        0x2104
+#define BACK_GROUND_COLOR		BG_DARK_GRAY
