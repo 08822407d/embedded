@@ -13,6 +13,8 @@ TFT_eSPI tft			= TFT_eSPI();
 TFT_eSprite spr			= TFT_eSprite(&tft);
 DrawParams Canvas		= DrawParams(SCREEN_ROTAION);
 CanvasArea CurveArea	= CanvasArea(&spr);
+CanvasArea InfoArea		= CanvasArea(&spr);
+
 
 bool single_trigger	= false;
 
@@ -53,7 +55,10 @@ void screen_init()
 	spr.createSprite(Canvas.ScreenWidth, Canvas.ScreenHeight);
 	spr.setSwapBytes(1);
 
+
 	CurveArea.setArea(6, 0, 6 * GRID_SIZE, Canvas.ScreenHeight);
+	InfoArea.setArea(Point2D(CurveArea.getEndOnCanvas().X, 0),
+			Point2D(Canvas.ScreenWidth, Canvas.ScreenHeight));
 	voltage_division[1] = ADC_VOLTREAD_CAP / (CurveArea.Height / GRID_SIZE);
 }
 
@@ -61,8 +66,8 @@ void setup_screen() {
 	screen_init();
 
 	// // Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
-	// spr.setColorDepth(16);
-	// spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
+	spr.setColorDepth(16);
+	spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
 	// Create a sprite of defined size
 	spr.setTextColor(TFT_GREEN, BG_DARK_GRAY);
 	spr.setTextSize(2);
@@ -211,17 +216,13 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 			spr.drawLine(231, 129, 238, 129, TFT_WHITE);
 		}
 	} else if (GlobOpts.info) {
-		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift, Yshift);
-		spr.drawString(frequency, Xshift, Yshift + 10);
+		InfoArea.drawString("P-P: " + String(max_v - min_v) + "V", 5, Yshift);
+		InfoArea.drawString(frequency, 5, Yshift + 20);
 
-		spr.drawString(String(int(CurveArea.v_div)) + "mV/div", Xshift, Yshift + 25);
-		spr.drawString(String(int(CurveArea.t_div)) + "uS/div", Xshift, Yshift + 35);
+		InfoArea.drawString(String(int(CurveArea.v_div)) + "mV/div", 5, Yshift + 45);
+		InfoArea.drawString(String(int(CurveArea.t_div)) + "uS/div", 5, Yshift + 65);
 
-		String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
-		spr.drawString(offset_line, Xshift + 40, Canvas.ScreenHeight / 2 + 5);
-
-		spr.drawString(String(ScreenFPS) + "FPS", 20, 5);
-		spr.drawString(String(min_v) + " - " + String(max_v), Xshift, Canvas.ScreenHeight - 15);
+		InfoArea.drawString(String(min_v) + " - " + String(max_v), 5, Canvas.ScreenHeight - 15);
 	}
 }
 
@@ -293,6 +294,9 @@ void drawGridOnArea(CanvasArea *area) {
 	// draw two Axis
 	area->drawLine(0, centerY, area->Width, centerY, axis_color); // X-axis
 	// area.drawLine(centerX, 0, centerX, area.Height, axis_color); // Y-axis
+
+	String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
+	area->drawString(offset_line, 290, centerY - 20);
 }
 
 
@@ -345,4 +349,5 @@ void CanvasArea::drawCurve(SignalInfo *Wave) {
 			drawLine(i - 1, prevY, i, currY, curve_color);
 		prevY = currY;
 	}
+	drawString(String(ScreenFPS, 1) + "FPS", 10, 5);
 }
