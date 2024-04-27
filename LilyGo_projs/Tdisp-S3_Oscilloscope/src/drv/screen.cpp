@@ -18,8 +18,6 @@ CanvasArea CurveArea	= CanvasArea(&spr);
 bool single_trigger	= false;
 
 
-uint16_t *CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
-
 
 #define DRAW_TIME_NUM	60
 unsigned long DrawScreenTimes[DRAW_TIME_NUM] = { 0 };
@@ -73,17 +71,10 @@ void setup_screen() {
 
 
 	// Init Global variables related to draw screen
-	CurveArea.GND_Ypos = Canvas.ScreenHeight -
-			((Canvas.ScreenHeight / 2) % CurveArea.grid_size);
 	CurveArea.v_div = voltage_division[GlobOpts.volts_index];
 	CurveArea.t_div = time_division[GlobOpts.tscale_index];
-	CurveDrawBuff = new uint16_t[Canvas.ScreenWidth];
 }
 
-float to_scale(float reading) {
-	return CurveArea.GND_Ypos - (to_voltage(reading) + CurveArea.offset)
-			 * CurveArea.grid_size * 1000 / CurveArea.v_div;
-}
 
 
 void update_screen(SignalInfo *Wave) {
@@ -162,7 +153,8 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
 		spr.fillSprite(BACK_GROUND_COLOR);
 
-		draw_grid(0, 0, Canvas.ScreenWidth, Canvas.ScreenHeight);
+		// draw_grid(0, 0, Canvas.ScreenWidth, Canvas.ScreenHeight);
+		drawGridOnArea(&CurveArea);
 
 		if (GlobOpts.auto_scale) {
 			GlobOpts.auto_scale = false;
@@ -176,7 +168,7 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 
 		//only draw digital data if a trigger was in the data
 		if (!(GlobOpts.digi_wave_opt == 2 && trigger == 0))
-			draw_channel1(Wave);
+			CurveArea.drawCurve(Wave);
 	}
 
 	int Xshift = 250;
@@ -300,10 +292,74 @@ void draw_grid(int startX, int startY, uint width, uint heigh) {
 }
 
 
-void genDrawBuffer(SignalInfo *Wave) 
-{
-	memset(CurveDrawBuff, 0, sizeof(CurveDrawBuff[0]) * Canvas.ScreenWidth);
+void drawGridOnArea(CanvasArea *area) {
+	int x_off = area->Width / 2;
+	int y_off = area->Height / 2;
+	uint point_off = CurveArea.grid_size / 10;
+	uint cross_size = 2;
+	uint dash_color = TFT_WHITE;
+	uint axis_color = TFT_YELLOW;
+	uint cross_color = TFT_YELLOW;
+	// make sure the dash-lines exactly overlap at each cross point
+	assert((CurveArea.grid_size % point_off) == 0);
+	int centerX = x_off;
+	int centerY = y_off;
 
+	// draw horizontal dash-lines symmetrically from center to 4 Diagonals
+	for (int row = 0; row <= area->Height / 2; row += CurveArea.grid_size)
+		for (int pix_idx = 0; pix_idx <= area->Width / 2; pix_idx += point_off) {
+			int x_left = centerX - pix_idx;
+			int x_right = centerX + pix_idx;
+			int y_top = centerY - row;
+			int y_bottom = centerY + row;
+			area->drawPixel(x_right, y_top, dash_color);
+			area->drawPixel(x_right, y_bottom, dash_color);
+			area->drawPixel(x_left, y_bottom, dash_color);
+			area->drawPixel(x_left, y_top, dash_color);
+			// if ((pix_idx % CurveArea.grid_size) == 0) {
+			// 	area->drawLine(x_left - cross_size, y_top,
+			// 			x_left + cross_size, y_top, cross_color);
+			// 	area->drawLine(x_left - cross_size, y_bottom,
+			// 			x_left + cross_size, y_bottom, cross_color);
+			// 	area->drawLine(x_right - cross_size, y_bottom,
+			// 			x_right + cross_size, y_bottom, cross_color);
+			// 	area->drawLine(x_right - cross_size, y_top,
+			// 			x_right + cross_size, y_top, cross_color);
+			// }
+		}
+	// draw vertical dash-lines symmetrically from center to 4 Diagonals
+	for (int col = 0; col <= area->Width / 2; col += CurveArea.grid_size)
+		for (int pix_idx = 0; pix_idx <= area->Height / 2; pix_idx += point_off) {
+			int x_left = centerX - col;
+			int x_right = centerX + col;
+			int y_top = centerY - pix_idx;
+			int y_bottom = centerY + pix_idx;
+			area->drawPixel(x_left, y_top, dash_color);
+			area->drawPixel(x_left, y_bottom, dash_color);
+			area->drawPixel(x_right, y_bottom, dash_color);
+			area->drawPixel(x_right, y_top, dash_color);
+			// if ((pix_idx % CurveArea.grid_size) == 0) {
+			// 	area->drawLine(x_left, y_top - cross_size,
+			// 			x_left, y_top + cross_size, cross_color);
+			// 	area->drawLine(x_left, y_bottom - cross_size,
+			// 			x_left, y_bottom + cross_size, cross_color);
+			// 	area->drawLine(x_right, y_bottom - cross_size,
+			// 			x_right, y_bottom + cross_size, cross_color);
+			// 	area->drawLine(x_right, y_top - cross_size,
+			// 			x_right, y_top + cross_size, cross_color);
+			// }
+		}
+	
+	// draw two Axis
+	area->drawLine(0, centerY, area->Width, centerY, axis_color); // X-axis
+	// area.drawLine(centerX, 0, centerX, area.Height, axis_color); // Y-axis
+}
+
+
+
+
+void CanvasArea::genDrawBuffer(SignalInfo *Wave) 
+{
 	uint curve_color = TFT_SKYBLUE;
 	uint32_t trigger0 = Wave->TrigIdx_0;
 	uint32_t *AdcDataBuf = Wave->SampleBuff;
@@ -312,7 +368,7 @@ void genDrawBuffer(SignalInfo *Wave)
 	mean_filter mfilter(5);
 	mfilter.init(AdcDataBuf[trigger0]);
 	filter._value = AdcDataBuf[trigger0];
-	float data_per_pixel = (CurveArea.t_div / CurveArea.grid_size) / (Wave->SampleRate / 1000);
+	float data_per_pixel = ((float)CurveArea.t_div / CurveArea.grid_size) / (Wave->SampleRate / 1000.0);
 
 
 	uint32_t index_offset = (uint32_t)(CurveArea.toffset / data_per_pixel);
@@ -320,7 +376,7 @@ void genDrawBuffer(SignalInfo *Wave)
 	uint32_t old_index = trigger0;
 	float n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
 	CurveDrawBuff[0] = o_data;
-	for (uint32_t i = 1; i < Canvas.ScreenWidth; i++) {
+	for (uint32_t i = 1; i < CurveArea.Width; i++) {
 		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
 		if (index < Wave->SampleNum) {
 			if (GlobOpts.current_filter == 2)
@@ -338,14 +394,14 @@ void genDrawBuffer(SignalInfo *Wave)
 	}
 }
 
-void draw_channel1(SignalInfo *Wave) {
+void CanvasArea::drawCurve(SignalInfo *Wave) {
 	uint curve_color = TFT_SKYBLUE;
 	uint16_t
 		currY,
 		prevY = CurveDrawBuff[0];
-	for (uint32_t i = 1; i < Canvas.ScreenWidth; i++) {
+	for (uint32_t i = 1; i < Width; i++) {
 		currY = CurveDrawBuff[i];
-		spr.drawLine(i - 1, prevY, i, currY, curve_color);
+		drawLine(i - 1, prevY, i, currY, curve_color);
 		prevY = currY;
 	}
 }

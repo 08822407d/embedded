@@ -31,12 +31,9 @@ public:
 class CanvasArea {
 public:
 	bool			Dirty			= false;
-	uint16_t		X_onScreen;
-	uint16_t		Y_onScreen;
 	uint16_t		Width;
 	uint16_t		Height;
 	uint			grid_size		= GRID_SIZE;
-	uint			GND_Ypos;		// Y-position of the votage 0 on screen
 	uint32_t		v_div;
 	uint32_t		t_div;
 	float			offset;
@@ -51,7 +48,12 @@ public:
 		Y_onScreen = y;
 		Width = w;
 		Height = h;
+		GND_Ypos = Height - ((Height / 2) % grid_size);
+		CurveDrawBuff = new uint16_t[Width];
 	}
+	
+	void drawCurve(SignalInfo *Wave);
+	void genDrawBuffer(SignalInfo *Wave);
 
 	inline void flushDrawArea(void) {
 		pushScreenBuffer(X_onScreen, Y_onScreen, Width, Height);
@@ -80,8 +82,18 @@ public:
 		_spr->drawRect(X_onScreen + x, Y_onScreen + y, w, h, color);
 	}
 
+
 private:
 	TFT_eSprite		*_spr;
+	uint16_t		X_onScreen;
+	uint16_t		Y_onScreen;
+	uint			GND_Ypos;		// Y-position of the votage 0 on screen
+	uint16_t		*CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
+
+	float to_scale(float reading) {
+		return GND_Ypos - (to_voltage(reading) + offset)
+				* grid_size * 1000 / v_div;
+	}
 };
 
 
@@ -96,12 +108,10 @@ extern CanvasArea CurveArea;
 extern bool single_trigger;
 extern bool data_trigger;
 extern void setup_screen(void);
-extern float to_scale(float reading);
 extern void update_screen(SignalInfo *Wave);
 extern void draw_sprite(SignalInfo *Wave, bool new_data);
 extern void draw_grid(int startX, int startY, uint width, uint heigh);
-extern void genDrawBuffer(SignalInfo *Wave);
-extern void draw_channel1(SignalInfo *Wave);
+extern void drawGridOnArea(CanvasArea *area);
 
 extern void maxFPStest(void);
 

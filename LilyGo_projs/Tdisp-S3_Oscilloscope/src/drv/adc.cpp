@@ -81,7 +81,7 @@ float to_voltage(uint32_t reading) {
 
 		peak_mean(Wave);
 		trigger_freq(Wave);
-		genDrawBuffer(Wave);
+		CurveArea.genDrawBuffer(Wave);
 
 		unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 
