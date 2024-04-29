@@ -216,6 +216,7 @@ void EPD_Reset()
 /* e-Paper initialization functions ------------------------------------------*/ 
 #include "epd2in13.h"
 #include "esp32-waveshare-epd/utility/EPD_2in13_V3.h"
+#include "esp32-waveshare-epd/utility/EPD_2in13_V4.h"
 
 bool EPD_invert;           // If true, then image data bits must be inverted
 int  EPD_dispIndex;        // The index of the e-Paper's type

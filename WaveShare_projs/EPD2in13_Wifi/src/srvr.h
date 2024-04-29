@@ -17,22 +17,22 @@
 /* Includes ------------------------------------------------------------------*/
 //#include <ESP8266WiFi.h>// ESP8266 and WiFi classes
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 #include "buff.h" // POST request data accumulator
 #include "epd.h"  // e-Paper driver
 
-#include "scripts.h" // JavaScript code
-#include "css.h"     // Cascading Style Sheets
-#include "html.h"    // HTML page of the tool
+#include "drv/button.h"
+#include "webpage/webpage.h"
 
 
 	/* SSID and password of your WiFi net ----------------------------------------*/
 	const char *ssid = "WaveShare_WifiEPD"; //"your ssid";
-	const char *password = "0123456789";   //"your password";
+	const char *password = "77777777";   //"your password";
 
 	/* Static IP address Settings ------------------------------------------------*/
-	IPAddress staticIP(192, 168, 1, 159);
-	IPAddress gateway(192, 168, 1, 1);
+	IPAddress staticIP(10, 61, 5, 1);
+	IPAddress gateway(10, 61, 5, 1);
 	IPAddress subnet(255, 255, 255, 0);
 	IPAddress dns(223, 5, 5, 5);
 
@@ -47,11 +47,6 @@
 
 
 
-	extern bool hasSingleClick;
-	extern bool hasDoubleClick;
-	extern bool hasTripleClick;
-
-
 	void Srvr__setup()
 	{
 		Serial.println();
@@ -59,7 +54,7 @@
 		// Serial.print("Connecting to ");
 		// Serial.println(ssid);
 
-		if (WiFi.config(staticIP, gateway, subnet, dns, dns) == false) {
+		if (WiFi.softAPConfig(staticIP, gateway, subnet) == false) {
 			Serial.println("Configuration failed.");
 		}
 
@@ -84,7 +79,7 @@
 
 		// Show obtained IP address in local Wifi net
 		// Serial.println(myIP = WiFi.localIP());
-		IPAddress myIP = WiFi.softAPIP();
+		myIP = WiFi.softAPIP();
 		Serial.printf("SoftAP: %s\n", myIP.toString());
 	}
 
@@ -107,7 +102,7 @@
 			sendCSS(client);
 			break;
 		case 1:
-			sendJS_A(client);
+			sendJS_A(client, staticIP);
 			break;
 		case 2:
 			sendJS_B(client);
@@ -132,11 +127,17 @@
 	/* The server state observation loop -------------------------------------------*/
 	bool Srvr__loop()
 	{
-		if (hasTripleClick)
+		if (LongPressed)
 		{
-			hasTripleClick = false;
-			EPD_2in13_V3_Init();
-			EPD_2in13_V3_Clear();
+			LongPressed = false;
+			EPD_2in13_V4_Init();
+			EPD_2in13_V4_Clear();
+			return true;
+		}
+		else if (SingleClick)
+		{
+			SingleClick = false;
+			EPD2in13_V3.show();
 			return true;
 		}
 
@@ -288,7 +289,7 @@
 
 		// Send the 'index' page if it's needed
 		if (isIndexPage)
-			sendHtml(client, myIP);
+			sendHtml(client);
 		else
 			client.print("Ok!");
 
