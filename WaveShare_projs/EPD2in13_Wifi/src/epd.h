@@ -23,6 +23,8 @@
   *           
   ******************************************************************************
   */
+ #include <SPIFFS.h>
+
 /* SPI pin definition --------------------------------------------------------*/
 //#include "epd7in5_HD.h"
 
@@ -223,20 +225,11 @@ int  EPD_dispIndex;        // The index of the e-Paper's type
 int  EPD_dispX, EPD_dispY; // Current pixel's coordinates (for 2.13 only)
 void(*EPD_dispLoad)();     // Pointer on a image data writting function
 
-/* Image data loading function for 2.13 e-Paper ------------------------------*/
-void EPD_loadC()
+void _EPD_loadC(int start, int end)
 {
-	// Come back to the image data end
-	Buff__bufInd -= 8;
-
-	// Get the index of the image data begin
-	int pos = Buff__bufInd - Buff__getWord(Buff__bufInd);
-
-	EPD_Send_2(0x44, 0, 15);        //SET_RAM_X_ADDRESS_START_END_POSITION LO(x >> 3), LO((w - 1) >> 3)
-	EPD_Send_4(0x45, 0, 0, 249, 0); //SET_RAM_Y_ADDRESS_START_END_POSITION LO(y), HI(y), LO(h - 1), HI(h - 1)
-
+	int pos = start;
 	// Enumerate all of image data bytes
-	while (pos < Buff__bufInd)
+	while (pos < end)
 	{
 		// Before write a line of image data
 		// 2.13 e-Paper requires to set the address counter
@@ -263,6 +256,32 @@ void EPD_loadC()
 			if (++EPD_dispY > 250) return;
 		}
 	}
+}
+void save_buffimg_to_file(int start)
+{
+	const uint8_t *bufp = (const uint8_t *)&(Buff__bufArr[start]);
+	File imgfile = SPIFFS.open("/image.bin", FILE_APPEND);
+	imgfile.write(bufp, Buff__bufInd - start);
+	imgfile.flush();
+	imgfile.close();
+}
+void read_buffimg_from_file(int start)
+{
+
+}
+/* Image data loading function for 2.13 e-Paper ------------------------------*/
+void EPD_loadC()
+{
+	// Come back to the image data end
+	Buff__bufInd -= 8;
+
+	// Get the index of the image data begin
+	int pos = Buff__bufInd - Buff__getWord(Buff__bufInd);
+
+	EPD_Send_2(0x44, 0, 15);        //SET_RAM_X_ADDRESS_START_END_POSITION LO(x >> 3), LO((w - 1) >> 3)
+	EPD_Send_4(0x45, 0, 0, 249, 0); //SET_RAM_Y_ADDRESS_START_END_POSITION LO(y), HI(y), LO(h - 1), HI(h - 1)
+
+	_EPD_loadC(pos, Buff__bufInd);
 }
 
 

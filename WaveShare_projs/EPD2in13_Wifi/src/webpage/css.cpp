@@ -15,7 +15,8 @@
 
 
 void sendCSS(WiFiClient client) {
-	File css_file = SPIFFS.open("/page.css");
+	File css_file = SPIFFS.open("/page.css", FILE_READ);
 	if (css_file)
 		client.println(css_file.readString());
+	css_file.close();
 }
