@@ -44,10 +44,12 @@ void screen_init()
 		digitalWrite(PIN_POWER_ON, HIGH);
 		// Initialise the TFT registers
 		tft.begin();
-		tft.setAttribute(PSRAM_ENABLE, false);
+		// tft.setAttribute(PSRAM_ENABLE, false);
 		tft.setRotation(SCREEN_ROTAION);
-		ScreenWidth = tft.width();
-		ScreenHeight = tft.height();
+		Canvas.ScreenWidth = tft.width();
+		Canvas.ScreenHeight = tft.height();
+		tft.setTextColor(TFT_GREEN, BG_DARK_GRAY);
+		tft.setTextSize(2);
 	#endif
 
 	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
@@ -66,12 +68,12 @@ void setup_screen() {
 	screen_init();
 
 	// // Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
-	spr.setColorDepth(16);
-	spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
+	// spr.setColorDepth(16);
+	// spr.loadFont(AA_FONT_LARGE); // Must load the font first into the sprite class
 	// Create a sprite of defined size
 	spr.setTextColor(TFT_GREEN, BG_DARK_GRAY);
 	spr.setTextSize(2);
-	spr.fillSprite(TFT_DARKGREY);
+	spr.fillSprite(BG_DARK_GRAY);
 	pushScreenBuffer();
 
 
@@ -350,4 +352,13 @@ void CanvasArea::drawCurve(SignalInfo *Wave) {
 		prevY = currY;
 	}
 	drawString(String(ScreenFPS, 1) + "FPS", 10, 5);
+}
+
+
+int dbg_counter = 0;
+char progress_chars[] = { '-', '\\', '|', '/' };
+void DebugScreenMessage(String additional_message) {
+	tft.setCursor(10, 10);
+	tft.printf("Debug Here... %c %s",
+			progress_chars[dbg_counter++ % 4], additional_message);
 }

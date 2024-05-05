@@ -7,6 +7,7 @@
 #define SAMPLE_BUFFLEN			((2 * SAMPLE_BUFFLEN_BASE))
 
 #define ADC_READ_MAX_VAL		4095
+// #define ADC_READ_MAX_VAL		8191
 #define ADC_VOLTREAD_CAP		3100
 
 

@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include <M5StickCPlus.h>
+#include <M5StickCPlus2.h>
 #include "soc/rtc_cntl_reg.h"
 #include "soc/sens_reg.h"
 

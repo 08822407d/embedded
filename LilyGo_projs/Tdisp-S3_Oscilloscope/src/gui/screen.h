@@ -37,6 +37,11 @@ extern void drawGridOnArea(CanvasArea *area);
 
 extern void maxFPStest(void);
 
+
+extern void DebugScreenMessage(String additional_message = "");
+
+
+
 inline void pushScreenBuffer(uint16_t x = 0, uint16_t y = 0,
 		uint16_t w = Canvas.ScreenWidth,
 		uint16_t h = Canvas.ScreenHeight) {

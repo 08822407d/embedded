@@ -1,0 +1,1 @@
+#define VOLT_TO_DAC_VALUE(x) ((x) / 10.0 * 32767)    // x between 0 ~ 10.0V

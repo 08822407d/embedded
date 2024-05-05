@@ -45,8 +45,7 @@ int16_t curY = 0;
 char progress_char[] = "|/-\\"; 
 void setup() {
 	M5.begin();
-	M5.Imu.Init();
-	joyc.Init();
+	// M5.Imu.Init();
 	Serial.begin(SERIAL_BAUD_RATE);
 
 	// M5.Lcd.setRotation(1);
@@ -61,7 +60,7 @@ void setup() {
 		M5.Lcd.println("STA Failed to configure\n");
 	}
 	M5.Lcd.setTextColor(GREEN);
-	// Serial.printf("Connecting to %s", ssid);
+	Serial.printf("Connecting to %s", ssid);
 	M5.Lcd.printf("Connecting:\n");
 	M5.Lcd.setTextColor(ORANGE);
 	M5.Lcd.printf(" %s", ssid);
@@ -72,7 +71,7 @@ void setup() {
 	curY = M5.Lcd.getCursorY();
 	WiFi.begin(ssid, password);
 	while (WiFi.status() != WL_CONNECTED) {
-		// Serial.print(".");
+		Serial.print(".");
 		M5.Lcd.printf(" %c ", progress_char[wait_count % 4]);
 		M5.Lcd.setCursor(curX, curY);
 		wait_count++;
@@ -82,7 +81,7 @@ void setup() {
 		M5.Lcd.fillRect(curX, curY, curX + 20, curY + 20, BLACK);
 	}
 
-	// Serial.println("CONNECTED!\n");
+	Serial.println("CONNECTED!\n");
 	M5.Lcd.setTextColor(ORANGE);
 	M5.Lcd.println("\nCONNECTED!\n");
 	M5.Lcd.setTextColor(GREEN);
@@ -93,6 +92,8 @@ void setup() {
 
 	curX = M5.Lcd.getCursorX();
 	curY = M5.Lcd.getCursorY();
+
+	joyc.Init();
 }
 
 
