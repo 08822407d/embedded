@@ -79,7 +79,8 @@ void core1_task(void * pvParameters) {
 				if (stop_change)
 					stop_change = false;
 
-				new_data = ADC_Sampling(&CurrentWave);
+				ADC_Sampling(&CurrentWave);
+				new_data = true;
 			} else {
 				if (!stop_change)
 					stop_change = true;
@@ -89,10 +90,9 @@ void core1_task(void * pvParameters) {
 			float old_mean = 0;
 			while (single_trigger) {
 				stop = true;
-
+				ADC_Sampling(&CurrentWave);
 				//signal captured (pp > 0.4V || changing mean > 0.2V) -> DATA ANALYSIS
-				if (ADC_Sampling(&CurrentWave) && 
-						(old_mean != 0 && fabs(CurrentWave.MeanVolt - old_mean) > 0.2) ||
+				if ((old_mean != 0 && fabs(CurrentWave.MeanVolt - old_mean) > 0.2) ||
 						to_voltage(CurrentWave.MaxVal) - to_voltage(CurrentWave.MinVal) > 0.05) {
 					float freq = 0;
 					float period = 0;

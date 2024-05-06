@@ -55,29 +55,22 @@ float to_voltage(uint32_t reading) {
 	return reading * cal_to_volt_factor;
 }
 
-bool ADC_Sampling(SignalInfo *Wave){
+void ADC_Sampling(SignalInfo *Wave){
 	esp_err_t ret;
-	bool sample_valid;
 
 	unsigned long time_start = micros();
 
-	volatile uint retry_times = 0;
-	do {
-		uint32_t total_read = 0;
-		retry_times++;
+	uint32_t total_read = 0;
 
-		adc_digi_start();
-		for (uint32_t ret_num = 0; (BUFFLEN_BYTES - total_read) >= ONE_SAMPLE_BUFFLEN; total_read+=ret_num)
-			ret = adc_digi_read_bytes(&((uint8_t *)(Wave->SampleBuff))[total_read],
-						ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
-		adc_digi_stop();
+	adc_digi_start();
+	for (uint32_t ret_num = 0; (BUFFLEN_BYTES - total_read) >= ONE_SAMPLE_BUFFLEN; total_read+=ret_num)
+		ret = adc_digi_read_bytes(&((uint8_t *)(Wave->SampleBuff))[total_read],
+					ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
+	adc_digi_stop();
 
-		Wave->SampleNum = total_read / ADC_RESULT_BYTE;
-		sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * Canvas.ScreenWidth);
+	Wave->SampleNum = total_read / ADC_RESULT_BYTE;
 
-		// DebugScreenMessage("" + String(total_read, 16) +
-		// 		" - " + String(retry_times, 16));
-	} while (!sample_valid);
+	// DebugScreenMessage(String(total_read, 16));
 
 	unsigned long sample_timespan = micros() - time_start;
 
@@ -87,8 +80,6 @@ bool ADC_Sampling(SignalInfo *Wave){
 
 	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 
-	Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
-			(sample_timespan / 1000.0), analyze_timespan);
-
-	return sample_valid;
+	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+	// 		(sample_timespan / 1000.0), analyze_timespan);
 }
