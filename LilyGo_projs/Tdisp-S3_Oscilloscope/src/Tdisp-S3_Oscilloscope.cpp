@@ -1,5 +1,11 @@
 #include "headers.h"
 
+// #include <Arduino_APA102.h>
+
+
+// #define PIN_APA102_CLK		45
+// #define PIN_APA102_DI		42
+// Arduino_APA102 ledStrip = Arduino_APA102(8, PIN_APA102_DI, PIN_APA102_CLK);
 
 
 TaskHandle_t	task_menu;
@@ -19,6 +25,8 @@ void setup() {
 	InitUserButton();
 
 	config_adc();
+	
+	// ledStrip.begin();
 
 
 	xTaskCreatePinnedToCore(

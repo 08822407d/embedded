@@ -24,7 +24,6 @@ public:
 extern TFT_eSPI tft;
 extern TFT_eSprite spr;
 extern DrawParams Canvas;
-extern CanvasArea CurveArea;
 
 
 extern bool single_trigger;

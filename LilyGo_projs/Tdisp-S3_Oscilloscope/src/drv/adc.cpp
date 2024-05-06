@@ -1,7 +1,7 @@
 #include "headers.h"
 
 
-static const char *TAG = "ADC DMA";
+// static const char *TAG = "ADC DMA";
 
 static uint16_t adc1_chan_mask = BIT(0);
 static adc_channel_t channel[1] = { ADC_CHANNEL_0 };
@@ -75,7 +75,8 @@ bool ADC_Sampling(SignalInfo *Wave){
 		Wave->SampleNum = total_read / ADC_RESULT_BYTE;
 		sample_valid = Wave->SampleNum  >= (SAMPLE_VALID_FACTOR * Canvas.ScreenWidth);
 
-		DebugScreenMessage(String(total_read));
+		// DebugScreenMessage("" + String(total_read, 16) +
+		// 		" - " + String(retry_times, 16));
 	} while (!sample_valid);
 
 	unsigned long sample_timespan = micros() - time_start;
