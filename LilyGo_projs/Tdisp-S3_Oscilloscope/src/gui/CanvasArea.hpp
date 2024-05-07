@@ -27,7 +27,6 @@ public:
 	uint32_t		BG_Color	= BACK_GROUND_COLOR;
 
 	CanvasArea(TFT_eSprite *spr);
-	// CanvasArea(TFT_eSPI *tft);
 	
 	void setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 	void setArea(Point2D start, Point2D end);
@@ -59,7 +58,6 @@ public:
 
 private:
 	TFT_eSprite		*_spr;
-	// TFT_eSprite		_spri;
 	Extent2D		CanvasPos;
 	uint			GND_Ypos;		// Y-position of the votage 0 on screen
 	int32_t			*CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve

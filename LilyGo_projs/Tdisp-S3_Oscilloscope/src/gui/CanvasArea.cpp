@@ -53,9 +53,6 @@ bool CanvasArea::posValid(int32_t x, int32_t y) {
 CanvasArea::CanvasArea(TFT_eSprite *spr) {
 	_spr = spr;
 }
-// CanvasArea::CanvasArea(TFT_eSPI *tft) {
-// 	_spri = TFT_eSprite(tft);
-// }
 
 
 void CanvasArea::setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {

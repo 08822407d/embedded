@@ -19,9 +19,6 @@ TFT_eSprite CurveSpr	= TFT_eSprite(&tft);
 TFT_eSprite InfoSpr		= TFT_eSprite(&tft);
 CanvasArea CurveArea	= CanvasArea(&CurveSpr);
 CanvasArea InfoArea		= CanvasArea(&InfoSpr);
-// CanvasArea CurveArea	= CanvasArea(&tft);
-// CanvasArea InfoArea		= CanvasArea(&tft);
-
 
 bool single_trigger	= false;
 
