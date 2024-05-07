@@ -32,7 +32,7 @@ void setup() {
 	xTaskCreatePinnedToCore(
 		core0_task,
 		"menu_handle",
-		16384,			/* Stack size in words */
+		65536,			/* Stack size in words */
 		NULL,			/* Task input parameter */
 		0,				/* Priority of the task */
 		&task_menu,		/* Task handle. */

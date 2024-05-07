@@ -6,23 +6,17 @@
 	#include <esp_wifi.h>
 
 
-	#define SAMPLE_VALID_FACTOR		3
-	#define SAMPLE_BUFFLEN_BASE		256U
-	#define SAMPLE_BUFFLEN			((4 * SAMPLE_BUFFLEN_BASE))
-
-
-	#define BUFFLEN_BYTES			((SAMPLE_BUFFLEN * ADC_RESULT_BYTE))
-	
-	#ifdef AMOLED
-	#  define ONE_SAMPLE_TIMES		((SAMPLE_BUFFLEN * 4))
-	#else
-	#  define ONE_SAMPLE_TIMES		((SAMPLE_BUFFLEN / 16))
-	#endif
-
-	#define ONE_SAMPLE_BUFFLEN		((ONE_SAMPLE_TIMES * ADC_RESULT_BYTE))
+	#define ADC_START_STOP_MICROS	240
 	#define ADC_RESULT_BYTE			4
 	#define ADC_CONV_LIMIT_EN		0
 	#define GET_UNIT(x)				((x>>3) & 0x1)
+
+
+	#define ONE_SAMPLE_BUFFLEN		((256UL))
+	#define ONE_SAMPLE_TIMES		((ONE_SAMPLE_BUFFLEN / ADC_RESULT_BYTE))
+	#define ONE_SAMPLE_LEN_MASK		((~(ONE_SAMPLE_BUFFLEN - 1)))
+	#define SAMPLE_BUFFLEN			((MAX_SAMPLE_COUNT & ONE_SAMPLE_LEN_MASK))
+	#define BUFFLEN_BYTES			((SAMPLE_BUFFLEN * ADC_RESULT_BYTE))
 
 
 	class SignalInfo {
