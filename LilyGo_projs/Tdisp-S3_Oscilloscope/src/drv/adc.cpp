@@ -70,7 +70,7 @@ void ADC_Sampling(SignalInfo *Wave){
 
 	peak_mean(Wave);
 	trigger_freq(Wave);
-	CurveArea.genDrawBuffer(Wave);
+	genDrawBuffer(Wave, &CurveArea);
 
 	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 

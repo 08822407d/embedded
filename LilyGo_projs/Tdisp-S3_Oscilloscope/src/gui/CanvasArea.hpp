@@ -16,15 +16,18 @@
 
 class CanvasArea {
 public:
-	bool			Dirty		= false;
+	bool			Dirty			= false;
 	uint16_t		Width;
 	uint16_t		Height;
-	uint			grid_size	= GRID_SIZE;
+	uint			grid_size		= GRID_SIZE;
 	uint32_t		v_div;
 	uint32_t		t_div;
 	float			offset;
 	float			toffset;
-	uint32_t		BG_Color	= BACK_GROUND_COLOR;
+	uint32_t		BG_Color		= BACK_GROUND_COLOR;
+
+	int32_t			*CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
+
 
 	CanvasArea(TFT_eSprite *spr);
 	
@@ -37,41 +40,36 @@ public:
 	Point2D getStartOnCanvas();
 	Point2D getEndOnCanvas();
 	
-	void genDrawBuffer(SignalInfo *Wave);
-	void drawCurve(SignalInfo *Wave);
-	void drawBorder(uint32_t color);
-
 	void flushDrawArea(void);
+
+	void drawBorder(int32_t radius, uint32_t color);
 
 	void fillArea(uint32_t color);
 	void fillRect(uint32_t color);
 	
 	void drawString(const String &string, int32_t x, int32_t y);
 	void drawPixel(int32_t x, int32_t y, uint32_t color);
-	void drawLine(int32_t x0, int32_t y0,
-			int32_t x1, int32_t y1, uint32_t color);
-	void drawRect(int32_t x, int32_t y,
-			int32_t w, int32_t h, uint32_t color);
+	void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+	void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
 
 	void clearArea(void);
 
+
+	bool posValid(int32_t x, int32_t y);
+	int32_t to_scale(float reading);
 
 private:
 	TFT_eSprite		*_spr;
 	Extent2D		CanvasPos;
 	uint			GND_Ypos;		// Y-position of the votage 0 on screen
-	int32_t			*CurveDrawBuff;	// Only stores Screen-Y coords of the Wave curve
+	uint32_t		BG_color		= BG_DARK_GRAY;
+	uint32_t		TxtFG_color		= TFT_GREEN;
+	uint32_t		TxtBG_color		= BG_DARK_GRAY;
 
-	uint32_t		BG_color = BG_DARK_GRAY;
-	uint32_t		TxtFG_color = TFT_GREEN;
-	uint32_t		TxtBG_color = BG_DARK_GRAY;
-
-	int32_t to_scale(float reading);
 
 	void castPosition(int32_t &x, int32_t &y);
 	void castPosition(int32_t &x, int32_t &y, int32_t &w, int32_t &h);
 	void castStringPosition(int32_t &x, int32_t &y, const String &string);
-	bool posValid(int32_t x, int32_t y);
 };
 
 

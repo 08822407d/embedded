@@ -23,6 +23,10 @@ CanvasArea InfoArea		= CanvasArea(&InfoSpr);
 bool single_trigger	= false;
 
 
+#define DRAW_TIME_NUM	60
+unsigned long DrawScreenTimes[DRAW_TIME_NUM] = { 0 };
+float ScreenFPS = 0;
+
 
 void screen_init()
 {
@@ -53,7 +57,6 @@ void screen_init()
 	#endif
 
 	// Optionally set colour depth to 8 or 16 bits, default is 16 if not spedified
-	// spr.setColorDepth(8);
 	spr.createSprite(Canvas.ScreenWidth, Canvas.ScreenHeight);
 	spr.setSwapBytes(1);
 
@@ -89,9 +92,6 @@ void update_screen(SignalInfo *Wave) {
 
 	draw_sprite(Wave, true);
 
-	//push the drawed sprite to the screen
-	// pushScreenBuffer();
-
 	// draw screen performance
 	unsigned long draw_end = micros();
 	unsigned long draw_timespan = draw_end - draw_start;
@@ -107,13 +107,6 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 	float period = Wave->Period;
 	uint32_t trigger = Wave->TrigIdx_0;
 
-	String frequency = "";
-	if (freq < 1000)
-		frequency = String(freq) + "hz";
-	else if (freq < 100000)
-		frequency = String(freq / 1000) + "khz";
-	else
-		frequency = "----";
 
 	String s_mean = "";
 	if (mean > 1.0)
@@ -153,20 +146,20 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
 		drawGridOnArea(&CurveArea);
 
-		if (GlobOpts.auto_scale) {
-			GlobOpts.auto_scale = false;
-			CurveArea.v_div = 1000.0 * max_v / 6.0;
-			CurveArea.t_div = period / 8;
-			if (CurveArea.t_div > 7000 || CurveArea.t_div <= 0)
-				CurveArea.t_div = 7000;
-			if (CurveArea.v_div <= 0)
-				CurveArea.v_div = 550;
-		}
+		// if (GlobOpts.auto_scale) {
+		// 	GlobOpts.auto_scale = false;
+		// 	CurveArea.v_div = 1000.0 * max_v / 6.0;
+		// 	CurveArea.t_div = period / 8;
+		// 	if (CurveArea.t_div > 7000 || CurveArea.t_div <= 0)
+		// 		CurveArea.t_div = 7000;
+		// 	if (CurveArea.v_div <= 0)
+		// 		CurveArea.v_div = 550;
+		// }
 
 		//only draw digital data if a trigger was in the data
-		if (!(GlobOpts.digi_wave_opt == 2 && trigger == 0))
-		{
-			CurveArea.drawCurve(Wave);
+		if (!(GlobOpts.digi_wave_opt == 2 && trigger == 0)) {
+			drawCurve(Wave, &CurveArea);
+			drawCurveInfo(Wave, &CurveArea);
 			CurveArea.flushDrawArea();
 		}
 	}
@@ -179,8 +172,6 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		spr.fillRect(Xshift + 1, 3 + 10 * (opt - 1), 100, 11, TFT_RED);
 
 		spr.drawString("AUTOSCALE", Xshift + 5, 5);
-		spr.drawString(String(int(CurveArea.v_div)) + "mV/div", Xshift + 5, 15);
-		spr.drawString(String(int(CurveArea.t_div)) + "uS/div", Xshift + 5, 25);
 		spr.drawString("Offset: " + String(CurveArea.offset) + "V", Xshift + 5, 35);
 		spr.drawString("T-Off: " + String((uint32_t)CurveArea.toffset) + "uS", Xshift + 5, 45);
 		spr.drawString("Filter: " + str_filter, Xshift + 5, 55);
@@ -197,10 +188,6 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		Xshift -= 70;
 
 		spr.drawRect(Xshift, 0, 70, 30, TFT_WHITE);
-		spr.drawString("P-P: " + String(max_v - min_v) + "V",  Xshift + 5, 5);
-		spr.drawString(frequency,  Xshift + 5, 15);
-		String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
-		spr.drawString(offset_line,  Xshift + 30, 59);
 
 		if (GlobOpts.set_value) {
 			spr.fillRect(229, 0, 11, 11, TFT_BLUE);
@@ -213,20 +200,86 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 			spr.drawRect(229, 124, 11, 11, TFT_WHITE);
 			spr.drawLine(231, 129, 238, 129, TFT_WHITE);
 		}
-	} else if (GlobOpts.info) {
-		InfoArea.drawString("P-P: " + String(max_v - min_v) + "V", FONT_WIDTH, Yshift);
-		InfoArea.drawString(frequency, FONT_WIDTH, Yshift + 20);
-
-		InfoArea.drawString(String(int(CurveArea.v_div)) + "mV/div", FONT_WIDTH, Yshift + 45);
-		InfoArea.drawString(String(int(CurveArea.t_div)) + "uS/div", FONT_WIDTH, Yshift + 65);
-
-		InfoArea.drawString(String(min_v) + "/" + String(max_v), FONT_WIDTH, Canvas.ScreenHeight - 15);
-
-		InfoArea.flushDrawArea();
 	}
 }
 
 
+void genDrawBuffer(SignalInfo *Wave, CanvasArea *area)  {
+	uint curve_color = TFT_SKYBLUE;
+	uint32_t trigger0 = Wave->TrigIdx_0;
+	uint32_t *AdcDataBuf = Wave->SampleBuff;
+	//screen wave drawing
+	low_pass filter(0.99);
+	mean_filter mfilter(5);
+	mfilter.init(AdcDataBuf[trigger0]);
+	filter._value = AdcDataBuf[trigger0];
+	float data_per_pixel = ((float)CurveArea.t_div / CurveArea.grid_size) /
+								(Wave->SampleRate / 1000.0);
+
+	uint32_t index_offset = (uint32_t)(CurveArea.toffset / data_per_pixel);
+	trigger0 += index_offset;  
+	uint32_t old_index = trigger0;
+	int32_t n_data = 0, o_data = area->to_scale(AdcDataBuf[trigger0]);
+	area->CurveDrawBuff[0] = o_data;
+	for (uint32_t i = 1; i < CurveArea.Width; i++) {
+		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
+		if (index < Wave->SampleNum) {
+			if (GlobOpts.current_filter == 2)
+				n_data = area->to_scale(mfilter.filter((float)AdcDataBuf[index]));
+			else if (GlobOpts.current_filter == 3)
+				n_data = area->to_scale(filter.filter((float)AdcDataBuf[index]));
+			else
+				n_data = area->to_scale(AdcDataBuf[index]);
+
+			area->CurveDrawBuff[i] = n_data;
+		} else {
+			break;
+		}
+		old_index = index;
+	}
+}
+
+void drawCurveInfo(SignalInfo *Wave, CanvasArea *area) {
+	float max_v = to_voltage(Wave->MaxVal);
+	float min_v = to_voltage(Wave->MinVal);
+	float freq = Wave->Freq;
+
+	String freq_str = "";
+	if (freq < 1000)
+		freq_str = String(freq) + "hz";
+	else if (freq < 100000)
+		freq_str = String(freq / 1000) + "khz";
+	else
+		freq_str = "----";
+	
+	String t_div_str = String(CurveArea.t_div) + "uS/div";
+	if (CurveArea.t_div >= 1000)
+		t_div_str = String(CurveArea.t_div / 1000.0, 1) + "mS/div";
+
+
+	int32_t Raw1_shift = 10;
+	int32_t Raw2_shift = 20;
+	int32_t Col1_shift = 115;
+	int32_t Col2_shift = 180;	
+
+	area->drawString("P-P:" + String(max_v - min_v) + "V", Col1_shift, Raw1_shift);
+	area->drawString(freq_str, Col1_shift, Raw2_shift);
+	area->drawString(String(int(CurveArea.v_div)) + "mV/div", Col2_shift, Raw1_shift);
+	area->drawString(t_div_str, Col2_shift, Raw2_shift);
+
+
+	area->drawString(String(min_v) + "/" + String(max_v), FONT_WIDTH, -15);
+	area->drawString(String(ScreenFPS, 1) + "FPS", 2 * FONT_WIDTH, -5);
+
+	// draw screen performance
+	unsigned long timestamp = micros();
+	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
+			(DRAW_TIME_NUM - 1) * sizeof(typeof(DrawScreenTimes[0])));
+	DrawScreenTimes[DRAW_TIME_NUM - 1] = timestamp;
+	if (DrawScreenTimes[0] >= 0)
+		ScreenFPS =  (1000000.0 * (DRAW_TIME_NUM - 1)) /
+						(timestamp - DrawScreenTimes[0]);
+}
 
 void drawGridOnArea(CanvasArea *area) {
 	area->clearArea();
@@ -296,9 +349,20 @@ void drawGridOnArea(CanvasArea *area) {
 	// area.drawLine(centerX, 0, centerX, area.Height, axis_color); // Y-axis
 
 	String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
-	area->drawString(offset_line, -FONT_WIDTH, centerY - (int32_t)(FONT_HEIGHT * 1.5));
+	area->drawString(offset_line, -(FONT_WIDTH / 2), centerY - (int32_t)(FONT_HEIGHT * 1.5));
 }
 
+void drawCurve(SignalInfo *Wave, CanvasArea *area) {
+	uint curve_color = TFT_SKYBLUE;
+	int32_t currY, prevY = area->CurveDrawBuff[0];
+	for (uint32_t i = 1; i < area->Width; i++) {
+		currY = area->CurveDrawBuff[i];
+		if (area->posValid(i - 1, prevY) && area->posValid(i, currY))
+			area->drawLine(i - 1, prevY, i, currY, curve_color);
+		prevY = currY;
+	}
+	area->drawBorder(15, TFT_DARKGREY);
+}
 
 void pushScreenBuffer(TFT_eSprite *s,
 		uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
@@ -308,8 +372,6 @@ void pushScreenBuffer(TFT_eSprite *s,
 		s->pushSprite(x, y);
 	#endif
 }
-
-
 
 
 

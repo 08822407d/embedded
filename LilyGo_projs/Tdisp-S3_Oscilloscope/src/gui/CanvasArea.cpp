@@ -3,18 +3,11 @@
 
 #include "algo/filters.h"
 #include "options/options.h"
-
-#define DRAW_TIME_NUM	60
-unsigned long DrawScreenTimes[DRAW_TIME_NUM] = { 0 };
-float ScreenFPS = 0;
-
-
 /*================================================================================*
  *										private members							  *
  *================================================================================*/
 int32_t CanvasArea::to_scale(float reading) {
-	int32_t VoltPixels = (to_voltage(reading) + offset)
-							* grid_size * 1000 / v_div;
+	int32_t VoltPixels = (to_voltage(reading) + offset) * grid_size * 1000 / v_div;
 	return GND_Ypos - VoltPixels;
 }
 
@@ -91,70 +84,10 @@ Point2D CanvasArea::getEndOnCanvas() {
 	return CanvasPos.End;
 }
 
-
-void CanvasArea::genDrawBuffer(SignalInfo *Wave) 
-{
-	uint curve_color = TFT_SKYBLUE;
-	uint32_t trigger0 = Wave->TrigIdx_0;
-	uint32_t *AdcDataBuf = Wave->SampleBuff;
-	//screen wave drawing
-	low_pass filter(0.99);
-	mean_filter mfilter(5);
-	mfilter.init(AdcDataBuf[trigger0]);
-	filter._value = AdcDataBuf[trigger0];
-	float data_per_pixel = ((float)CurveArea.t_div / CurveArea.grid_size) / (Wave->SampleRate / 1000.0);
-
-	uint32_t index_offset = (uint32_t)(CurveArea.toffset / data_per_pixel);
-	trigger0 += index_offset;  
-	uint32_t old_index = trigger0;
-	int32_t n_data = 0, o_data = to_scale(AdcDataBuf[trigger0]);
-	CurveDrawBuff[0] = o_data;
-	for (uint32_t i = 1; i < CurveArea.Width; i++) {
-		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
-		if (index < Wave->SampleNum) {
-			if (GlobOpts.current_filter == 2)
-				n_data = to_scale(mfilter.filter((float)AdcDataBuf[index]));
-			else if (GlobOpts.current_filter == 3)
-				n_data = to_scale(filter.filter((float)AdcDataBuf[index]));
-			else
-				n_data = to_scale(AdcDataBuf[index]);
-
-			CurveDrawBuff[i] = n_data;
-		} else {
-			break;
-		}
-		old_index = index;
-	}
-}
-void CanvasArea::drawCurve(SignalInfo *Wave) {
-	uint curve_color = TFT_SKYBLUE;
-	int32_t
-		currY,
-		prevY = CurveDrawBuff[0];
-	for (uint32_t i = 1; i < Width; i++) {
-		currY = CurveDrawBuff[i];
-		if (posValid(i - 1, prevY) && posValid(i, currY))
-			drawLine(i - 1, prevY, i, currY, curve_color);
-		prevY = currY;
-	}
-	drawString(String(ScreenFPS, 1) + "FPS", FONT_WIDTH, FONT_HEIGHT);
-
-	// draw screen performance
-	unsigned long timestamp = micros();
-	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
-			(DRAW_TIME_NUM - 1) * sizeof(typeof(DrawScreenTimes[0])));
-	DrawScreenTimes[DRAW_TIME_NUM - 1] = timestamp;
-	if (DrawScreenTimes[0] >= 0)
-		ScreenFPS =  (1000000.0 * (DRAW_TIME_NUM - 1)) /
-						(timestamp - DrawScreenTimes[0]);
-
-	drawBorder(TFT_DARKGREY);
-}
-void CanvasArea::drawBorder(uint32_t color) {
+void CanvasArea::drawBorder(int32_t radius, uint32_t color) {
 	int32_t startX = CanvasPos.Start.X;
 	int32_t startY = CanvasPos.Start.Y;
-	int32_t radius = 20;
-	_spr->drawSmoothRoundRect(startX - radius, startY - radius, radius * 2, radius,
+	_spr->drawSmoothRoundRect(startX - radius, startY - radius,radius * 2, radius,
 			Width - 1 + 2 * radius, Height - 1 + 2 * radius, color, BG_DARK_GRAY);
 }
 
@@ -166,8 +99,7 @@ void CanvasArea::flushDrawArea(void) {
 
 
 void CanvasArea::fillArea(uint32_t color) {
-	_spr->fillRect(CanvasPos.Start.X, CanvasPos.Start.Y,
-			Width, Height, color);
+	_spr->fillRect(CanvasPos.Start.X, CanvasPos.Start.Y, Width, Height, color);
 }
 void CanvasArea::fillRect(uint32_t color) {
 	fillArea(color);
@@ -176,23 +108,20 @@ void CanvasArea::fillRect(uint32_t color) {
 
 void CanvasArea::drawString(const String &string, int32_t x, int32_t y) {
 	castStringPosition(x, y, string);
-	_spr->drawString(string, CanvasPos.Start.X + x, CanvasPos.Start.Y + y);
+	_spr->drawString(string, x, y);
 }
 void CanvasArea::drawPixel(int32_t x, int32_t y, uint32_t color) {
 	castPosition(x, y);
-	_spr->drawPixel(CanvasPos.Start.X + x, CanvasPos.Start.Y + y, color);
+	_spr->drawPixel(x, y, color);
 }
-void CanvasArea::drawLine(int32_t x0, int32_t y0,
-		int32_t x1, int32_t y1, uint32_t color) {
+void CanvasArea::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {
 	castPosition(x0, y0);
 	castPosition(x1, y1);
-	_spr->drawLine(CanvasPos.Start.X + x0, CanvasPos.Start.Y + y0,
-			CanvasPos.Start.X + x1, CanvasPos.Start.Y + y1, color);
+	_spr->drawLine(x0, y0, x1, y1, color);
 }
-void CanvasArea::drawRect(int32_t x, int32_t y,
-		int32_t w, int32_t h, uint32_t color) {
+void CanvasArea::drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
 	castPosition(x, y, w, h);
-	_spr->drawRect(CanvasPos.Start.X + x, CanvasPos.Start.Y + y, w, h, color);
+	_spr->drawRect(x, y, w, h, color);
 }
 
 

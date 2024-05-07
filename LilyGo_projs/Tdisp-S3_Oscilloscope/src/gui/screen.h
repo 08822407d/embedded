@@ -33,6 +33,9 @@ extern void update_screen(SignalInfo *Wave);
 extern void draw_sprite(SignalInfo *Wave, bool new_data);
 extern void draw_grid(int startX, int startY, uint width, uint heigh);
 extern void drawGridOnArea(CanvasArea *area);
+extern void genDrawBuffer(SignalInfo *Wave, CanvasArea *area);
+extern void drawCurve(SignalInfo *Wave, CanvasArea *area);
+extern void drawCurveInfo(SignalInfo *Wave, CanvasArea *area);
 
 extern void maxFPStest(void);
 
