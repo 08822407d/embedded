@@ -50,9 +50,13 @@ bool CanvasArea::posValid(int32_t x, int32_t y) {
 /*================================================================================*
  *										private members							  *
  *================================================================================*/
-CanvasArea::CanvasArea(TFT_eSprite *s) {
-	_spr = s;
+CanvasArea::CanvasArea(TFT_eSprite *spr) {
+	_spr = spr;
 }
+// CanvasArea::CanvasArea(TFT_eSPI *tft) {
+// 	_spri = TFT_eSprite(tft);
+// }
+
 
 void CanvasArea::setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 	CanvasPos.Start.X = x;
@@ -61,6 +65,8 @@ void CanvasArea::setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 	Height = h;
 	CanvasPos.End.X = x + w - 1;
 	CanvasPos.End.Y = y + h - 1;
+	_spr->createSprite(Width, Height);
+	_spr->setTextColor(TxtFG_color, TxtBG_color, true);
 
 	GND_Ypos = Height - ((Height / 2) % grid_size) - 1;
 	CurveDrawBuff = new int32_t[Width];
@@ -72,12 +78,22 @@ void CanvasArea::setArea(Extent2D area) {
 	setArea(area.Start, area.End);
 }
 
+
+void CanvasArea::setColors(uint32_t BG, uint32_t TxtFG, uint32_t TxtBG) {
+	BG_color = BG;
+	TxtFG_color = TxtFG;
+	TxtBG_color = TxtBG;
+	_spr->setTextColor(TxtFG_color, TxtBG_color, true);
+}
+
+
 Point2D CanvasArea::getStartOnCanvas() {
 	return CanvasPos.Start;
 }
 Point2D CanvasArea::getEndOnCanvas() {
 	return CanvasPos.End;
 }
+
 
 void CanvasArea::genDrawBuffer(SignalInfo *Wave) 
 {
@@ -90,7 +106,6 @@ void CanvasArea::genDrawBuffer(SignalInfo *Wave)
 	mfilter.init(AdcDataBuf[trigger0]);
 	filter._value = AdcDataBuf[trigger0];
 	float data_per_pixel = ((float)CurveArea.t_div / CurveArea.grid_size) / (Wave->SampleRate / 1000.0);
-
 
 	uint32_t index_offset = (uint32_t)(CurveArea.toffset / data_per_pixel);
 	trigger0 += index_offset;  
@@ -114,7 +129,6 @@ void CanvasArea::genDrawBuffer(SignalInfo *Wave)
 		old_index = index;
 	}
 }
-
 void CanvasArea::drawCurve(SignalInfo *Wave) {
 	uint curve_color = TFT_SKYBLUE;
 	int32_t
@@ -136,11 +150,23 @@ void CanvasArea::drawCurve(SignalInfo *Wave) {
 	if (DrawScreenTimes[0] >= 0)
 		ScreenFPS =  (1000000.0 * (DRAW_TIME_NUM - 1)) /
 						(timestamp - DrawScreenTimes[0]);
+
+	drawBorder(TFT_DARKGREY);
+}
+void CanvasArea::drawBorder(uint32_t color) {
+	int32_t startX = CanvasPos.Start.X;
+	int32_t startY = CanvasPos.Start.Y;
+	int32_t radius = 20;
+	_spr->drawSmoothRoundRect(startX - radius, startY - radius, radius * 2, radius,
+			Width - 1 + 2 * radius, Height - 1 + 2 * radius, color, BG_DARK_GRAY);
 }
 
+
+extern void pushScreenBuffer(TFT_eSprite *s, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void CanvasArea::flushDrawArea(void) {
-	pushScreenBuffer(CanvasPos.Start.X, CanvasPos.Start.Y, Width, Height);
+	pushScreenBuffer(_spr, CanvasPos.Start.X, CanvasPos.Start.Y, Width, Height);
 }
+
 
 void CanvasArea::fillArea(uint32_t color) {
 	_spr->fillRect(CanvasPos.Start.X, CanvasPos.Start.Y,
@@ -155,7 +181,6 @@ void CanvasArea::drawString(const String &string, int32_t x, int32_t y) {
 	castStringPosition(x, y, string);
 	_spr->drawString(string, CanvasPos.Start.X + x, CanvasPos.Start.Y + y);
 }
-
 void CanvasArea::drawPixel(int32_t x, int32_t y, uint32_t color) {
 	castPosition(x, y);
 	_spr->drawPixel(CanvasPos.Start.X + x, CanvasPos.Start.Y + y, color);
@@ -172,6 +197,7 @@ void CanvasArea::drawRect(int32_t x, int32_t y,
 	castPosition(x, y, w, h);
 	_spr->drawRect(CanvasPos.Start.X + x, CanvasPos.Start.Y + y, w, h, color);
 }
+
 
 void CanvasArea::clearArea(void) {
 	fillArea(BG_Color);

@@ -14,8 +14,13 @@ TFT_eSPI tft			= TFT_eSPI();
 // Declare Sprite object "spr" with pointer to "tft" object
 TFT_eSprite spr			= TFT_eSprite(&tft);
 DrawParams Canvas		= DrawParams(SCREEN_ROTAION);
-CanvasArea CurveArea	= CanvasArea(&spr);
-CanvasArea InfoArea		= CanvasArea(&spr);
+
+TFT_eSprite CurveSpr	= TFT_eSprite(&tft);
+TFT_eSprite InfoSpr		= TFT_eSprite(&tft);
+CanvasArea CurveArea	= CanvasArea(&CurveSpr);
+CanvasArea InfoArea		= CanvasArea(&InfoSpr);
+// CanvasArea CurveArea	= CanvasArea(&tft);
+// CanvasArea InfoArea		= CanvasArea(&tft);
 
 
 bool single_trigger	= false;
@@ -57,8 +62,8 @@ void screen_init()
 
 
 	CurveArea.setArea(0, 0, 6 * GRID_SIZE, Canvas.ScreenHeight);
-	InfoArea.setArea(Point2D(CurveArea.getEndOnCanvas().X, 0),
-			Point2D(Canvas.ScreenWidth, Canvas.ScreenHeight));
+	InfoArea.setArea(Point2D(CurveArea.getEndOnCanvas().X + 1, 0),
+			Point2D(Canvas.ScreenWidth - 1, Canvas.ScreenHeight));
 	voltage_division[1] = ADC_VOLTREAD_CAP / (CurveArea.Height / GRID_SIZE);
 }
 
@@ -83,12 +88,12 @@ void setup_screen() {
 
 
 void update_screen(SignalInfo *Wave) {
-	draw_sprite(Wave, true);
-	
 	unsigned long draw_start = micros();
 
+	draw_sprite(Wave, true);
+
 	//push the drawed sprite to the screen
-	pushScreenBuffer();
+	// pushScreenBuffer();
 
 	// draw screen performance
 	unsigned long draw_end = micros();
@@ -163,7 +168,10 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 
 		//only draw digital data if a trigger was in the data
 		if (!(GlobOpts.digi_wave_opt == 2 && trigger == 0))
+		{
 			CurveArea.drawCurve(Wave);
+			CurveArea.flushDrawArea();
+		}
 	}
 
 	int Xshift = 250;
@@ -216,6 +224,8 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 		InfoArea.drawString(String(int(CurveArea.t_div)) + "uS/div", FONT_WIDTH, Yshift + 65);
 
 		InfoArea.drawString(String(min_v) + "/" + String(max_v), FONT_WIDTH, Canvas.ScreenHeight - 15);
+
+		InfoArea.flushDrawArea();
 	}
 }
 
@@ -291,6 +301,18 @@ void drawGridOnArea(CanvasArea *area) {
 	String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
 	area->drawString(offset_line, -FONT_WIDTH, centerY - (int32_t)(FONT_HEIGHT * 1.5));
 }
+
+
+void pushScreenBuffer(TFT_eSprite *s,
+		uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+	#ifdef AMOLED
+		lcd_PushColors(x, y, Canvas.ScreenWidth, Canvas.ScreenHeight, (uint16_t *)s->getPointer());
+	#else
+		s->pushSprite(x, y);
+	#endif
+}
+
+
 
 
 

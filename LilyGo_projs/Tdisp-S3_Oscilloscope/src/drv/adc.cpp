@@ -17,8 +17,8 @@ void config_adc() {
 	esp_err_t ret;
 
 	adc_digi_init_config_t adc_dma_config = {
-		.max_store_buf_size = ONE_SAMPLE_BUFFLEN,
-		.conv_num_each_intr = ONE_SAMPLE_TIMES,
+		.max_store_buf_size = ONCE_SAMPLES_BUFFLEN,
+		.conv_num_each_intr = ONCE_SAMPLES,
 		.adc1_chan_mask = adc1_chan_mask,
 	};
 	ESP_ERROR_CHECK(ret = adc_digi_initialize(&adc_dma_config));
@@ -56,21 +56,15 @@ float to_voltage(uint32_t reading) {
 }
 
 void ADC_Sampling(SignalInfo *Wave){
-	esp_err_t ret;
-
 	unsigned long time_start = micros();
 
 	uint32_t total_read = 0;
-
 	adc_digi_start();
-	for (uint32_t ret_num = 0; (BUFFLEN_BYTES - total_read) >= ONE_SAMPLE_BUFFLEN; total_read+=ret_num)
-		ret = adc_digi_read_bytes(&((uint8_t *)(Wave->SampleBuff))[total_read],
-					ONE_SAMPLE_BUFFLEN, &ret_num, ADC_MAX_DELAY);
+	for (uint32_t ret_num = 0; (BUFFLEN_BYTES - total_read) >= ONCE_SAMPLES_BUFFLEN; total_read+=ret_num)
+		adc_digi_read_bytes(&((uint8_t *)(Wave->SampleBuff))[total_read],
+				ONCE_SAMPLES_BUFFLEN, &ret_num, ADC_MAX_DELAY);
 	adc_digi_stop();
-
 	Wave->SampleNum = total_read / ADC_RESULT_BYTE;
-
-	// DebugScreenMessage(String(total_read, 16));
 
 	unsigned long sample_timespan = micros() - time_start;
 
@@ -80,6 +74,6 @@ void ADC_Sampling(SignalInfo *Wave){
 
 	unsigned long analyze_timespan = micros() - time_start - sample_timespan;
 
-	Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
-			(sample_timespan / 1000.0), analyze_timespan);
+	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
+	// 		(sample_timespan / 1000.0), analyze_timespan);
 }
