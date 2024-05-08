@@ -1,0 +1,5 @@
+#define WAVEFORM_BUFSIZE	402
+#define MAX_OUTPUT_VOLT		3.1
+#define VDDA				3.3
+
+#define DAC_RESOL_BITS		12
