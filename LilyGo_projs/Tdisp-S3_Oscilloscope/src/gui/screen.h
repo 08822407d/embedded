@@ -40,6 +40,7 @@ extern void drawCurveInfo(SignalInfo *Wave, CanvasArea *area);
 extern void maxFPStest(void);
 
 
+extern void calcScreenFPS(void);
 extern void DebugScreenMessage(String additional_message = "");
 
 void pushScreenBuffer(TFT_eSprite *s = &spr, uint16_t x = 0, uint16_t y = 0,

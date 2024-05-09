@@ -213,23 +213,22 @@ void genDrawBuffer(SignalInfo *Wave, CanvasArea *area)  {
 	mean_filter mfilter(5);
 	mfilter.init(AdcDataBuf[trigger0]);
 	filter._value = AdcDataBuf[trigger0];
-	float data_per_pixel = ((float)CurveArea.t_div / CurveArea.grid_size) /
-								(Wave->SampleRate / 1000.0);
+	float data_per_pixel = area->dataPerPixel(Wave);
 
-	uint32_t index_offset = (uint32_t)(CurveArea.toffset / data_per_pixel);
+	uint32_t index_offset = (uint32_t)(area->toffset / data_per_pixel);
 	trigger0 += index_offset;  
 	uint32_t old_index = trigger0;
 	int32_t n_data = 0, o_data = area->to_scale(AdcDataBuf[trigger0]);
 	area->CurveDrawBuff[0] = o_data;
-	for (uint32_t i = 1; i < CurveArea.Width; i++) {
-		uint32_t index = trigger0 + (uint32_t)((i + 1) * data_per_pixel);
+	for (uint32_t i = 1; i < area->Width; i++) {
+		float index = trigger0 + ((i + 1) * data_per_pixel);
 		if (index < Wave->SampleNum) {
 			if (GlobOpts.current_filter == 2)
-				n_data = area->to_scale(mfilter.filter((float)AdcDataBuf[index]));
+				n_data = area->to_scale(mfilter.filter(Wave->interpolateSample(index)));
 			else if (GlobOpts.current_filter == 3)
-				n_data = area->to_scale(filter.filter((float)AdcDataBuf[index]));
+				n_data = area->to_scale(filter.filter(Wave->interpolateSample(index)));
 			else
-				n_data = area->to_scale(AdcDataBuf[index]);
+				n_data = area->to_scale(Wave->interpolateSample(index));
 
 			area->CurveDrawBuff[i] = n_data;
 		} else {
@@ -271,14 +270,8 @@ void drawCurveInfo(SignalInfo *Wave, CanvasArea *area) {
 	area->drawString(String(min_v) + "/" + String(max_v), FONT_WIDTH, -15);
 	area->drawString(String(ScreenFPS, 1) + "FPS", 2 * FONT_WIDTH, -5);
 
-	// draw screen performance
-	unsigned long timestamp = micros();
-	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
-			(DRAW_TIME_NUM - 1) * sizeof(typeof(DrawScreenTimes[0])));
-	DrawScreenTimes[DRAW_TIME_NUM - 1] = timestamp;
-	if (DrawScreenTimes[0] >= 0)
-		ScreenFPS =  (1000000.0 * (DRAW_TIME_NUM - 1)) /
-						(timestamp - DrawScreenTimes[0]);
+
+	calcScreenFPS();
 }
 
 void drawGridOnArea(CanvasArea *area) {
@@ -374,6 +367,17 @@ void pushScreenBuffer(TFT_eSprite *s,
 }
 
 
+
+// draw screen performance
+void calcScreenFPS() {
+	unsigned long timestamp = micros();
+	memmove(&DrawScreenTimes[0], &DrawScreenTimes[1],
+			(DRAW_TIME_NUM - 1) * sizeof(typeof(DrawScreenTimes[0])));
+	DrawScreenTimes[DRAW_TIME_NUM - 1] = timestamp;
+	if (DrawScreenTimes[0] >= 0)
+		ScreenFPS =  (1000000.0 * (DRAW_TIME_NUM - 1)) /
+						(timestamp - DrawScreenTimes[0]);
+}
 
 int dbg_counter = 0;
 char progress_chars[] = { '-', '\\', '|', '/' };

@@ -6,11 +6,6 @@
 /*================================================================================*
  *										private members							  *
  *================================================================================*/
-int32_t CanvasArea::to_scale(float reading) {
-	int32_t VoltPixels = (to_voltage(reading) + offset) * grid_size * 1000 / v_div;
-	return GND_Ypos - VoltPixels;
-}
-
 void CanvasArea::castPosition(int32_t &x, int32_t &y) {
 	if (x < 0) x = 0;
 	if (y < 0) y = 0;
@@ -127,4 +122,18 @@ void CanvasArea::drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
 
 void CanvasArea::clearArea(void) {
 	fillArea(BG_Color);
+}
+
+
+
+int32_t CanvasArea::to_scale(float reading) {
+	int32_t VoltPixels = (to_voltage(reading) + offset) * grid_size * 1000 / v_div;
+	return GND_Ypos - VoltPixels;
+}
+
+float CanvasArea::dataPerPixel(SignalInfo *Wave) {
+	// t_div counted in micro_seconds
+	float uS_per_pixel = (float)t_div / grid_size;
+	float sample_per_uS = Wave->SampleRate / 1000000.0;
+	return uS_per_pixel * sample_per_uS;
 }

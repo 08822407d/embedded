@@ -32,6 +32,8 @@
 		uint32_t	SampleRate = ADC_SAMPLE_RATE;
 		uint32_t	SampleNum;
 		uint32_t	SampleBuff[SAMPLE_BUFFLEN];
+
+		uint32_t	interpolateSample(float index);
 	};
 
 

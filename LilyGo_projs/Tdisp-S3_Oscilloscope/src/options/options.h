@@ -11,7 +11,7 @@ public:
 	bool		auto_scale		= false;
 
 	int8_t		volts_index		= 1;
-	int8_t		tscale_index	= 5;
+	int8_t		tscale_index	= 2;
 	uint8_t		current_filter	= 1;
 	uint8_t		digi_wave_opt	= 0; // 0-auto | 1-analog | 2-digital data (SERIAL/SPI/I2C/etc)
 };

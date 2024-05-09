@@ -1,6 +1,14 @@
 #include "headers.h"
 
 
+uint32_t SignalInfo::interpolateSample(float index) {
+	int idx_intpart = (int)ceil(index);
+	float idx_fracpart = index - idx_intpart;
+	return idx_fracpart * SampleBuff[idx_intpart + 1] +
+				(1 - idx_fracpart) * SampleBuff[idx_intpart];
+}
+
+
 // static const char *TAG = "ADC DMA";
 
 static uint16_t adc1_chan_mask = BIT(0);

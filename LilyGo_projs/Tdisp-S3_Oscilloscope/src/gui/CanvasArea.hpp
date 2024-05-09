@@ -31,32 +31,33 @@ public:
 
 	CanvasArea(TFT_eSprite *spr);
 	
-	void setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
-	void setArea(Point2D start, Point2D end);
-	void setArea(Extent2D area);
+	void	setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+	void	setArea(Point2D start, Point2D end);
+	void	setArea(Extent2D area);
 
-	void setColors(uint32_t BG, uint32_t TxtFG, uint32_t TxtBG);
+	void	setColors(uint32_t BG, uint32_t TxtFG, uint32_t TxtBG);
 
-	Point2D getStartOnCanvas();
-	Point2D getEndOnCanvas();
+	Point2D	getStartOnCanvas();
+	Point2D	getEndOnCanvas();
 	
-	void flushDrawArea(void);
+	void	flushDrawArea(void);
 
-	void drawBorder(int32_t radius, uint32_t color);
+	void	drawBorder(int32_t radius, uint32_t color);
 
-	void fillArea(uint32_t color);
-	void fillRect(uint32_t color);
-	
-	void drawString(const String &string, int32_t x, int32_t y);
-	void drawPixel(int32_t x, int32_t y, uint32_t color);
-	void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
-	void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+	void	fillArea(uint32_t color);
+	void	fillRect(uint32_t color);
 
-	void clearArea(void);
+	void	drawString(const String &string, int32_t x, int32_t y);
+	void	drawPixel(int32_t x, int32_t y, uint32_t color);
+	void	drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+	void	drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+
+	void	clearArea(void);
 
 
-	bool posValid(int32_t x, int32_t y);
-	int32_t to_scale(float reading);
+	bool	posValid(int32_t x, int32_t y);
+	int32_t	to_scale(float reading);
+	float	dataPerPixel(SignalInfo *Wave);
 
 private:
 	TFT_eSprite		*_spr;
