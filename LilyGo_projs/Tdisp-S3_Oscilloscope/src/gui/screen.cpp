@@ -20,6 +20,10 @@ TFT_eSprite InfoSpr		= TFT_eSprite(&tft);
 CanvasArea CurveArea	= CanvasArea(&CurveSpr);
 CanvasArea InfoArea		= CanvasArea(&InfoSpr);
 
+TFT_eSprite GridSpr		= TFT_eSprite(&tft);
+CanvasArea GridArea		= CanvasArea(&GridSpr);
+
+
 bool single_trigger	= false;
 
 
@@ -65,6 +69,10 @@ void screen_init()
 	InfoArea.setArea(Point2D(CurveArea.getEndOnCanvas().X + 1, 0),
 			Point2D(Canvas.ScreenWidth - 1, Canvas.ScreenHeight));
 	voltage_division[1] = ADC_VOLTREAD_CAP / (CurveArea.Height / GRID_SIZE);
+
+	Point2D GridBG_size = Point2D(CurveArea.Width * 2, CurveArea.Height * 2);
+	GridArea.setArea(Point2D(), GridBG_size);
+	drawGridOnArea(&GridArea);
 }
 
 void setup_screen() {
@@ -95,7 +103,7 @@ void update_screen(SignalInfo *Wave) {
 	// draw screen performance
 	unsigned long draw_end = micros();
 	unsigned long draw_timespan = draw_end - draw_start;
-	Serial.println("Push Sprite Time: " + String(draw_timespan / 1000.0) + "ms\n");
+	// Serial.println("Push Sprite Time: " + String(draw_timespan / 1000.0) + "ms\n");
 }
 
 void draw_sprite(SignalInfo *Wave, bool new_data) {
@@ -144,7 +152,8 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 
 	if (new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
-		drawGridOnArea(&CurveArea);
+		// drawGridOnArea(&CurveArea);
+		CurveArea.fromSprite(&GridSpr, 240, 85);
 
 		// if (GlobOpts.auto_scale) {
 		// 	GlobOpts.auto_scale = false;
@@ -281,19 +290,20 @@ void drawGridOnArea(CanvasArea *area) {
 	uint axis_color = TFT_YELLOW;
 	uint cross_color = TFT_YELLOW;
 
+	uint grid_size = area->grid_size;
 	// Find the center of the @area
 	int HalfWidth = area->Width / 2;
 	int HalfHeight = area->Height / 2;
 	int centerX = HalfWidth;
 	int centerY = HalfHeight;
 	// Interval of points in dash-lines
-	uint point_off = CurveArea.grid_size / 10;
+	uint point_off = grid_size / 10;
 	uint cross_size = 1;
 	// make sure the dash-lines exactly overlap at each cross point
-	assert((CurveArea.grid_size % point_off) == 0);
+	assert((grid_size % point_off) == 0);
 
 	// draw horizontal dash-lines symmetrically from center to 4 Diagonals
-	for (int row = 0; row <= HalfHeight; row += CurveArea.grid_size)
+	for (int row = 0; row <= HalfHeight; row += grid_size)
 		for (int pix_idx = 0; pix_idx <= HalfWidth; pix_idx += point_off) {
 			int x_left = centerX - pix_idx;
 			int x_right = centerX + pix_idx;
@@ -303,7 +313,7 @@ void drawGridOnArea(CanvasArea *area) {
 			area->drawPixel(x_right, y_bottom, dash_color);
 			area->drawPixel(x_left, y_bottom, dash_color);
 			area->drawPixel(x_left, y_top, dash_color);
-			if ((pix_idx % CurveArea.grid_size) == 0) {
+			if ((pix_idx % grid_size) == 0) {
 				area->drawLine(x_left - cross_size, y_top,
 						x_left + cross_size, y_top, cross_color);
 				area->drawLine(x_left - cross_size, y_bottom,
@@ -315,7 +325,7 @@ void drawGridOnArea(CanvasArea *area) {
 			}
 		}
 	// draw vertical dash-lines symmetrically from center to 4 Diagonals
-	for (int col = 0; col <= HalfWidth; col += CurveArea.grid_size)
+	for (int col = 0; col <= HalfWidth; col += grid_size)
 		for (int pix_idx = 0; pix_idx <= HalfHeight; pix_idx += point_off) {
 			int x_left = centerX - col;
 			int x_right = centerX + col;
@@ -325,7 +335,7 @@ void drawGridOnArea(CanvasArea *area) {
 			area->drawPixel(x_left, y_bottom, dash_color);
 			area->drawPixel(x_right, y_bottom, dash_color);
 			area->drawPixel(x_right, y_top, dash_color);
-			if ((pix_idx % CurveArea.grid_size) == 0) {
+			if ((pix_idx % grid_size) == 0) {
 				area->drawLine(x_left, y_top - cross_size,
 						x_left, y_top + cross_size, cross_color);
 				area->drawLine(x_left, y_bottom - cross_size,
@@ -341,7 +351,7 @@ void drawGridOnArea(CanvasArea *area) {
 	area->drawLine(0, centerY, area->Width, centerY, axis_color); // X-axis
 	// area.drawLine(centerX, 0, centerX, area.Height, axis_color); // Y-axis
 
-	String offset_line = String((2.0 * CurveArea.v_div) / 1000.0 - CurveArea.offset) + "V";
+	String offset_line = String((2.0 * area->v_div) / 1000.0 - area->offset) + "V";
 	area->drawString(offset_line, -(FONT_WIDTH / 2), centerY - (int32_t)(FONT_HEIGHT * 1.5));
 }
 
@@ -357,12 +367,12 @@ void drawCurve(SignalInfo *Wave, CanvasArea *area) {
 	area->drawBorder(15, TFT_DARKGREY);
 }
 
-void pushScreenBuffer(TFT_eSprite *s,
-		uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+void pushScreenBuffer(TFT_eSprite *s, uint16_t tx, uint16_t ty,
+		uint16_t sx, uint16_t sy,uint16_t w, uint16_t h) {
 	#ifdef AMOLED
 		lcd_PushColors(x, y, Canvas.ScreenWidth, Canvas.ScreenHeight, (uint16_t *)s->getPointer());
 	#else
-		s->pushSprite(x, y);
+		s->pushSprite(sx, sy, tx, ty, w, h);
 	#endif
 }
 

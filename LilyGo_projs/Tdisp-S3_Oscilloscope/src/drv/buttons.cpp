@@ -65,7 +65,8 @@ void BtnBack_SingleClick() {
 }
 void BtnBack_MultiClick() {
 	int n = BtnBack.getNumberClicks();
-	if (n >= 4)
+	Serial.println("MultiClick: " + String(n));
+	if (n >= 3)
 		esp_deep_sleep_start();
 }
 void BtnBack_PressStart() {
@@ -85,7 +86,8 @@ void InitUserButton() {
 	BtnEnter.attachLongPressStop(BtnEnter_PressStop);
 
 	attachInterrupt(digitalPinToInterrupt(BtnBack.pin()), BtnBack_CheckTicks, FALLING);
-	BtnBack.setClickMs(100);
+	BtnBack.setDebounceMs(100);
+	BtnBack.setClickMs(200);
 	BtnBack.attachClick(BtnBack_SingleClick);
 	BtnBack.attachMultiClick(BtnBack_MultiClick);
 	BtnBack.setPressMs(BtnLongPressMs);

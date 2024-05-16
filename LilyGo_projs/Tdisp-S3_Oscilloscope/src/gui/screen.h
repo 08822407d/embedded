@@ -43,6 +43,7 @@ extern void maxFPStest(void);
 extern void calcScreenFPS(void);
 extern void DebugScreenMessage(String additional_message = "");
 
-void pushScreenBuffer(TFT_eSprite *s = &spr, uint16_t x = 0, uint16_t y = 0,
+void pushScreenBuffer(TFT_eSprite *s = &spr, uint16_t tx = 0,
+		uint16_t ty = 0, uint16_t sx = 0, uint16_t sy = 0,
 		uint16_t w = Canvas.ScreenWidth, uint16_t h = Canvas.ScreenHeight);
 

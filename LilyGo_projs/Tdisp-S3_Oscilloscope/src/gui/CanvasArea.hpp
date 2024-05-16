@@ -16,6 +16,7 @@
 
 class CanvasArea {
 public:
+	TFT_eSprite		*_spr;
 	bool			Dirty			= false;
 	uint16_t		Width;
 	uint16_t		Height;
@@ -52,6 +53,10 @@ public:
 	void	drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
 	void	drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
 
+	void	pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *data);
+	
+	void	fromSprite(TFT_eSprite *sspr, int32_t sx, int32_t sy);
+
 	void	clearArea(void);
 
 
@@ -60,7 +65,6 @@ public:
 	float	dataPerPixel(SignalInfo *Wave);
 
 private:
-	TFT_eSprite		*_spr;
 	Extent2D		CanvasPos;
 	uint			GND_Ypos;		// Y-position of the votage 0 on screen
 	uint32_t		BG_color		= BG_DARK_GRAY;

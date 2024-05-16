@@ -50,6 +50,7 @@ void CanvasArea::setArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 	Height = h;
 	CanvasPos.End.X = x + w - 1;
 	CanvasPos.End.Y = y + h - 1;
+	_spr->setColorDepth(16);
 	_spr->createSprite(Width, Height);
 	_spr->setTextColor(TxtFG_color, TxtBG_color, true);
 
@@ -87,9 +88,10 @@ void CanvasArea::drawBorder(int32_t radius, uint32_t color) {
 }
 
 
-extern void pushScreenBuffer(TFT_eSprite *s, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+void pushScreenBuffer(TFT_eSprite *s, uint16_t tx, uint16_t ty,
+		uint16_t sx, uint16_t sy,uint16_t w, uint16_t h);
 void CanvasArea::flushDrawArea(void) {
-	pushScreenBuffer(_spr, CanvasPos.Start.X, CanvasPos.Start.Y, Width, Height);
+	pushScreenBuffer(_spr, CanvasPos.Start.X, CanvasPos.Start.Y, 0, 0, Width, Height);
 }
 
 
@@ -117,6 +119,15 @@ void CanvasArea::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32
 void CanvasArea::drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
 	castPosition(x, y, w, h);
 	_spr->drawRect(x, y, w, h, color);
+}
+
+void CanvasArea::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *data) {
+	_spr->pushImage(x, y, w, h, data, 16);
+}
+
+
+void CanvasArea::fromSprite(TFT_eSprite *sspr, int32_t sx, int32_t sy) {
+	sspr->pushToSprite(_spr, -sx, -sy);
 }
 
 
