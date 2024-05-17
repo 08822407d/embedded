@@ -86,5 +86,5 @@ void ADC_Sampling(SignalInfo *Wave){
 
 	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
 	// 		(sample_timespan / 1000.0), analyze_timespan);
-	// Serial.printf("JoyStick1: X-%d , Y-%d\n", JoyStick1.X, JoyStick1.Y);
+	Serial.printf("JoyStick1: X-%d , Y-%d\n", JoyStick1.X, JoyStick1.Y);
 }
