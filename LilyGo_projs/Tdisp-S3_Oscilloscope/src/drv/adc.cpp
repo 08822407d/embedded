@@ -44,7 +44,7 @@ void config_adc() {
 	for (int i = 0; i < dig_cfg.pattern_num; i++) {
 		uint8_t unit = GET_UNIT(channel[i]);
 		uint8_t ch = channel[i] & 0x7;
-		adc_pattern[i].atten = ADC_ATTEN_DB_11;
+		adc_pattern[i].atten = ADC_ATTEN_DB_12;
 		adc_pattern[i].channel = ch;
 		adc_pattern[i].unit = unit;
 		adc_pattern[i].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
@@ -74,6 +74,8 @@ void ADC_Sampling(SignalInfo *Wave){
 	adc_digi_stop();
 	Wave->SampleNum = total_read / ADC_RESULT_BYTE;
 
+	JoyStick1.readXY();
+
 	unsigned long sample_timespan = micros() - time_start;
 
 	peak_mean(Wave);
@@ -84,4 +86,5 @@ void ADC_Sampling(SignalInfo *Wave){
 
 	// Serial.printf("Sample time: %.4f ms; Analyze time: %.4fms\n",
 	// 		(sample_timespan / 1000.0), analyze_timespan);
+	// Serial.printf("JoyStick1: X-%d , Y-%d\n", JoyStick1.X, JoyStick1.Y);
 }

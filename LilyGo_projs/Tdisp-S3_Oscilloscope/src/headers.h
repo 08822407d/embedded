@@ -4,6 +4,7 @@
 
 #include "drv/adc.h"
 #include "drv/buttons.h"
+#include "drv/joystick.hpp"
 #include "gui/screen.h"
 #include "algo/data_analysis.h"
 #include "algo/filters.h"
