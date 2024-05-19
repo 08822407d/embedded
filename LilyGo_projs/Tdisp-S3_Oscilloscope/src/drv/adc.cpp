@@ -44,7 +44,7 @@ void config_adc() {
 	for (int i = 0; i < dig_cfg.pattern_num; i++) {
 		uint8_t unit = GET_UNIT(channel[i]);
 		uint8_t ch = channel[i] & 0x7;
-		adc_pattern[i].atten = ADC_ATTEN_DB_12;
+		adc_pattern[i].atten = ADC_ATTEN_DB_11;
 		adc_pattern[i].channel = ch;
 		adc_pattern[i].unit = unit;
 		adc_pattern[i].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
