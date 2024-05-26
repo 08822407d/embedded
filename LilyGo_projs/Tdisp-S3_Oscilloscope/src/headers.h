@@ -2,6 +2,7 @@
 
 #include "configs.h"
 
+#include "drv/pins_config.h"
 #include "drv/adc.h"
 #include "drv/buttons.h"
 #include "drv/joystick.hpp"

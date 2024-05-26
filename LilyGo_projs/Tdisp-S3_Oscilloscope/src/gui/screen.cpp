@@ -70,7 +70,7 @@ void screen_init()
 			Point2D(Canvas.ScreenWidth - 1, Canvas.ScreenHeight));
 	voltage_division[1] = ADC_VOLTREAD_CAP / (CurveArea.Height / GRID_SIZE);
 
-	Point2D GridBG_size = Point2D(CurveArea.Width * 2, CurveArea.Height * 2);
+	Point2D GridBG_size = Point2D(CurveArea.Width, CurveArea.Height);
 	GridArea.setArea(Point2D(), GridBG_size);
 	drawGridOnArea(&GridArea);
 }
@@ -153,7 +153,11 @@ void draw_sprite(SignalInfo *Wave, bool new_data) {
 	if (new_data) {
 		// Fill the whole sprite with black (Sprite is in memory so not visible yet)
 		// drawGridOnArea(&CurveArea);
-		CurveArea.fromSprite(&GridSpr, 240, 85);
+		CurveArea.fromSprite(&GridSpr, 0, 0);
+
+		InfoArea.fillRect(5, 5, 120, 10, TFT_BLACK);
+		InfoArea.drawString(String(JoyStick1.X) + " , " + String(JoyStick1.Y), 5, 5);
+		InfoArea.flushDrawArea();
 
 		// if (GlobOpts.auto_scale) {
 		// 	GlobOpts.auto_scale = false;
@@ -370,7 +374,7 @@ void drawCurve(SignalInfo *Wave, CanvasArea *area) {
 void pushScreenBuffer(TFT_eSprite *s, uint16_t tx, uint16_t ty,
 		uint16_t sx, uint16_t sy,uint16_t w, uint16_t h) {
 	#ifdef AMOLED
-		lcd_PushColors(x, y, Canvas.ScreenWidth, Canvas.ScreenHeight, (uint16_t *)s->getPointer());
+		lcd_PushColors(tx, ty, w, h, (uint16_t *)s->getPointer());
 	#else
 		s->pushSprite(sx, sy, tx, ty, w, h);
 	#endif

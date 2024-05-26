@@ -98,8 +98,8 @@ void CanvasArea::flushDrawArea(void) {
 void CanvasArea::fillArea(uint32_t color) {
 	_spr->fillRect(CanvasPos.Start.X, CanvasPos.Start.Y, Width, Height, color);
 }
-void CanvasArea::fillRect(uint32_t color) {
-	fillArea(color);
+void CanvasArea::fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+	_spr->fillRect(x, y, w, h, color);
 }
 
 

@@ -46,7 +46,7 @@ public:
 	void	drawBorder(int32_t radius, uint32_t color);
 
 	void	fillArea(uint32_t color);
-	void	fillRect(uint32_t color);
+	void	fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
 
 	void	drawString(const String &string, int32_t x, int32_t y);
 	void	drawPixel(int32_t x, int32_t y, uint32_t color);
