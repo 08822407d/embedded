@@ -10,106 +10,93 @@
 * Date: 2022/7/8
 *******************************************************************************
 */
-#include "M5StickCPlus2.h"
+#include <M5Unified.h>
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
 
+
+#define STICKC_SDA 32
+#define STICKC_SCL 33
+
+
 Unit_DDS dds;
 
-int phase     = 0;
-int freq      = 1000;
-int modeIndex = 0;
+int sawtooth_freq	= 13600;
+int phase			= 0;
+int freq			= 1000;
+int modeIndex		= 0;
 
 String modeName[] = {"Sine", "Square", "Triangle", "Sawtooth"};
 
 const unsigned char *waveIcon[] = {sine, square, triangle, sawtooth};
 
+
 void displayInfo() {
+	int realfreq = freq;
+
 	M5.Lcd.clear();
-	M5.Lcd.drawJpg(waveIcon[modeIndex], sizeof(waveIcon[modeIndex]));
-	// M5.Lcd.setTextColor(TFT_GREEN);
-	// M5.Lcd.drawString("Wave:  " + modeName[modeIndex], 10, 95);
-	M5.Lcd.setTextColor(TFT_BLUE);
-	M5.Lcd.drawString("Phase:  " + String(phase), 10, 110);
+
+	// M5.Lcd.drawJpg(waveIcon[modeIndex], sizeof(waveIcon[modeIndex]));
+
+	M5.Lcd.setTextColor(TFT_GREEN);
+	M5.Lcd.drawString("Wave:  " + modeName[modeIndex], 10, 110);
+
+	// M5.Lcd.setTextColor(TFT_BLUE);
+	// M5.Lcd.drawString("Phase:  " + String(phase), 10, 110);
+
+	if (modeIndex == 3)
+		realfreq = sawtooth_freq;
 	M5.Lcd.setTextColor(TFT_YELLOW);
-	M5.Lcd.drawString("Freq:  " + String(freq), 120, 110);
+	M5.Lcd.drawString("Freq:  " + String(realfreq), 120, 110);
 }
 
 void changeWave(int expression) {
-	// switch (expression) {
-	// 	case 0:
-	// 		dds.quickOUT(Unit_DDS::kSINUSMode, freq, phase);
-	// 		break;
-	// 	case 1:
-	// 		dds.quickOUT(Unit_DDS::kSQUAREMode, freq, phase);
-	// 		break;
-	// 	case 2:
-	// 		dds.quickOUT(Unit_DDS::kTRIANGLEMode, freq, phase);
-	// 		break;
-	// 	case 3:
-	// 		// SAWTOOTH WAVE Only support 13.6Khz
-	// 		freq = 13600;
-	// 		// dds.quickOUT(Unit_DDS::kSAWTOOTHMode, freq, phase);
-	// 		dds.quickOUT(Unit_DDS::kSAWTOOTHMode, 13600, phase);
-	// 		break;
-	// 	default:
-	// 		break;
-	// }
+	switch (expression) {
+		case 0:
+			dds.quickOUT(Unit_DDS::kSINUSMode, freq, phase);
+			break;
+		case 1:
+			dds.quickOUT(Unit_DDS::kSQUAREMode, freq, phase);
+			break;
+		case 2:
+			dds.quickOUT(Unit_DDS::kTRIANGLEMode, freq, phase);
+			break;
+		case 3:
+			// SAWTOOTH WAVE Only support 13.6Khz
+			dds.quickOUT(Unit_DDS::kSAWTOOTHMode, sawtooth_freq, phase);
+			break;
+		default:
+			break;
+	}
 	displayInfo();
 }
 
 void uiInit() {
 	M5.Lcd.setRotation(3);
 	M5.Lcd.fillScreen(BLACK);
+	M5.Lcd.fillTriangle(110, 50, 110, 80, 130, 65, TFT_GREEN);
 	M5.Lcd.setTextFont(2);
-	// M5.Lcd.setTextDatum(CC_DATUM);
 }
 
 void setup() {
 	M5.begin();
+	Wire.begin(STICKC_SDA, STICKC_SCL);
+
 	uiInit();
 
-	// dds.begin(&Wire);
-	changeWave(modeIndex);
+	dds.begin(&Wire);
 }
 
 void loop() {
 	M5.update();
-	// if (M5.BtnA.wasPressed()) {
-	// 	freq += 10000;
-	// 	changeWave(modeIndex);
-	// }
-	// if (M5.BtnB.wasPressed()) {
-	// 	phase += 10;
-	// 	changeWave(modeIndex);
-	// }
-	// if (M5.BtnC.wasPressed()) {
-	// 	if (modeIndex == 3) {
-	// 		freq = 10000;
-	// 	}
-	// 	if (modeIndex < 3) {
-	// 		modeIndex++;
-	// 	} else {
-	// 		modeIndex = 0;
-	// 	}
-	// 	changeWave(modeIndex);
-	// }
 
 	if (M5.BtnA.wasPressed()) {
-		freq += 100;
+		freq += 500;
 		changeWave(modeIndex);
 	}
 	if (M5.BtnB.wasPressed()) {
-		if (modeIndex == 3)
-			freq = 10000;
-		else
-			freq = 500;
-
-		if (modeIndex < 3) {
-			modeIndex++;
-		} else {
-			modeIndex = 0;
-		}
+		modeIndex++;
+		modeIndex %= 4;
 		changeWave(modeIndex);
 	}
 }
