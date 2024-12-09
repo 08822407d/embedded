@@ -24,8 +24,10 @@
 #define SERIAL_TASK_STACK_SIZE   2048
 #define SERIAL_TASK_PRIORITY     1
 
-#define STICKC_SDA 32
-#define STICKC_SCL 33
+#define JOYSTICK_SDA	0
+#define JOYSTICK_SCL	26
+#define DDS_SDA			32
+#define DDS_SCL			33
 
 
 // Default polling interval in milliseconds
@@ -95,11 +97,13 @@ void uiInit() {
 
 void setup() {
 	M5.begin();
-	Wire.begin(STICKC_SDA, STICKC_SCL);
+	Serial.begin(115200);
+	// Wire.begin(DDS_SDA, DDS_SCL);
+	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
 
 	uiInit();
 
-	dds.begin(&Wire);
+	// dds.begin(&Wire);
 
 
 	// 创建FreeRTOS任务
@@ -191,6 +195,9 @@ void serialTask(void * parameter) {
 		// 		Serial.println("Unknown command.");
 		// 	}
 		// }
+
+		Serial.printf("MultiThread test\n");
+
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 每100ms检查一次
 	}
 }
