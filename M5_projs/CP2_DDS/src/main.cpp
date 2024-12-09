@@ -14,18 +14,31 @@
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
 
-#include "modules/Number.hpp"
+#include "include.h"
 
+
+// Task Parameters
+#define JOYSTICK_TASK_STACK_SIZE 2048
+#define JOYSTICK_TASK_PRIORITY   1
+
+#define SERIAL_TASK_STACK_SIZE   2048
+#define SERIAL_TASK_PRIORITY     1
 
 #define STICKC_SDA 32
 #define STICKC_SCL 33
 
 
+// Default polling interval in milliseconds
+volatile uint32_t joystickPollingInterval = 50; // 可通过其他方式修改
+
 Unit_DDS dds;
+
+Number<uint64_t> Freq(1000, 100, 10000000);
+
+JoyStickData_s JoyStick;
 
 int sawtooth_freq	= 13600;
 int phase			= 0;
-int freq			= 1000;
 int modeIndex		= 0;
 
 String modeName[] = {"Sine", "Square", "Triangle", "Sawtooth"};
@@ -34,7 +47,7 @@ const unsigned char *waveIcon[] = {sine, square, triangle, sawtooth};
 
 
 void displayInfo() {
-	int realfreq = freq;
+	int realfreq = Freq.getValue();
 
 	M5.Lcd.clear();
 
@@ -55,13 +68,13 @@ void displayInfo() {
 void changeWave(int expression) {
 	switch (expression) {
 		case 0:
-			dds.quickOUT(Unit_DDS::kSINUSMode, freq, phase);
+			dds.quickOUT(Unit_DDS::kSINUSMode, Freq.getValue(), phase);
 			break;
 		case 1:
-			dds.quickOUT(Unit_DDS::kSQUAREMode, freq, phase);
+			dds.quickOUT(Unit_DDS::kSQUAREMode, Freq.getValue(), phase);
 			break;
 		case 2:
-			dds.quickOUT(Unit_DDS::kTRIANGLEMode, freq, phase);
+			dds.quickOUT(Unit_DDS::kTRIANGLEMode, Freq.getValue(), phase);
 			break;
 		case 3:
 			// SAWTOOTH WAVE Only support 13.6Khz
@@ -87,18 +100,97 @@ void setup() {
 	uiInit();
 
 	dds.begin(&Wire);
+
+
+	// 创建FreeRTOS任务
+	xTaskCreate(
+		joystickTask,               // Task function
+		"Joystick Task",            // Task name
+		JOYSTICK_TASK_STACK_SIZE,   // Stack size
+		NULL,                       // Task input parameter
+		JOYSTICK_TASK_PRIORITY,     // Priority
+		NULL                        // Task handle
+	);
+
+	// 创建Serial任务
+	xTaskCreate(
+		serialTask,                 // Task function
+		"Serial Task",              // Task name
+		SERIAL_TASK_STACK_SIZE,     // Stack size
+		NULL,                       // Task input parameter
+		SERIAL_TASK_PRIORITY,       // Priority
+		NULL                        // Task handle
+	);
 }
 
 void loop() {
-	M5.update();
+	// 主循环可以保持空闲，所有功能由FreeRTOS任务处理
+	// 或者在此添加其他非关键任务
+	delay(1000); // 防止主循环占用过多CPU
+}
 
-	if (M5.BtnA.wasPressed()) {
-		freq += 500;
-		changeWave(modeIndex);
+// void loop() {
+// 	M5.update();
+
+// 	if (M5.BtnA.wasPressed()) {
+// 		Freq += 100;
+// 		changeWave(modeIndex);
+// 	}
+// 	if (M5.BtnB.wasPressed()) {
+// 		modeIndex++;
+// 		modeIndex %= 4;
+// 		changeWave(modeIndex);
+// 	}
+// }
+
+
+// 任务实现
+void joystickTask(void * parameter) {
+	(void) parameter; // 避免未使用参数的编译警告
+
+	while (1) {
+		// 记录任务开始时间
+		TickType_t taskStart = xTaskGetTickCount();
+
+
+		// 读取摇杆数据
+		readJoyStick(&Wire, &JoyStick);
+		Serial.printf("Joystick ( x:%d , y:%d )\n", JoyStick.x, JoyStick.y);
+
+		// 计算任务执行时间
+		TickType_t taskEnd = xTaskGetTickCount();
+		TickType_t elapsedTime = taskEnd - taskStart;
+		// 计算剩余延迟时间
+		uint32_t delayTime =
+				(joystickPollingInterval > (elapsedTime * portTICK_PERIOD_MS)) ? 
+					joystickPollingInterval - (elapsedTime * portTICK_PERIOD_MS) : 0;
+		// 延迟指定时间后再次执行
+		vTaskDelay(pdMS_TO_TICKS(delayTime));
 	}
-	if (M5.BtnB.wasPressed()) {
-		modeIndex++;
-		modeIndex %= 4;
-		changeWave(modeIndex);
+}
+
+// Serial任务实现
+void serialTask(void * parameter) {
+	(void) parameter;
+
+	while (1) {
+		// if (Serial.available() > 0) {
+		// 	String input = Serial.readStringUntil('\n');
+		// 	input.trim(); // 去除换行符和空格
+
+		// 	// 期望输入格式为: "interval 100"
+		// 	if (input.startsWith("interval")) {
+		// 		int newInterval = input.substring(9).toInt();
+		// 		if (newInterval > 0) {
+		// 			joystickPollingInterval = newInterval;
+		// 			Serial.printf("Polling interval updated to %d ms\n", joystickPollingInterval);
+		// 		} else {
+		// 			Serial.println("Invalid interval value.");
+		// 		}
+		// 	} else {
+		// 		Serial.println("Unknown command.");
+		// 	}
+		// }
+		vTaskDelay(pdMS_TO_TICKS(1000)); // 每100ms检查一次
 	}
 }
