@@ -14,6 +14,8 @@
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
 
+#include "modules/Number.hpp"
+
 
 #define STICKC_SDA 32
 #define STICKC_SCL 33
