@@ -1,6 +1,7 @@
 #include "modules/Number.hpp"
-#include "device/JoyStick.hpp"
+#include "device/M5-JoyStick.hpp"
 #include "device/DDS.hpp"
+#include "driver/Joystick.hpp"
 
 
     extern void joystickTask(void * parameter);
