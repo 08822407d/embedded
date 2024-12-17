@@ -205,7 +205,7 @@
 		 * @param buttonCount   按钮的数量（最多 JOYSTICK_MAX_BUTTONS）
 		 */
 		M5JoystickReader(int address, int regstart = 2, uint8_t buttonCount = 0)
-			: address(address), buttonCount(buttonCount) {}
+			: address(address), regstart(regstart), buttonCount(buttonCount) {}
 		
 		virtual bool read(int &x, int &y, uint8_t &buttons) override {
 			Wire.beginTransmission(address);

@@ -9,99 +9,148 @@ uint8_t r, g, b;
 
 void setup()
 {
-    M5.begin();
-    RollerI2C.begin(&Wire, 0x64, 32, 33, 400000);
+	auto cfg = M5.config();
+	M5.begin(cfg);
+	Serial.begin(115200);
+	RollerI2C.begin(&Wire, 0x64, 32, 33, 400000);
+
+
+	RollerI2C.setOutput(0);
+	RollerI2C.setMode(ROLLER_MODE_SPEED);
+	RollerI2C.setOutput(1);
 }
 
 void loop()
 {
-    // current mode
-    RollerI2C.setMode(ROLLER_MODE_ENCODER);
-    RollerI2C.setCurrent(120000);
-    RollerI2C.setOutput(1);
-    printf("current: %d\n", RollerI2C.getCurrent());
-    delay(100);
-    printf("actualCurrent: %d\n", RollerI2C.getCurrentReadback() / 100.0f);
-    delay(5000);
+	auto imu_update = M5.Imu.update();
+	if (imu_update) {
+		M5.Lcd.setCursor(0, 40);
+		M5.Lcd.clear();  // Delay 100ms 延迟100ms
 
-    // position mode
-    RollerI2C.setOutput(0);
-    RollerI2C.setMode(ROLLER_MODE_SPEED);
-    RollerI2C.setPos(2000000);
-    RollerI2C.setPosMaxCurrent(100000);
-    RollerI2C.setOutput(1);
-    RollerI2C.getPosPID(&p, &i, &d);
-    printf("PosPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
-    delay(100);
-    printf("pos: %d\n", RollerI2C.getPos());
-    delay(100);
-    printf("posMaxCurrent: %d\n", RollerI2C.getPosMaxCurrent() / 100.0f);
-    delay(100);
-    printf("actualPos: %d\n", RollerI2C.getPosReadback() / 100.f);
-    delay(5000);
+		auto data = M5.Imu.getImuData();
 
-    // speed mode
-    RollerI2C.setOutput(0);
-    RollerI2C.setMode(ROLLER_MODE_SPEED);
-    RollerI2C.setSpeed(240000);
-    RollerI2C.setSpeedMaxCurrent(100000);
-    RollerI2C.setOutput(1);
-    RollerI2C.getSpeedPID(&p, &i, &d);
-    printf("SpeedPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
-    delay(100);
-    printf("speed: %d\n", RollerI2C.getSpeed());
-    delay(100);
-    printf("speedMaxCurrent: %d\n", RollerI2C.getSpeedMaxCurrent() / 100.0f);
-    delay(100);
-    printf("actualSpeed: %d\n", RollerI2C.getSpeedReadback() / 100.0f);
-    delay(5000);
+		// The data obtained by getImuData can be used as follows.
+		data.accel.x;      // accel x-axis value.
+		data.accel.y;      // accel y-axis value.
+		data.accel.z;      // accel z-axis value.
+		data.accel.value;  // accel 3values array [0]=x / [1]=y / [2]=z.
 
-    // encoder mode
-    RollerI2C.setOutput(0);
-    RollerI2C.setMode(ROLLER_MODE_ENCODER);
-    RollerI2C.setDialCounter(240000);
-    RollerI2C.setOutput(1);
-    printf("DialCounter:%d\n", RollerI2C.getDialCounter());
-    delay(5000);
-    printf("temp:%d\n", RollerI2C.getTemp());
-    delay(100);
-    printf("Vin:%3.2f\n", RollerI2C.getVin() / 100.0);
-    delay(100);
-    printf("RGBBrightness:%d\n", RollerI2C.getRGBBrightness());
-    delay(1000);
-    RollerI2C.setRGBBrightness(100);
-    delay(100);
-    RollerI2C.setRGBMode(ROLLER_RGB_MODE_USER_DEFINED);
-    delay(1000);
-    RollerI2C.setRGB(TFT_WHITE);
-    delay(1000);
-    RollerI2C.setRGB(TFT_BLUE);
-    delay(2000);
-    RollerI2C.setRGB(TFT_YELLOW);
-    delay(2000);
-    RollerI2C.setRGB(TFT_RED);
-    delay(2000);
-    RollerI2C.setRGBMode(ROLLER_RGB_MODE_DEFAULT);
-    delay(100);
-    RollerI2C.setKeySwitchMode(1);
-    delay(100);
-    printf("I2CAddress:%d\n", RollerI2C.getI2CAddress());
-    delay(100);
-    printf("485 BPS:%d\n", RollerI2C.getBPS());
-    delay(100);
-    printf("485 motor id:%d\n", RollerI2C.getMotorID());
-    delay(100);
-    printf("motor output:%d\n", RollerI2C.getOutputStatus());
-    delay(100);
-    printf("SysStatus:%d\n", RollerI2C.getSysStatus());
-    delay(100);
-    printf("ErrorCode:%d\n", RollerI2C.getErrorCode());
-    delay(100);
-    printf("Button switching mode enable:%d\n", RollerI2C.getKeySwitchMode());
-    delay(100);
-    RollerI2C.getRGB(&r, &g, &b);
-    printf("RGB-R: 0x%02X  RGB-G: 0x%02X  RGB-B: 0x%02X\n", r, g, b);
-    delay(5000);
+		data.gyro.x;      // gyro x-axis value.
+		data.gyro.y;      // gyro y-axis value.
+		data.gyro.z;      // gyro z-axis value.
+		data.gyro.value;  // gyro 3values array [0]=x / [1]=y / [2]=z.
+
+		data.value;  // all sensor 9values array [0~2]=accel / [3~5]=gyro /
+					 // [6~8]=mag
+
+		Serial.printf("ax:%f  ay:%f  az:%f\r\n", data.accel.x, data.accel.y,
+					  data.accel.z);
+		Serial.printf("gx:%f  gy:%f  gz:%f\r\n", data.gyro.x, data.gyro.y,
+					  data.gyro.z);
+
+		M5.Lcd.printf("IMU:\r\n");
+		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.accel.x, data.accel.y,
+					  data.accel.z);
+		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.gyro.x, data.gyro.y,
+					  data.gyro.z);
+		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.mag.x, data.mag.y,
+					  data.mag.z);
+		
+
+		RollerI2C.setOutput(0);
+		RollerI2C.setSpeed(240000 * data.accel.x);
+		RollerI2C.setOutput(1);
+	}
+	delay(10);
+
+
+	// // current mode
+	// RollerI2C.setMode(ROLLER_MODE_ENCODER);
+	// RollerI2C.setCurrent(120000);
+	// RollerI2C.setOutput(1);
+	// printf("current: %d\n", RollerI2C.getCurrent());
+	// delay(100);
+	// printf("actualCurrent: %d\n", RollerI2C.getCurrentReadback() / 100.0f);
+	// delay(5000);
+
+	// // position mode
+	// RollerI2C.setOutput(0);
+	// RollerI2C.setMode(ROLLER_MODE_SPEED);
+	// RollerI2C.setPos(2000000);
+	// RollerI2C.setPosMaxCurrent(100000);
+	// RollerI2C.setOutput(1);
+	// RollerI2C.getPosPID(&p, &i, &d);
+	// printf("PosPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
+	// delay(100);
+	// printf("pos: %d\n", RollerI2C.getPos());
+	// delay(100);
+	// printf("posMaxCurrent: %d\n", RollerI2C.getPosMaxCurrent() / 100.0f);
+	// delay(100);
+	// printf("actualPos: %d\n", RollerI2C.getPosReadback() / 100.f);
+	// delay(5000);
+
+	// // speed mode
+	// RollerI2C.setOutput(0);
+	// RollerI2C.setMode(ROLLER_MODE_SPEED);
+	// RollerI2C.setSpeed(240000);
+	// RollerI2C.setSpeedMaxCurrent(100000);
+	// RollerI2C.setOutput(1);
+	// RollerI2C.getSpeedPID(&p, &i, &d);
+	// printf("SpeedPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
+	// delay(100);
+	// printf("speed: %d\n", RollerI2C.getSpeed());
+	// delay(100);
+	// printf("speedMaxCurrent: %d\n", RollerI2C.getSpeedMaxCurrent() / 100.0f);
+	// delay(100);
+	// printf("actualSpeed: %d\n", RollerI2C.getSpeedReadback() / 100.0f);
+	// delay(5000);
+
+	// // encoder mode
+	// RollerI2C.setOutput(0);
+	// RollerI2C.setMode(ROLLER_MODE_ENCODER);
+	// RollerI2C.setDialCounter(240000);
+	// RollerI2C.setOutput(1);
+	// printf("DialCounter:%d\n", RollerI2C.getDialCounter());
+	// delay(5000);
+	// printf("temp:%d\n", RollerI2C.getTemp());
+	// delay(100);
+	// printf("Vin:%3.2f\n", RollerI2C.getVin() / 100.0);
+	// delay(100);
+	// printf("RGBBrightness:%d\n", RollerI2C.getRGBBrightness());
+	// delay(1000);
+	// RollerI2C.setRGBBrightness(100);
+	// delay(100);
+	// RollerI2C.setRGBMode(ROLLER_RGB_MODE_USER_DEFINED);
+	// delay(1000);
+	// RollerI2C.setRGB(TFT_WHITE);
+	// delay(1000);
+	// RollerI2C.setRGB(TFT_BLUE);
+	// delay(2000);
+	// RollerI2C.setRGB(TFT_YELLOW);
+	// delay(2000);
+	// RollerI2C.setRGB(TFT_RED);
+	// delay(2000);
+	// RollerI2C.setRGBMode(ROLLER_RGB_MODE_DEFAULT);
+	// delay(100);
+	// RollerI2C.setKeySwitchMode(1);
+	// delay(100);
+	// printf("I2CAddress:%d\n", RollerI2C.getI2CAddress());
+	// delay(100);
+	// printf("485 BPS:%d\n", RollerI2C.getBPS());
+	// delay(100);
+	// printf("485 motor id:%d\n", RollerI2C.getMotorID());
+	// delay(100);
+	// printf("motor output:%d\n", RollerI2C.getOutputStatus());
+	// delay(100);
+	// printf("SysStatus:%d\n", RollerI2C.getSysStatus());
+	// delay(100);
+	// printf("ErrorCode:%d\n", RollerI2C.getErrorCode());
+	// delay(100);
+	// printf("Button switching mode enable:%d\n", RollerI2C.getKeySwitchMode());
+	// delay(100);
+	// RollerI2C.getRGB(&r, &g, &b);
+	// printf("RGB-R: 0x%02X  RGB-G: 0x%02X  RGB-B: 0x%02X\n", r, g, b);
+	// delay(5000);
 }
 
 

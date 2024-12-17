@@ -31,7 +31,7 @@
 
 
 // Default polling interval in milliseconds
-volatile uint32_t joystickPollingInterval = 50; // 可通过其他方式修改
+volatile uint32_t joystickPollingInterval = 100; // 可通过其他方式修改
 
 Unit_DDS dds;
 
@@ -100,7 +100,8 @@ void setup() {
 	M5.begin();
 	Serial.begin(115200);
 	// Wire.begin(DDS_SDA, DDS_SCL);
-	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
+	// Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
+	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL);
 	initJoystick();
 
 	uiInit();
@@ -112,7 +113,7 @@ void setup() {
 		if(event.source == EventSource::AXIS){
 			switch(event.type){
 				case EventType::SINGLE_CLICK:
-					// Serial.printf("Axis Single Click Detected: %d\n", static_cast<int>(event.direction));
+					Serial.printf("Axis Single Click Detected: %d\n", static_cast<int>(event.direction));
 					M5.Lcd.clear();
 					switch (static_cast<int>(event.direction))
 					{
@@ -137,10 +138,10 @@ void setup() {
 					}
 					break;
 				case EventType::MULTICLICK:
-					// Serial.printf("Axis Multiclick Detected: %d\n", static_cast<int>(event.direction));
+					Serial.printf("Axis Multiclick Detected: %d\n", static_cast<int>(event.direction));
 					break;
 				case EventType::LONG_PRESS:
-					// Serial.printf("Axis Long Press Detected: %d\n", static_cast<int>(event.direction));
+					Serial.printf("Axis Long Press Detected: %d\n", static_cast<int>(event.direction));
 					break;
 			}
 		}
@@ -169,15 +170,15 @@ void setup() {
 		NULL                        // Task handle
 	);
 
-	// 创建Serial任务
-	xTaskCreate(
-		serialTask,                 // Task function
-		"Serial Task",              // Task name
-		SERIAL_TASK_STACK_SIZE,     // Stack size
-		NULL,                       // Task input parameter
-		SERIAL_TASK_PRIORITY,       // Priority
-		NULL                        // Task handle
-	);
+	// // 创建Serial任务
+	// xTaskCreate(
+	// 	serialTask,                 // Task function
+	// 	"Serial Task",              // Task name
+	// 	SERIAL_TASK_STACK_SIZE,     // Stack size
+	// 	NULL,                       // Task input parameter
+	// 	SERIAL_TASK_PRIORITY,       // Priority
+	// 	NULL                        // Task handle
+	// );
 }
 
 void loop() {
@@ -210,7 +211,7 @@ void joystickTask(void * parameter) {
 		TickType_t taskStart = xTaskGetTickCount();
 
 
-		joystick->update(taskStart);
+		joystick->update();
 		// 读取摇杆数据
 		// readJoyStick(&Wire, &JoyStick);
 		// Serial.printf("Joystick ( x:%d , y:%d )\n", JoyStick.x, JoyStick.y);
@@ -228,31 +229,31 @@ void joystickTask(void * parameter) {
 	}
 }
 
-// Serial任务实现
-void serialTask(void * parameter) {
-	(void) parameter;
+// // Serial任务实现
+// void serialTask(void * parameter) {
+// 	(void) parameter;
 
-	while (1) {
-		// if (Serial.available() > 0) {
-		// 	String input = Serial.readStringUntil('\n');
-		// 	input.trim(); // 去除换行符和空格
+// 	while (1) {
+// 		// if (Serial.available() > 0) {
+// 		// 	String input = Serial.readStringUntil('\n');
+// 		// 	input.trim(); // 去除换行符和空格
 
-		// 	// 期望输入格式为: "interval 100"
-		// 	if (input.startsWith("interval")) {
-		// 		int newInterval = input.substring(9).toInt();
-		// 		if (newInterval > 0) {
-		// 			joystickPollingInterval = newInterval;
-		// 			Serial.printf("Polling interval updated to %d ms\n", joystickPollingInterval);
-		// 		} else {
-		// 			Serial.println("Invalid interval value.");
-		// 		}
-		// 	} else {
-		// 		Serial.println("Unknown command.");
-		// 	}
-		// }
+// 		// 	// 期望输入格式为: "interval 100"
+// 		// 	if (input.startsWith("interval")) {
+// 		// 		int newInterval = input.substring(9).toInt();
+// 		// 		if (newInterval > 0) {
+// 		// 			joystickPollingInterval = newInterval;
+// 		// 			Serial.printf("Polling interval updated to %d ms\n", joystickPollingInterval);
+// 		// 		} else {
+// 		// 			Serial.println("Invalid interval value.");
+// 		// 		}
+// 		// 	} else {
+// 		// 		Serial.println("Unknown command.");
+// 		// 	}
+// 		// }
 
-		Serial.printf("MultiThread test\n");
+// 		Serial.printf("MultiThread test\n");
 
-		vTaskDelay(pdMS_TO_TICKS(1000)); // 每100ms检查一次
-	}
-}
+// 		vTaskDelay(pdMS_TO_TICKS(1000)); // 每100ms检查一次
+// 	}
+// }
