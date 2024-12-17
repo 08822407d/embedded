@@ -8,13 +8,14 @@
 
 // Joystick数据结构
 typedef struct JoystickData {
-	int16_t	x;
-	int16_t	y;
-	int16_t	center;
+	int	x;
+	int	y;
+	int	center;
 } JoyStickData_s;
 
 
 // extern Joystick joystick;
 
 extern void readJoyStick(TwoWire *wire, JoyStickData_s *data);
+extern void readJoyStick_16bit(TwoWire *wire, JoyStickData_s *data);
 extern void initJoystick(void);

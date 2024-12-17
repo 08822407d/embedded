@@ -47,6 +47,9 @@
 	template <typename T>
 	class Joystick {
 	public:
+		int x;
+		int y;
+
 		Joystick(std::shared_ptr<JoystickReader<T>> reader, 
 				unsigned char thresholdPercent = 20,
 				unsigned long longPressDurationMs = JOYSTICK_LONG_PRESS_DURATION_MS, 

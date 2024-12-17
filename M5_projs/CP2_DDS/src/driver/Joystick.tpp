@@ -81,7 +81,7 @@
 		}
 		lastUpdateTick = currentTick;
 		
-		int x, y;
+		// int x, y;
 		uint8_t buttonsState;
 		if (!reader->read(x, y, buttonsState)) {
 			// 读取失败，可添加错误处理
