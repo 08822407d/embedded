@@ -1,10 +1,35 @@
-#include "unit_rolleri2c.hpp"
+#include <Arduino.h>
+#include <Wire.h>
 #include <M5Unified.h>
+#include <MadgwickAHRS.h>
+#include <PID_v1.h>
+#include "unit_rolleri2c.hpp"
+
+
+#define IMU_SAMPLE_FREQ		20
+#define IMU_SAMPLE_PERIOD	(1000 / (IMU_SAMPLE_FREQ))
 
 
 UnitRollerI2C RollerI2C;  // Create a UNIT_ROLLERI2C object
-uint32_t p, i, d;         // Defines a variable to store the PID value
-uint8_t r, g, b;
+Madgwick filter; 
+
+// PID相关
+double rollInput, rollOutput, rollSetpoint;
+
+// PID参数（根据实际情况调优）
+double Kp = 10.0; 
+double Ki = 0.5;
+double Kd = 0.1; 
+
+PID rollPID(&rollInput, &rollOutput, &rollSetpoint, Kp, Ki, Kd, DIRECT);
+
+// PID相关
+double pitchInput, pitchOutput, pitchSetpoint;
+
+PID pitchPID(&pitchInput, &pitchOutput, &pitchSetpoint, Kp, Ki, Kd, DIRECT);
+
+// 使用FreeRTOS计时
+TickType_t lastUpdate;
 
 
 void setup()
@@ -12,11 +37,27 @@ void setup()
 	auto cfg = M5.config();
 	M5.begin(cfg);
 	Serial.begin(115200);
-	RollerI2C.begin(&Wire, 0x64, 32, 33, 400000);
+	RollerI2C.begin(&Wire, 0x64, 2, 1, 400000);
+
+
+	// 假设IMU更新频率约200Hz，可据实际情况修改
+	filter.begin(IMU_SAMPLE_FREQ); 
+	lastUpdate = xTaskGetTickCount(); // 获取当前tick计数
+
+	// 设置目标roll = 0度
+	rollSetpoint = 0.0;
+
+	rollPID.SetMode(AUTOMATIC);
+	rollPID.SetOutputLimits(-1000, 1000);
+	pitchPID.SetMode(AUTOMATIC);
+	pitchPID.SetOutputLimits(-1000, 1000);
 
 
 	RollerI2C.setOutput(0);
+	// RollerI2C.setMode(ROLLER_MODE_POSITION);
+	// RollerI2C.setPos(0);
 	RollerI2C.setMode(ROLLER_MODE_SPEED);
+	RollerI2C.setSpeed(0);
 	RollerI2C.setOutput(1);
 }
 
@@ -29,39 +70,59 @@ void loop()
 
 		auto data = M5.Imu.getImuData();
 
-		// The data obtained by getImuData can be used as follows.
-		data.accel.x;      // accel x-axis value.
-		data.accel.y;      // accel y-axis value.
-		data.accel.z;      // accel z-axis value.
-		data.accel.value;  // accel 3values array [0]=x / [1]=y / [2]=z.
+		// float ax, ay, az, gx, gy, gz, mx, my, mz;
+		float ax, ay, az, gx, gy, gz;
+		ax = data.accel.x;
+		ay = data.accel.y;
+		az = data.accel.z;
+		gx = data.gyro.x;
+		gy = data.gyro.y;
+		gz = data.gyro.z;
+		// mx = data.mag.x;
+		// my = data.mag.y;
+		// mz = data.mag.z;
 
-		data.gyro.x;      // gyro x-axis value.
-		data.gyro.y;      // gyro y-axis value.
-		data.gyro.z;      // gyro z-axis value.
-		data.gyro.value;  // gyro 3values array [0]=x / [1]=y / [2]=z.
+		// 获取当前tick
+		TickType_t now = xTaskGetTickCount();
+		// 计算dt（秒）
+		// portTICK_PERIOD_MS通常为1ms
+		float dt = (now - lastUpdate) * portTICK_PERIOD_MS / 1000.0f; 
+		lastUpdate = now;
 
-		data.value;  // all sensor 9values array [0~2]=accel / [3~5]=gyro /
-					 // [6~8]=mag
+		const float deg2rad = 3.14159265358979f/180.0f;
+		// 使用6轴（加速度+陀螺仪）更新Madgwick滤波器，不需要磁力计
+		filter.updateIMU(gx * deg2rad, gy * deg2rad, gz * deg2rad, ax, ay, az);
 
-		Serial.printf("ax:%f  ay:%f  az:%f\r\n", data.accel.x, data.accel.y,
-					  data.accel.z);
-		Serial.printf("gx:%f  gy:%f  gz:%f\r\n", data.gyro.x, data.gyro.y,
-					  data.gyro.z);
-
-		M5.Lcd.printf("IMU:\r\n");
-		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.accel.x, data.accel.y,
-					  data.accel.z);
-		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.gyro.x, data.gyro.y,
-					  data.gyro.z);
-		M5.Lcd.printf("%0.2f %0.2f %0.2f\r\n", data.mag.x, data.mag.y,
-					  data.mag.z);
+		double roll = filter.getRoll(); // 获取roll角度
+		double pitch = filter.getPitch(); // 获取roll角度
 		
+		// // 将roll作为PID输入
+		// rollInput = roll;
+		// rollPID.Compute();
 
-		RollerI2C.setOutput(0);
-		RollerI2C.setSpeed(240000 * data.accel.x);
-		RollerI2C.setOutput(1);
+		// pitchInput = pitch;
+		// pitchPID.Compute();
+
+		// M5.Lcd.printf("Orig - roll: %-4.2f\r\n", roll);
+		// M5.Lcd.printf("Orig - pitch: %-4.2f\r\n", pitch);
+		// M5.Lcd.printf("PID - roll: %-4.2f\r\n", rollOutput);
+		// M5.Lcd.printf("PID - pitch: %-4.2f\r\n", pitchOutput);
+		// // 将PID输出作为电机速度指令
+		// motor.setSpeed(rollOutput);
+
+		// // 输出调试信息
+		// Serial.print("Roll: "); Serial.print(roll, 2);
+		// Serial.print(" | Output: "); Serial.print(rollOutput, 2);
+		// Serial.print(" | dt: "); Serial.println(dt, 4);
+
+
+		// RollerI2C.setOutput(0);
+		RollerI2C.setSpeed(2000 * pitch);
+		// RollerI2C.setPos(pitch * 10000);
+		// RollerI2C.setOutput(1);
 	}
-	delay(10);
+	// 根据需要调整循环延时
+	vTaskDelay(pdMS_TO_TICKS(IMU_SAMPLE_PERIOD));
 
 
 	// // current mode
