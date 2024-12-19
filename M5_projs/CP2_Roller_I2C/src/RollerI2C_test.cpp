@@ -6,7 +6,7 @@
 #include "unit_rolleri2c.hpp"
 
 
-#define IMU_SAMPLE_FREQ		20
+#define IMU_SAMPLE_FREQ		200
 #define IMU_SAMPLE_PERIOD	(1000 / (IMU_SAMPLE_FREQ))
 
 
@@ -37,6 +37,7 @@ void setup()
 	auto cfg = M5.config();
 	M5.begin(cfg);
 	Serial.begin(115200);
+	Serial.printf("Serial print test\r\n");
 	RollerI2C.begin(&Wire, 0x64, 2, 1, 400000);
 
 
@@ -63,34 +64,29 @@ void setup()
 
 void loop()
 {
-	auto imu_update = M5.Imu.update();
-	if (imu_update) {
-		M5.Lcd.setCursor(0, 40);
-		M5.Lcd.clear();  // Delay 100ms 延迟100ms
+	float ax, ay, az, gx, gy, gz;
+	m5::IMU_Class::imu_data_t data;
+	// 排空IMU的FIFO中的数据
+	while (M5.Imu.update()) {
+		data = M5.Imu.getImuData();
+	}
 
-		auto data = M5.Imu.getImuData();
-
-		// float ax, ay, az, gx, gy, gz, mx, my, mz;
-		float ax, ay, az, gx, gy, gz;
-		ax = data.accel.x;
-		ay = data.accel.y;
-		az = data.accel.z;
-		gx = data.gyro.x;
-		gy = data.gyro.y;
-		gz = data.gyro.z;
-		// mx = data.mag.x;
-		// my = data.mag.y;
-		// mz = data.mag.z;
+	ax = data.accel.x;
+	ay = data.accel.y;
+	az = data.accel.z;
+	gx = data.gyro.x;
+	gy = data.gyro.y;
+	gz = data.gyro.z;
 
 		// 获取当前tick
 		TickType_t now = xTaskGetTickCount();
-		// 计算dt（秒）
-		// portTICK_PERIOD_MS通常为1ms
-		float dt = (now - lastUpdate) * portTICK_PERIOD_MS / 1000.0f; 
+
+		// 计算时间间隔（秒）
+		float dt = (now - lastUpdate) * portTICK_PERIOD_MS / 1000.0f;
 		lastUpdate = now;
 
-		const float deg2rad = 3.14159265358979f/180.0f;
-		// 使用6轴（加速度+陀螺仪）更新Madgwick滤波器，不需要磁力计
+		// 将陀螺仪读数从deg/s转为rad/s（如果Madgwick库需要）
+		const float deg2rad = 3.14159265358979f / 180.0f;
 		filter.updateIMU(gx * deg2rad, gy * deg2rad, gz * deg2rad, ax, ay, az);
 
 		double roll = filter.getRoll(); // 获取roll角度
@@ -103,8 +99,17 @@ void loop()
 		// pitchInput = pitch;
 		// pitchPID.Compute();
 
-		// M5.Lcd.printf("Orig - roll: %-4.2f\r\n", roll);
-		// M5.Lcd.printf("Orig - pitch: %-4.2f\r\n", pitch);
+		// 调试输出（减少打印频率以避免延迟）
+		static int printCounter = 0;
+		printCounter++;
+		if (printCounter >= 10) { // 每100次循环打印一次
+			printCounter = 0;
+			
+			M5.Lcd.setCursor(10, 10);
+			M5.Lcd.clear();
+			M5.Lcd.printf("%.2f\r\n", roll);
+			M5.Lcd.printf("%.2f\r\n", pitch);
+		}
 		// M5.Lcd.printf("PID - roll: %-4.2f\r\n", rollOutput);
 		// M5.Lcd.printf("PID - pitch: %-4.2f\r\n", pitchOutput);
 		// // 将PID输出作为电机速度指令
@@ -117,10 +122,10 @@ void loop()
 
 
 		// RollerI2C.setOutput(0);
-		RollerI2C.setSpeed(2000 * pitch);
+		// RollerI2C.setSpeed(2000 * pitch);
 		// RollerI2C.setPos(pitch * 10000);
 		// RollerI2C.setOutput(1);
-	}
+
 	// 根据需要调整循环延时
 	vTaskDelay(pdMS_TO_TICKS(IMU_SAMPLE_PERIOD));
 
