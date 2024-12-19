@@ -108,57 +108,57 @@ void setup() {
 
 	// dds.begin(&Wire);
 
-	// // 注册事件回调
-	// joystick->attachCallback([](const JoystickEvent& event) {
-	// 	if(event.source == EventSource::AXIS){
-	// 		switch(event.type){
-	// 			case EventType::SINGLE_CLICK:
-	// 				Serial.printf("Axis Single Click Detected: %d\n", static_cast<int>(event.direction));
-	// 				M5.Lcd.clear();
-	// 				switch (static_cast<int>(event.direction))
-	// 				{
-	// 					case 1:
-	// 					M5.Lcd.fillTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
-	// 						break;
+	// 注册事件回调
+	joystick->attachCallback([](const JoystickEvent& event) {
+		if(event.source == EventSource::AXIS){
+			switch(event.type){
+				case EventType::SINGLE_CLICK:
+					Serial.printf("Axis Single Click Detected: %d\n", static_cast<int>(event.direction));
+					M5.Lcd.clear();
+					switch (static_cast<int>(event.direction))
+					{
+						case 1:
+						M5.Lcd.fillTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
+							break;
 
-	// 					case 2:
-	// 					M5.Lcd.fillTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
-	// 						break;
+						case 2:
+						M5.Lcd.fillTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
+							break;
 
-	// 					case 3:
-	// 					M5.Lcd.fillTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
-	// 						break;
+						case 3:
+						M5.Lcd.fillTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
+							break;
 
-	// 					case 4:
-	// 					M5.Lcd.fillTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
-	// 						break;
+						case 4:
+						M5.Lcd.fillTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
+							break;
 						
-	// 					default:
-	// 						break;
-	// 				}
-	// 				break;
-	// 			case EventType::MULTICLICK:
-	// 				Serial.printf("Axis Multiclick Detected: %d\n", static_cast<int>(event.direction));
-	// 				break;
-	// 			case EventType::LONG_PRESS:
-	// 				Serial.printf("Axis Long Press Detected: %d\n", static_cast<int>(event.direction));
-	// 				break;
-	// 		}
-	// 	}
-	// 	else if(event.source == EventSource::BUTTON){
-	// 		switch(event.type){
-	// 			case EventType::SINGLE_CLICK:
-	// 				Serial.printf("Button %d Single Click Detected\n", event.buttonId);
-	// 				break;
-	// 			case EventType::MULTICLICK:
-	// 				Serial.printf("Button %d Multiclick Detected\n", event.buttonId);
-	// 				break;
-	// 			case EventType::LONG_PRESS:
-	// 				Serial.printf("Button %d Long Press Detected\n", event.buttonId);
-	// 				break;
-	// 		}
-	// 	}
-	// });
+						default:
+							break;
+					}
+					break;
+				case EventType::MULTICLICK:
+					Serial.printf("Axis Multiclick Detected: %d\n", static_cast<int>(event.direction));
+					break;
+				case EventType::LONG_PRESS:
+					Serial.printf("Axis Long Press Detected: %d\n", static_cast<int>(event.direction));
+					break;
+			}
+		}
+		else if(event.source == EventSource::BUTTON){
+			switch(event.type){
+				case EventType::SINGLE_CLICK:
+					Serial.printf("Button %d Single Click Detected\n", event.buttonId);
+					break;
+				case EventType::MULTICLICK:
+					Serial.printf("Button %d Multiclick Detected\n", event.buttonId);
+					break;
+				case EventType::LONG_PRESS:
+					Serial.printf("Button %d Long Press Detected\n", event.buttonId);
+					break;
+			}
+		}
+	});
 
 	// 创建FreeRTOS任务
 	xTaskCreate(
@@ -211,12 +211,12 @@ void joystickTask(void * parameter) {
 		TickType_t taskStart = xTaskGetTickCount();
 
 
-		// joystick->update();
-		// Serial.printf("Joystick ( x:%d , y:%d )\n", joystick->x, joystick->y);
+		joystick->update();
+		Serial.printf("Joystick ( x:%d , y:%d )\n", joystick->x, joystick->y);
 		// 读取摇杆数据
 		readJoyStick(&Wire, &JoyStick);
 		// readJoyStick_16bit(&Wire, &JoyStick);
-		Serial.printf("Joystick ( x:%d , y:%d )\n", JoyStick.x, JoyStick.y);
+		// Serial.printf("Joystick ( x:%d , y:%d )\n", JoyStick.x, JoyStick.y);
 
 
 		// 计算任务执行时间

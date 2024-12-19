@@ -8,9 +8,9 @@
 
 // Joystick数据结构
 typedef struct JoystickData {
-	int	x;
-	int	y;
-	int	center;
+	int8_t	x;
+	int8_t	y;
+	int8_t	center;
 } JoyStickData_s;
 
 

@@ -18,10 +18,10 @@ void initJoystick()
 	joystick->enableDebounce(false);
 
 
-	Wire.beginTransmission(JOY_ADDR);  // 开始与设备通信
-	Wire.write(0x03);  // 写入寄存器地址
-	Wire.write(0x02);  // 写入要写入的数据
-	Wire.endTransmission();  // 结束传输
+	// Wire.beginTransmission(JOY_ADDR);  // 开始与设备通信
+	// Wire.write(0x03);  // 写入寄存器地址
+	// Wire.write(0x02);  // 写入要写入的数据
+	// Wire.endTransmission();  // 结束传输
 
 	// delay(3000);
 

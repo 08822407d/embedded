@@ -215,8 +215,8 @@
 			}
 			Wire.requestFrom(address, 2 + buttonCount); // 2轴数据 + 按钮字节
 			if (Wire.available() >= 2) {
-				x = Wire.read();
-				y = Wire.read();
+				x = (int8_t)Wire.read();
+				y = (int8_t)Wire.read();
 				buttons = 0;
 				for(uint8_t i = 0; i < buttonCount && i < JOYSTICK_MAX_BUTTONS; i++) {
 					if(Wire.available() > 0){
