@@ -1,10 +1,10 @@
 #pragma once
 
+// JoystickReader.h
 #ifndef JOYSTICK_READER_H
 #define JOYSTICK_READER_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "includes.h"
 
 
 	/**
@@ -115,6 +115,7 @@
 	};
 
 
+
 #include <Wire.h>
 
 	// 定义I2C模式下的最小值和最大值
@@ -175,6 +176,7 @@
 	private:
 		uint8_t address;
 	};
+
 
 
 #include <SPI.h>

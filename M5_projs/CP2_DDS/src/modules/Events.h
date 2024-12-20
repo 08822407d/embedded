@@ -36,18 +36,18 @@
 	 * @brief 摇杆事件结构体
 	 */
 	struct JoystickEvent {
-		EventSource source;     // AXIS 或 BUTTON
-		Direction direction;    // 如果来源是AXIS
-		EventType type;
+		EventSource	source;     // AXIS 或 BUTTON
+		Direction	direction;    // 如果来源是AXIS
+		EventType	type;
 	};
 
 	/**
 	 * @brief 按钮事件结构体
 	 */
 	struct ButtonEvent {
-		EventSource source;     // BUTTON
-		uint8_t buttonId;       // 按钮ID
-		EventType type;
+		EventSource	source;     // BUTTON
+		uint8_t		buttonId;       // 按钮ID
+		EventType	type;
 	};
 
 #endif // EVENTS_H

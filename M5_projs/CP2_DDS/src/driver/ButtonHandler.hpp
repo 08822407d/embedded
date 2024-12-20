@@ -4,13 +4,12 @@
 #ifndef BUTTON_HANDLER_H
 #define BUTTON_HANDLER_H
 
-#include <functional>
-#include <memory>
 #include "ButtonReader.hpp"
-#include "JoystickConfig.h"
-#include "modules/Events.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+
+#include "includes.h"
+
+#include "modules/includes.h"
+
 
 	/**
 	 * @brief ButtonHandler 类，用于处理按钮事件。

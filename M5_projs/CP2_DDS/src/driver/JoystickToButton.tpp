@@ -1,10 +1,8 @@
-#pragma once
-
 // JoystickToButton.tpp
 #ifndef JOYSTICK_TO_BUTTON_TPP
 #define JOYSTICK_TO_BUTTON_TPP
 
-#include "JoystickToButton.hpp"
+#include "JoystickToButton.h"
 
 
 	JoystickToButton::JoystickToButton(std::shared_ptr<Joystick> joystick, 

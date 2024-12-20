@@ -4,14 +4,9 @@
 #ifndef JOYSTICK_TO_BUTTON_H
 #define JOYSTICK_TO_BUTTON_H
 
-#include <functional>
-#include <memory>
-#include <vector>
-#include <map>
 #include "Joystick.hpp"
-#include "modules/Events.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+
+#include "modules/includes.h"
 
 
 	/**

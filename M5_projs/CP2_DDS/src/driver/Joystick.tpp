@@ -1,6 +1,9 @@
 // Joystick.tpp
-#ifndef _JOYSTICK_TPP_
-#define _JOYSTICK_TPP_
+#ifndef JOYSTICK_TPP
+#define JOYSTICK_TPP
+
+#include "Joystick.hpp"
+
 
 	Joystick::Joystick(std::shared_ptr<JoystickReader> reader, 
 					unsigned char thresholdPercent, 
@@ -227,4 +230,4 @@
 		}
 	}
 
-#endif /* _JOYSTICK_TPP_ */
+#endif // JOYSTICK_TPP

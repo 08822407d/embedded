@@ -1,16 +1,16 @@
 #pragma once
 
-#ifndef _JOYSTICK_H_
-#define _JOYSTICK_H_
+// Joystick.h
+#ifndef JOYSTICK_H
+#define JOYSTICK_H
 
 #include <Arduino.h>
 #include <functional>
 #include <memory>
+
 #include "JoystickReader.hpp"
-#include "JoystickConfig.h"
-#include "modules/Events.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+
+#include "includes.h"
 
 
 	/**
@@ -116,4 +116,4 @@
 
 #include "Joystick.tpp"
 
-#endif /* _JOYSTICK_H_ */
+#endif // JOYSTICK_H

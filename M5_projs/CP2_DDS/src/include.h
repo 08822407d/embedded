@@ -1,12 +1,7 @@
-#include <Arduino.h>
-#include <Wire.h>
 #include <memory>
 
-#include "driver/Joystick.hpp"
-#include "driver/JoystickReader.hpp"
-#include "driver/ButtonReader.hpp"
-#include "driver/ButtonHandler.hpp"
-#include "driver/JoystickToButton.hpp"
+#include "driver/driver.h"
+#include "driver/includes.h"
 
 #include "modules/Number.hpp"
 
