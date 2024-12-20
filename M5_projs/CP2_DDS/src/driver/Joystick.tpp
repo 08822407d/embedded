@@ -2,8 +2,6 @@
 #ifndef _JOYSTICK_TPP_
 #define _JOYSTICK_TPP_
 
-#include "Joystick.hpp"
-
 	Joystick::Joystick(std::shared_ptr<JoystickReader> reader, 
 					unsigned char thresholdPercent, 
 					unsigned long longPressDurationMs, 
