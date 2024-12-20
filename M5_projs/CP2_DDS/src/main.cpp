@@ -17,6 +17,17 @@
 #include "include.h"
 
 
+// 定义全局Joystick、ButtonHandler和JoystickToButton实例
+std::shared_ptr<Joystick> joystick;
+std::shared_ptr<ButtonHandler> buttonHandler;
+std::shared_ptr<JoystickToButton> joystickToButton;
+
+// 定义轮询间隔
+volatile unsigned long joystickPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
+volatile unsigned long buttonPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
+volatile unsigned long virtualButtonPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
+
+
 // Task Parameters
 #define JOYSTICK_TASK_STACK_SIZE 2048
 #define JOYSTICK_TASK_PRIORITY   1
@@ -37,8 +48,6 @@ Unit_DDS dds;
 
 Number<uint64_t> Freq(1000, 100, 10000000);
 
-JoyStickData_s JoyStick;
-extern std::shared_ptr<Joystick<int>> joystick;
 
 int sawtooth_freq	= 13600;
 int phase			= 0;
@@ -99,8 +108,6 @@ void uiInit() {
 void setup() {
 	M5.begin();
 	Serial.begin(115200);
-	// Wire.begin(DDS_SDA, DDS_SCL);
-	// Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL);
 	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
 	initJoystick();
 
@@ -169,16 +176,6 @@ void setup() {
 		JOYSTICK_TASK_PRIORITY,     // Priority
 		NULL                        // Task handle
 	);
-
-	// // 创建Serial任务
-	// xTaskCreate(
-	// 	serialTask,                 // Task function
-	// 	"Serial Task",              // Task name
-	// 	SERIAL_TASK_STACK_SIZE,     // Stack size
-	// 	NULL,                       // Task input parameter
-	// 	SERIAL_TASK_PRIORITY,       // Priority
-	// 	NULL                        // Task handle
-	// );
 }
 
 void loop() {
@@ -186,20 +183,6 @@ void loop() {
 	// 或者在此添加其他非关键任务
 	delay(1000); // 防止主循环占用过多CPU
 }
-
-// void loop() {
-// 	M5.update();
-
-// 	if (M5.BtnA.wasPressed()) {
-// 		Freq += 100;
-// 		changeWave(modeIndex);
-// 	}
-// 	if (M5.BtnB.wasPressed()) {
-// 		modeIndex++;
-// 		modeIndex %= 4;
-// 		changeWave(modeIndex);
-// 	}
-// }
 
 
 // 任务实现
@@ -211,12 +194,8 @@ void joystickTask(void * parameter) {
 		TickType_t taskStart = xTaskGetTickCount();
 
 
-		joystick->update();
-		Serial.printf("Joystick ( x:%d , y:%d )\n", joystick->x, joystick->y);
 		// 读取摇杆数据
-		readJoyStick(&Wire, &JoyStick);
-		// readJoyStick_16bit(&Wire, &JoyStick);
-		// Serial.printf("Joystick ( x:%d , y:%d )\n", JoyStick.x, JoyStick.y);
+		joystick->update();
 
 
 		// 计算任务执行时间
@@ -230,32 +209,3 @@ void joystickTask(void * parameter) {
 		vTaskDelay(pdMS_TO_TICKS(delayTime));
 	}
 }
-
-// // Serial任务实现
-// void serialTask(void * parameter) {
-// 	(void) parameter;
-
-// 	while (1) {
-// 		// if (Serial.available() > 0) {
-// 		// 	String input = Serial.readStringUntil('\n');
-// 		// 	input.trim(); // 去除换行符和空格
-
-// 		// 	// 期望输入格式为: "interval 100"
-// 		// 	if (input.startsWith("interval")) {
-// 		// 		int newInterval = input.substring(9).toInt();
-// 		// 		if (newInterval > 0) {
-// 		// 			joystickPollingInterval = newInterval;
-// 		// 			Serial.printf("Polling interval updated to %d ms\n", joystickPollingInterval);
-// 		// 		} else {
-// 		// 			Serial.println("Invalid interval value.");
-// 		// 		}
-// 		// 	} else {
-// 		// 		Serial.println("Unknown command.");
-// 		// 	}
-// 		// }
-
-// 		Serial.printf("MultiThread test\n");
-
-// 		vTaskDelay(pdMS_TO_TICKS(1000)); // 每100ms检查一次
-// 	}
-// }
