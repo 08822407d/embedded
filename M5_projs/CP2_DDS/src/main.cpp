@@ -27,6 +27,13 @@ volatile unsigned long joystickPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
 volatile unsigned long buttonPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
 volatile unsigned long virtualButtonPollingInterval = JOYSTICK_DEBOUNCE_TIME_MS;
 
+// 函数原型
+void joystickTask(void * parameter);
+void buttonTask(void * parameter);
+void joystickToButtonTask(void * parameter);
+void serialTask(void * parameter);
+
+
 
 // Task Parameters
 #define JOYSTICK_TASK_STACK_SIZE 2048
@@ -50,12 +57,12 @@ Number<uint64_t> Freq(1000, 100, 10000000);
 
 
 int sawtooth_freq	= 13600;
-int phase			= 0;
 int modeIndex		= 0;
 
 String modeName[] = {"Sine", "Square", "Triangle", "Sawtooth"};
 
-const unsigned char *waveIcon[] = {sine, square, triangle, sawtooth};
+// const unsigned char *waveIcon[] = {sine, square, triangle, sawtooth};
+
 
 
 void displayInfo() {
@@ -109,40 +116,29 @@ void setup() {
 	M5.begin();
 	Serial.begin(115200);
 	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
-	initJoystick();
-
 	uiInit();
-
 	// dds.begin(&Wire);
 
-	// 注册事件回调
+
+
+	// 创建JoystickReader实例（I2C）
+	std::shared_ptr<JoystickReader> joystickReader = std::make_shared<I2CJoystickReader>(JOYSTICK_I2C_ADDRESS);
+	
+	// 创建Joystick实例
+	joystick = std::make_shared<Joystick>(joystickReader, 20, JOYSTICK_LONG_PRESS_DURATION_MS, JOYSTICK_MULTICLICK_INTERVAL_MS);
+	
+	// 创建ButtonReader实例（数字引脚）
+	std::shared_ptr<ButtonReader> buttonReader = std::make_shared<DigitalButtonReader>(BUTTON_FIRST_PIN, BUTTON_COUNT);
+	
+	// 创建ButtonHandler实例
+	buttonHandler = std::make_shared<ButtonHandler>(buttonReader, JOYSTICK_LONG_PRESS_DURATION_MS, JOYSTICK_MULTICLICK_INTERVAL_MS);
+	
+	// 注册摇杆事件回调
 	joystick->attachCallback([](const JoystickEvent& event) {
 		if(event.source == EventSource::AXIS){
 			switch(event.type){
 				case EventType::SINGLE_CLICK:
 					Serial.printf("Axis Single Click Detected: %d\n", static_cast<int>(event.direction));
-					M5.Lcd.clear();
-					switch (static_cast<int>(event.direction))
-					{
-						case 1:
-						M5.Lcd.fillTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
-							break;
-
-						case 2:
-						M5.Lcd.fillTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
-							break;
-
-						case 3:
-						M5.Lcd.fillTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
-							break;
-
-						case 4:
-						M5.Lcd.fillTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
-							break;
-						
-						default:
-							break;
-					}
 					break;
 				case EventType::MULTICLICK:
 					Serial.printf("Axis Multiclick Detected: %d\n", static_cast<int>(event.direction));
@@ -152,7 +148,11 @@ void setup() {
 					break;
 			}
 		}
-		else if(event.source == EventSource::BUTTON){
+	});
+	
+	// 注册按钮事件回调
+	buttonHandler->attachCallback([](const ButtonEvent& event) {
+		if(event.source == EventSource::BUTTON){
 			switch(event.type){
 				case EventType::SINGLE_CLICK:
 					Serial.printf("Button %d Single Click Detected\n", event.buttonId);
@@ -166,15 +166,63 @@ void setup() {
 			}
 		}
 	});
+	
+	// 创建VirtualButtonHandler实例，假设将四个方向转换为四个虚拟按钮
+	std::vector<Direction> virtualDirections = { Direction::UP, Direction::DOWN, Direction::LEFT, Direction::RIGHT };
+	joystickToButton = std::make_shared<JoystickToButton>(joystick, virtualDirections, JOYSTICK_LONG_PRESS_DURATION_MS, JOYSTICK_MULTICLICK_INTERVAL_MS);
+	
+	// 注册虚拟按钮事件回调
+	joystickToButton->attachCallback([](const ButtonEvent& event) {
+		if(event.source == EventSource::BUTTON){
+			switch(event.type){
+				case EventType::SINGLE_CLICK:
+					Serial.printf("Virtual Button %d Single Click Detected\n", event.buttonId);
+					break;
+				case EventType::MULTICLICK:
+					Serial.printf("Virtual Button %d Multiclick Detected\n", event.buttonId);
+					break;
+				case EventType::LONG_PRESS:
+					Serial.printf("Virtual Button %d Long Press Detected\n", event.buttonId);
+					break;
+			}
+		}
+	});
 
 	// 创建FreeRTOS任务
 	xTaskCreate(
-		joystickTask,               // Task function
-		"Joystick Task",            // Task name
-		JOYSTICK_TASK_STACK_SIZE,   // Stack size
-		NULL,                       // Task input parameter
-		JOYSTICK_TASK_PRIORITY,     // Priority
-		NULL                        // Task handle
+		joystickTask,				// 任务函数
+		"Joystick Task",			// 任务名称
+		2048,						// 堆栈大小
+		NULL,						// 任务输入参数
+		1,							// 优先级
+		NULL						// 任务句柄
+	);
+	
+	xTaskCreate(
+		buttonTask,					// 任务函数
+		"Button Task",				// 任务名称
+		2048,						// 堆栈大小
+		NULL,						// 任务输入参数
+		1,							// 优先级
+		NULL						// 任务句柄
+	);
+	
+	xTaskCreate(
+		joystickToButtonTask,		// 任务函数
+		"JoystickToButton Task",	// 任务名称
+		2048,						// 堆栈大小
+		NULL,						// 任务输入参数
+		1,							// 优先级
+		NULL						// 任务句柄
+	);
+	
+	xTaskCreate(
+		serialTask,					// 任务函数
+		"Serial Task",				// 任务名称
+		2048,						// 堆栈大小
+		NULL,						// 任务输入参数
+		1,							// 优先级
+		NULL						// 任务句柄
 	);
 }
 
@@ -185,27 +233,122 @@ void loop() {
 }
 
 
-// 任务实现
+
+// Joystick任务实现
 void joystickTask(void * parameter) {
 	(void) parameter; // 避免未使用参数的编译警告
-
+	
 	while (1) {
-		// 记录任务开始时间
-		TickType_t taskStart = xTaskGetTickCount();
-
-
-		// 读取摇杆数据
 		joystick->update();
+		vTaskDelay(pdMS_TO_TICKS(joystickPollingInterval));
+	}
+}
 
+// Button任务实现
+void buttonTask(void * parameter) {
+	(void) parameter; // 避免未使用参数的编译警告
+	
+	while (1) {
+		buttonHandler->update();
+		vTaskDelay(pdMS_TO_TICKS(buttonPollingInterval));
+	}
+}
 
-		// 计算任务执行时间
-		TickType_t taskEnd = xTaskGetTickCount();
-		TickType_t elapsedTime = taskEnd - taskStart;
-		// 计算剩余延迟时间
-		uint32_t delayTime =
-				(joystickPollingInterval > (elapsedTime * portTICK_PERIOD_MS)) ? 
-					joystickPollingInterval - (elapsedTime * portTICK_PERIOD_MS) : 0;
-		// 延迟指定时间后再次执行
-		vTaskDelay(pdMS_TO_TICKS(delayTime));
+// JoystickToButton任务实现
+void joystickToButtonTask(void * parameter) {
+	(void) parameter; // 避免未使用参数的编译警告
+	
+	while (1) {
+		joystickToButton->update();
+		vTaskDelay(pdMS_TO_TICKS(virtualButtonPollingInterval));
+	}
+}
+
+// Serial任务实现（用于动态修改轮询间隔和校正）
+void serialTask(void * parameter) {
+	(void) parameter; // 避免未使用参数的编译警告
+	
+	while (1) {
+		if (Serial.available() > 0) {
+			String input = Serial.readStringUntil('\n');
+			input.trim(); // 去除换行符和空格
+			
+			// 期望命令格式：
+			// "joystick interval <value>" - 设置摇杆轮询间隔（毫秒）
+			// "joystick calibrate <x> <y>" - 设置摇杆中心位置
+			// "button interval <value>" - 设置按钮轮询间隔（毫秒）
+			// "virtualbutton interval <value>" - 设置虚拟按钮轮询间隔（毫秒）
+			if (input.startsWith("joystick interval")) {
+				int spaceIdx = input.indexOf(' ', 16);
+				if(spaceIdx > 0){
+					String valueStr = input.substring(spaceIdx + 1);
+					unsigned long newInterval = valueStr.toInt();
+					if(newInterval > 0){
+						joystickPollingInterval = newInterval;
+						Serial.printf("Joystick polling interval updated to %lu ms\n", newInterval);
+					}
+					else{
+						Serial.println("Invalid joystick interval value.");
+					}
+				}
+				else{
+					Serial.println("Invalid command format. Use: joystick interval <value>");
+				}
+			}
+			else if(input.startsWith("joystick calibrate")) {
+				// 期望格式： "joystick calibrate <x> <y>"
+				int firstSpace = input.indexOf(' ', 17);
+				int secondSpace = input.indexOf(' ', firstSpace + 1);
+				if(firstSpace > 0 && secondSpace > firstSpace + 1){
+					String xStr = input.substring(firstSpace + 1, secondSpace);
+					String yStr = input.substring(secondSpace + 1);
+					int calibratedX = xStr.toInt();
+					int calibratedY = yStr.toInt();
+					joystick->calibrate(calibratedX, calibratedY);
+					Serial.printf("Joystick calibrated to center X: %d, Y: %d\n", calibratedX, calibratedY);
+				}
+				else{
+					Serial.println("Invalid calibrate command. Use: joystick calibrate <x> <y>");
+				}
+			}
+			else if (input.startsWith("button interval")) {
+				int spaceIdx = input.indexOf(' ', 15);
+				if(spaceIdx > 0){
+					String valueStr = input.substring(spaceIdx + 1);
+					unsigned long newInterval = valueStr.toInt();
+					if(newInterval > 0){
+						buttonPollingInterval = newInterval;
+						Serial.printf("Button polling interval updated to %lu ms\n", newInterval);
+					}
+					else{
+						Serial.println("Invalid button interval value.");
+					}
+				}
+				else{
+					Serial.println("Invalid command format. Use: button interval <value>");
+				}
+			}
+			else if (input.startsWith("virtualbutton interval")) {
+				int spaceIdx = input.indexOf(' ', 21);
+				if(spaceIdx > 0){
+					String valueStr = input.substring(spaceIdx + 1);
+					unsigned long newInterval = valueStr.toInt();
+					if(newInterval > 0){
+						virtualButtonPollingInterval = newInterval;
+						Serial.printf("Virtual Button polling interval updated to %lu ms\n", newInterval);
+					}
+					else{
+						Serial.println("Invalid virtual button interval value.");
+					}
+				}
+				else{
+					Serial.println("Invalid command format. Use: virtualbutton interval <value>");
+				}
+			}
+			else {
+				Serial.println("Unknown command.");
+			}
+		}
+		vTaskDelay(pdMS_TO_TICKS(100)); // 每100ms检查一次
 	}
 }
