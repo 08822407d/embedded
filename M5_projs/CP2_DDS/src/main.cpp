@@ -97,15 +97,23 @@ void drvInit() {
 void setup() {
 	M5.begin();
 	Serial.begin(115200);
-	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 100000UL);
+	Wire.begin(JOYSTICK_SDA, JOYSTICK_SCL, 400000UL);
+	
 	uiInit();
 	// dds.begin(&Wire);
 
-	initModulePollingTask();
+	initM5JoystickHAT();
+
+    // 创建judge: 2) 对joystick的4向
+    auto joy4Way = std::make_shared<Joystick4WayJudge>("4Way", &joystick);
+    eventMgr.registerJudge(joy4Way);
+
+	initEventPollTask();
 }
 
 void loop() {
 	// 主循环可以保持空闲，所有功能由FreeRTOS任务处理
 	// 或者在此添加其他非关键任务
-	delay(1000); // 防止主循环占用过多CPU
+	Serial.printf("X: %d, Y: %d\n", joystick.getX(), joystick.getY());
+	delay(50); // 防止主循环占用过多CPU
 }
