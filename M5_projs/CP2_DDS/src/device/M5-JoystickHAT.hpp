@@ -3,9 +3,11 @@
 #ifndef _M5_JOYSTICKHAT_MODULE_HPP_
 #define _M5_JOYSTICKHAT_MODULE_HPP_
 
-#include <Wire.h>
+#include <memory>
 #include <functional>
 #include <map>
+
+#include <Wire.h>
 
 #include "GenericJoystick.hpp"
 
@@ -17,31 +19,8 @@
 #define STICKC_GPIO_SDA		0
 #define STICKC_GPIO_SCL		26
 
-	// // 事件枚举
-	// enum M5JoystickHATEventType {
-	// 	EVT_BTN_MIDDLE_CLICK,
-	// 	EVT_BTN_MIDDLE_DOUBLECLICK,
-	// 	EVT_BTN_MIDDLE_LONGPRESS,
-	// 	// EVT_BTN_TOP_CLICK,
-	// 	// EVT_BTN_TOP_DOUBLECLICK,
-	// 	// EVT_BTN_TOP_LONGPRESS,
-	// 	EVT_DIR_UP_CLICK,
-	// 	EVT_DIR_UP_DOUBLECLICK,
-	// 	EVT_DIR_UP_LONGPRESS,
-	// 	EVT_DIR_DOWN_CLICK,
-	// 	EVT_DIR_DOWN_DOUBLECLICK,
-	// 	EVT_DIR_DOWN_LONGPRESS,
-	// 	EVT_DIR_LEFT_CLICK,
-	// 	EVT_DIR_LEFT_DOUBLECLICK,
-	// 	EVT_DIR_LEFT_LONGPRESS,
-	// 	EVT_DIR_RIGHT_CLICK,
-	// 	EVT_DIR_RIGHT_DOUBLECLICK,
-	// 	EVT_DIR_RIGHT_LONGPRESS,
-	// 	// ... etc
-	// };
 
-
-	class M5JoystickHAT : public Joystick {
+	class M5JoystickHAT : public IJoystick {
 	public:
 		uint8_t		_addr;
 		TwoWire		*_wire;
@@ -54,7 +33,7 @@
 
 
 		M5JoystickHAT();
-		virtual ~M5JoystickHAT() {}
+		// virtual ~M5JoystickHAT() {}
 
 		/**
 		 * @brief Unit Joystick2 init
@@ -73,6 +52,9 @@
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
 
+		const char* getName() const override {
+			return "M5JoystickHAT";
+		}
 		// 可选: 提供 setLongPressTime, setDoubleClickInterval, setDirectionThreshold 等
 
 	private:
@@ -84,6 +66,7 @@
 	};
 
 
+	// 声明一个全局的 std::shared_ptr
 	extern M5JoystickHAT joystick;
 	void initM5JoystickHAT(void);
 

@@ -1,4 +1,4 @@
 #include "modules/includes.h"
-#include "driver/EventManager.hpp"
-#include "driver/Joystick4WayJudge.hpp"
+#include "driver/ModuleManager.hpp"
+#include "driver/Joystick4WayButtons.hpp"
 #include "device/M5-JoystickHAT.hpp"

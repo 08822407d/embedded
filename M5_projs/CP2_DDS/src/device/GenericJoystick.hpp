@@ -3,9 +3,9 @@
 #ifndef _GENERIC_JOYSTICK_MODULE_HPP_
 #define _GENERIC_JOYSTICK_MODULE_HPP_
 
+#include "GenericModule.hpp"
 
-	class Joystick
-	{
+	class IJoystick : public IDeviceModule {
 	private:
 		/* data */
 		int _xVal;
@@ -15,12 +15,14 @@
 		int Xmax;
 		int Ymax;
 
-		// virtual Joystick(/* args */) {}
-		// virtual ~Joystick() {}
-
 		virtual int getX() = 0;
 		virtual int getY() = 0;
 		virtual bool update() = 0;
+
+		/**
+		 * @brief 返回模块名称或标识(可用于调试或日志输出)。
+		 */
+		virtual const char* getName() const = 0;
 	};
 
 #endif /* _GENERIC_JOYSTICK_MODULE_HPP_ */
