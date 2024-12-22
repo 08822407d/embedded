@@ -15,46 +15,46 @@ AceButton JoystickRightButton(&JoystickRightConfig, 0);
 
 // 回调函数
 void handleEventUp(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	if (button == &JoystickUpButton) {
-		if (eventType == AceButton::kEventClicked) {
-		Serial.println("Up direction clicked");
-		} else if (eventType == AceButton::kEventLongPressed) {
-		Serial.println("Up direction long pressed");
-		}
-	}
+	Serial.println("Joystick Up Event\n");
+
+	// if (eventType == AceButton::kEventClicked) {
+	// 	Serial.println("Up direction clicked");
+	// } else if (eventType == AceButton::kEventLongPressed) {
+	// 	Serial.println("Up direction long pressed");
+	// }
 	// similarly for downButton, leftButton, rightButton ...
 }
 
 void handleEventDown(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	if (button == &JoystickDownButton) {
-		if (eventType == AceButton::kEventClicked) {
-		Serial.println("Down direction clicked");
-		} else if (eventType == AceButton::kEventLongPressed) {
-		Serial.println("Down direction long pressed");
-		}
-	}
+	Serial.println("Joystick Down Event\n");
+
+	// if (eventType == AceButton::kEventClicked) {
+	// 	Serial.println("Down direction clicked");
+	// } else if (eventType == AceButton::kEventLongPressed) {
+	// 	Serial.println("Down direction long pressed");
+	// }
 	// similarly for downButton, leftButton, rightButton ...
 }
 
 void handleEventLeft(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	if (button == &JoystickLeftButton) {
-		if (eventType == AceButton::kEventClicked) {
-		Serial.println("Left direction clicked");
-		} else if (eventType == AceButton::kEventLongPressed) {
-		Serial.println("Left direction long pressed");
-		}
-	}
+	Serial.println("Joystick Left Event\n");
+
+	// if (eventType == AceButton::kEventClicked) {
+	// 	Serial.println("Left direction clicked");
+	// } else if (eventType == AceButton::kEventLongPressed) {
+	// 	Serial.println("Left direction long pressed");
+	// }
 	// similarly for downButton, leftButton, rightButton ...
 }
 
 void handleEventRight(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	if (button == &JoystickRightButton) {
-		if (eventType == AceButton::kEventClicked) {
-		Serial.println("Right direction clicked");
-		} else if (eventType == AceButton::kEventLongPressed) {
-		Serial.println("Right direction long pressed");
-		}
-	}
+	Serial.println("Joystick Right Event\n");
+
+	// if (eventType == AceButton::kEventClicked) {
+	// 	Serial.println("Right direction clicked");
+	// } else if (eventType == AceButton::kEventLongPressed) {
+	// 	Serial.println("Right direction long pressed");
+	// }
 	// similarly for downButton, leftButton, rightButton ...
 }
 
@@ -95,20 +95,31 @@ void initJoystick4WayButtonsCheckTask() {
 void initJoystick4WayButtons(void) {
 	// 可setFeature
 	JoystickUpConfig.setFeature(ButtonConfig::kFeatureClick);
-	JoystickUpConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
-	JoystickUpConfig.setFeature(ButtonConfig::kFeatureLongPress);
+	// JoystickUpConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
+	// JoystickUpConfig.setFeature(ButtonConfig::kFeatureLongPress);
 
 	JoystickDownConfig.setFeature(ButtonConfig::kFeatureClick);
-	JoystickDownConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
-	JoystickDownConfig.setFeature(ButtonConfig::kFeatureLongPress);
+	// JoystickDownConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
+	// JoystickDownConfig.setFeature(ButtonConfig::kFeatureLongPress);
 
 	JoystickLeftConfig.setFeature(ButtonConfig::kFeatureClick);
-	JoystickLeftConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
-	JoystickLeftConfig.setFeature(ButtonConfig::kFeatureLongPress);
+	// JoystickLeftConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
+	// JoystickLeftConfig.setFeature(ButtonConfig::kFeatureLongPress);
 
 	JoystickRightConfig.setFeature(ButtonConfig::kFeatureClick);
-	JoystickRightConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
-	JoystickRightConfig.setFeature(ButtonConfig::kFeatureLongPress);
+	// JoystickRightConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
+	// JoystickRightConfig.setFeature(ButtonConfig::kFeatureLongPress);
+
+
+	// JoystickUpConfig.setDebounceDelay(50);
+	// JoystickDownConfig.setDebounceDelay(50);
+	// JoystickLeftConfig.setDebounceDelay(50);
+	// JoystickRightConfig.setDebounceDelay(50);
+
+	// JoystickUpConfig.setClickDelay(100);
+	// JoystickDownConfig.setClickDelay(100);
+	// JoystickLeftConfig.setClickDelay(100);
+	// JoystickRightConfig.setClickDelay(100);
 
 
 	// 添加回调函数
@@ -116,7 +127,4 @@ void initJoystick4WayButtons(void) {
 	JoystickDownButton.setEventHandler(handleEventDown);
 	JoystickLeftButton.setEventHandler(handleEventLeft);
 	JoystickRightButton.setEventHandler(handleEventRight);
-
-
-	initJoystick4WayButtonsCheckTask();
 }

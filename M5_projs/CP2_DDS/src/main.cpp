@@ -105,7 +105,9 @@ void setup() {
 
 	initJoystick4WayButtons();
 
-	initEventPollTask();
+
+	initJoystick4WayButtonsCheckTask();
+	initModulePollTask();
 }
 
 void loop() {

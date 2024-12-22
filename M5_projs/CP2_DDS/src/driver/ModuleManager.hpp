@@ -39,6 +39,6 @@
 
 
 	extern ModuleManager DevModManager;
-	void initEventPollTask(void);
+	void initModulePollTask(void);
 
 #endif /* _MODULE_MANAGER_H_ */

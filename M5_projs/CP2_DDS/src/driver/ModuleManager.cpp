@@ -15,7 +15,7 @@ static void EventPollTask(void *pvParam) {
 	}
 }
 
-void initEventPollTask() {
+void initModulePollTask() {
 	// 通过 xTaskCreate() 创建轮询任务
 	xTaskCreate(
 		EventPollTask,				// 任务函数

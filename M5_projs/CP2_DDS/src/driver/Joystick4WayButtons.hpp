@@ -47,13 +47,13 @@ using namespace ace_button;
 			// 注意: pin参数无用, 因为是虚拟引脚
 			switch (_direction) {
 			case JOY_DIR_UP:
-				return (abs(yVal) > abs(xVal)) && (yVal >= yMax * _threshold);
+				return (abs(yVal) >= abs(xVal)) && (yVal >= yMax * _threshold);
 			case JOY_DIR_DOWN:
-				return (abs(yVal) > abs(xVal)) && (yVal <= -yMax * _threshold);
+				return (abs(yVal) >= abs(xVal)) && (yVal <= -yMax * _threshold);
 			case JOY_DIR_LEFT:
-				return (abs(xVal) > abs(yVal)) && (xVal <= -xMax * _threshold);
+				return (abs(xVal) >= abs(yVal)) && (xVal <= -xMax * _threshold);
 			case JOY_DIR_RIGHT:
-				return (abs(xVal) > abs(yVal)) && (xVal >= xMax * _threshold);
+				return (abs(xVal) >= abs(yVal)) && (xVal >= xMax * _threshold);
 			}
 			return false;
 		}
@@ -66,6 +66,7 @@ using namespace ace_button;
 
 
 	
+	void initJoystick4WayButtonsCheckTask(void);
 	void initJoystick4WayButtons(void);
 
 #endif /* _JOYSTICK_4WAY_BUTTON_H_ */
