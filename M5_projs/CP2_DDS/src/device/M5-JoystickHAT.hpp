@@ -22,7 +22,6 @@
 
 	class M5JoystickHAT : public IJoystick {
 	public:
-
 		uint8_t		_addr;
 		TwoWire		*_wire;
 		uint8_t		_scl;

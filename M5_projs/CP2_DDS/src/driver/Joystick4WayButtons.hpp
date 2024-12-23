@@ -16,13 +16,6 @@ using namespace ace_button;
 	#define ACEBUTTON_TASK_PRIORITY		3
 
 
-	enum JoystickDirectionID {
-		JOY_DIR_UP,
-		JOY_DIR_DOWN,
-		JOY_DIR_LEFT,
-		JOY_DIR_RIGHT
-	};
-
 	// 1) 自定义一个 MyButtonConfig
 	class Joystick4WayButtonConfig : public ButtonConfig {
 	public:
@@ -30,6 +23,8 @@ using namespace ace_button;
 		Joystick4WayButtonConfig(IJoystick* js, double ts, JoystickDirectionID dir)
 			: ButtonConfig(), _joystick(js), _threshold(ts), _direction(dir)
 		{
+			assert(dir != JOY_DIR_CENTER);
+
 			_tsX = ts * js->getXmax();
 			_tsY = ts * js->getYmax();
 
@@ -43,17 +38,43 @@ using namespace ace_button;
 			int xVal = _joystick->getX();
 			int yVal = _joystick->getY();
 
-			// 注意: pin参数无用, 因为是虚拟引脚
+			// 如果已经是触发状态，且触发方向不是本Config负责的方向，就认为当前未触发
+			if (_direction != _joystick->CurrDirection &&
+				_joystick->CurrDirection != JOY_DIR_CENTER)
+				return false;
+				
+			// 判断当前方向触发或者回正
 			switch (_direction) {
 			case JOY_DIR_UP:
-				return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
+				if ((abs(yVal) >= abs(xVal)) && (yVal >= _tsY)) {
+					_joystick->CurrDirection = JOY_DIR_UP;
+					return true;
+				}
+				break;
+				// return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
 			case JOY_DIR_DOWN:
-				return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
+				if ((abs(yVal) >= abs(xVal)) && (yVal <= -_tsY)) {
+					_joystick->CurrDirection = JOY_DIR_DOWN;
+					return true;
+				}
+				break;
+				// return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
 			case JOY_DIR_LEFT:
-				return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
+				if ((abs(xVal) >= abs(yVal)) && (xVal <= -_tsX)) {
+					_joystick->CurrDirection = JOY_DIR_LEFT;
+					return true;
+				}
+				break;
+				// return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
 			case JOY_DIR_RIGHT:
-				return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
+				if ((abs(xVal) >= abs(yVal)) && (xVal >= _tsX)) {
+					_joystick->CurrDirection = JOY_DIR_RIGHT;
+					return true;
+				}
+				break;
+				// return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
 			}
+			_joystick->CurrDirection = JOY_DIR_CENTER;
 			return false;
 		}
 
