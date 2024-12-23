@@ -23,7 +23,6 @@ M5JoystickHAT::M5JoystickHAT()
 		_Xmax(MAX_XY_VAL), _Ymax(MAX_XY_VAL),
 		_rotation(0), lastUpdateMs(0)
 {
-	this->CurrDirection = JOY_DIR_CENTER;
 }
 
 bool M5JoystickHAT::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32_t speed)

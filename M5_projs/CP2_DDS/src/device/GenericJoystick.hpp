@@ -6,14 +6,6 @@
 #include "GenericModule.hpp"
 
 
-	enum JoystickDirectionID {
-		JOY_DIR_CENTER,
-		JOY_DIR_UP,
-		JOY_DIR_DOWN,
-		JOY_DIR_LEFT,
-		JOY_DIR_RIGHT
-	};
-
 	class IJoystick : public IDeviceModule {
 	private:
 		/* data */
@@ -23,8 +15,6 @@
 		int _Ymax;
 
 	public:
-		JoystickDirectionID CurrDirection = JOY_DIR_CENTER;
-
 		virtual int getX() = 0;
 		virtual int getY() = 0;
 		virtual int getXmax() = 0;

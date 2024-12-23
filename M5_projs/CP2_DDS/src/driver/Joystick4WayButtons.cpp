@@ -1,17 +1,12 @@
 #include "Joystick4WayButtons.hpp"
 
-extern std::shared_ptr<AceButton> JoystickUpButton;
-extern std::shared_ptr<AceButton> JoystickDownButton;
-extern std::shared_ptr<AceButton> JoystickLeftButton;
-extern std::shared_ptr<AceButton> JoystickRightButton;
+
+extern std::shared_ptr<AceButton> Joystick4WayButton;
 
 
 static void checkAceButton(void) {
 	// 添加回调函数
-	JoystickUpButton->check();
-	JoystickDownButton->check();
-	JoystickLeftButton->check();
-	JoystickRightButton->check();
+	Joystick4WayButton->check();
 }
 
 // 轮询任务函数
@@ -30,7 +25,7 @@ void initJoystick4WayButtonsCheckTask() {
 	xTaskCreate(
 		AceButtonCheckTask,			// 任务函数
 		"AceButtonCheckTask",		// 任务名称
-		2048,						// 堆栈大小(根据需求调整)
+		8192,						// 堆栈大小(根据需求调整)
 		NULL,						// 传递给任务的参数(指向manager)
 		ACEBUTTON_TASK_PRIORITY,	// 任务优先级(宏定义)
 		NULL						// 任务句柄(可选)

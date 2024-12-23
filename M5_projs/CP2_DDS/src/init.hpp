@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include <M5Unified.h>
+#include "Unit_DDS.h"
+#include "WaveIcon.c"
+
 #include "modules/Number.hpp"
 #include "device/M5-JoystickHAT.hpp"
 #include "driver/ModuleManager.hpp"
@@ -10,7 +14,7 @@
 
 
 #define GLOBAL_ROTATION				3
-#define JOYSTICK_TRIGGER_THRESAHOLD	0.3
+#define JOYSTICK_TRIGGER_THRESAHOLD	0.2
 
 
 // 声明一个全局的 std::shared_ptr

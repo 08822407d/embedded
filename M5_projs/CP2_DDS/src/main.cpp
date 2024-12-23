@@ -10,10 +10,6 @@
 * Date: 2022/7/8
 *******************************************************************************
 */
-#include <M5Unified.h>
-#include "Unit_DDS.h"
-#include "WaveIcon.c"
-
 #include "init.hpp"
 
 
