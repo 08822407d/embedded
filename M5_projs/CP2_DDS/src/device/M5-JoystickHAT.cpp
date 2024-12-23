@@ -18,13 +18,12 @@
 #include "driver/ModuleManager.hpp"
 
 
-M5JoystickHAT joystick;
-// 使用 std::shared_ptr 包装现有的对象
-std::shared_ptr<M5JoystickHAT> joystickPtr(&joystick, [](M5JoystickHAT*){});  // 禁止删除
-
+int M5JoystickHAT::Xmax = MAX_XY_VAL;
+int M5JoystickHAT::Ymax = MAX_XY_VAL;
 
 M5JoystickHAT::M5JoystickHAT()
-	: _addr(0x00), _xVal(0), _yVal(0), lastUpdateMs(0)
+	:	_addr(0x00), _xVal(0), _yVal(0),
+		lastUpdateMs(0)
 {
 }
 
@@ -53,7 +52,7 @@ bool M5JoystickHAT::update() {
 	this->_wire->beginTransmission(this->_addr);
 	this->_wire->write(0x02);
 	this->_wire->endTransmission();
-	this->_wire->requestFrom(this->_addr, 3);
+	this->_wire->requestFrom(this->_addr, (uint8_t)3);
 	if (this->_wire->available()) {
 		this->_xVal		= (int8_t)this->_wire->read();
 		this->_yVal		= (int8_t)this->_wire->read();
@@ -61,14 +60,4 @@ bool M5JoystickHAT::update() {
 	}
 	// Serial.printf("X: %d, Y: %d\n", this->getX(), this->getY());
 	return true;
-}
-
-void initM5JoystickHAT(void) {
-	joystick.begin(&Wire, JOYSTICKHAT_ADDR,
-		STICKC_GPIO_SDA, STICKC_GPIO_SCL, 100000UL);
-	
-	Serial.printf("_addr:0x%x , _sda:%d , _scl:%d\n",
-		joystick._addr, joystick._sda, joystick._scl);
-	
-	DevModManager.registerModule(joystickPtr);
 }

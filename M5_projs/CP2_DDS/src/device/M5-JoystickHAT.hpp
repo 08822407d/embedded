@@ -22,14 +22,13 @@
 
 	class M5JoystickHAT : public IJoystick {
 	public:
+		static int Xmax, Ymax;
+
 		uint8_t		_addr;
 		TwoWire		*_wire;
 		uint8_t		_scl;
 		uint8_t		_sda;
 		uint32_t	_speed;
-
-		int			Xmax = 127;
-		int			Ymax = 127;
 
 
 		M5JoystickHAT();
@@ -51,11 +50,17 @@
 		bool update() override;
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
+		// int getXmax() override { return _xMax; }
+		// int getYmax() override { return _yMax; }
 
 		const char* getName() const override {
 			return "M5JoystickHAT";
 		}
 		// 可选: 提供 setLongPressTime, setDoubleClickInterval, setDirectionThreshold 等
+
+		void debugPrintParams() {
+			Serial.printf("Joystick addr: 0x%x, XY Max: %d , %d\n", this, Xmax, Ymax);
+		}
 
 	private:
 		// 存储硬件读到的数据
@@ -64,10 +69,5 @@
 		// 事件判定相关
 		unsigned long lastUpdateMs;
 	};
-
-
-	// 声明一个全局的 std::shared_ptr
-	extern M5JoystickHAT joystick;
-	void initM5JoystickHAT(void);
 
 #endif /* _M5_JOYSTICKHAT_MODULE_HPP_ */

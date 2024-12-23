@@ -17,10 +17,10 @@ using namespace ace_button;
 
 
 	enum JoystickDirectionID {
-	JOY_DIR_UP,
-	JOY_DIR_DOWN,
-	JOY_DIR_LEFT,
-	JOY_DIR_RIGHT
+		JOY_DIR_UP,
+		JOY_DIR_DOWN,
+		JOY_DIR_LEFT,
+		JOY_DIR_RIGHT
 	};
 
 	// 1) 自定义一个 MyButtonConfig
@@ -30,10 +30,18 @@ using namespace ace_button;
 		Joystick4WayButtonConfig(IJoystick* js, double ts, JoystickDirectionID dir)
 			: ButtonConfig(), _joystick(js), _threshold(ts), _direction(dir)
 		{
-			// activeLow 表示AceButton是否当"true=按下" or "false=按下"
-			// 后续可 setFeature(ButtonConfig::kFeatureClick) 等
-			// setActiveLow(activeLow);
+			_tsX = ts * js->Xmax;
+			_tsY = ts * js->Ymax;
 		}
+
+		// void postInit() {
+			// Serial.printf("%p , %p\n", &joystick, _joystick);
+			// int xMax = joystick.getXmax();
+			// int yMax = joystick.getYmax();
+			// _tsX = _threshold * xMax;
+			// _tsY = _threshold * yMax;
+			// Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", xMax, yMax, _tsX, _tsY);
+		// }
 
 		// 重写 readButton
 		// AceButton中在 button->check() 里会调用 _config->readButton(pin)
@@ -41,32 +49,39 @@ using namespace ace_button;
 		virtual int readButton(uint8_t pin) override {
 			int xVal = _joystick->getX();
 			int yVal = _joystick->getY();
-			int xMax = _joystick->Xmax;
-			int yMax = _joystick->Ymax;
 
 			// 注意: pin参数无用, 因为是虚拟引脚
 			switch (_direction) {
 			case JOY_DIR_UP:
-				return (abs(yVal) >= abs(xVal)) && (yVal >= yMax * _threshold);
+				// Serial.printf("  %d , %d\n", yVal, _tsY);
+				return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
 			case JOY_DIR_DOWN:
-				return (abs(yVal) >= abs(xVal)) && (yVal <= -yMax * _threshold);
+				// Serial.printf("  %d , %d\n", yVal, _tsY);
+				return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
 			case JOY_DIR_LEFT:
-				return (abs(xVal) >= abs(yVal)) && (xVal <= -xMax * _threshold);
+				// Serial.printf("  %d , %d\n", xVal, _tsX);
+				return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
 			case JOY_DIR_RIGHT:
-				return (abs(xVal) >= abs(yVal)) && (xVal >= xMax * _threshold);
+				// Serial.printf("  %d , %d\n", xVal, _tsX);
+				return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
 			}
 			return false;
+		}
+
+		void debugPrintParams() {
+			// int xMax = _joystick->getXmax();
+			// int yMax = _joystick->getYmax();
+			// Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", xMax, yMax, _tsX, _tsY);
+			Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", _joystick->Xmax, _joystick->Ymax, _tsX, _tsY);
 		}
 
 	private:
 		IJoystick* _joystick;
 		double _threshold;
+		int _tsX;
+		int _tsY;
 		JoystickDirectionID _direction;
 	};
 
-
-	
-	void initJoystick4WayButtonsCheckTask(void);
-	void initJoystick4WayButtons(void);
 
 #endif /* _JOYSTICK_4WAY_BUTTON_H_ */

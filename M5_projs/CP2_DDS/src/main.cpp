@@ -15,16 +15,8 @@
 #include "WaveIcon.c"
 
 #include "include.h"
+#include "glo.hpp"
 
-
-
-// Task Parameters
-#define TASK_STACK_SIZE	2048
-
-#define JOYSTICK_SDA	0
-#define JOYSTICK_SCL	26
-#define DDS_SDA			32
-#define DDS_SCL			33
 
 
 
@@ -100,6 +92,7 @@ void setup() {
 	
 	uiInit();
 	// dds.begin(&Wire);
+	delay(1000);
 
 	initM5JoystickHAT();
 
