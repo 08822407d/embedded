@@ -75,14 +75,12 @@ void changeWave(int expression) {
 }
 
 void uiInit() {
-	M5.Lcd.setRotation(3);
+	M5.Lcd.setRotation(GLOBAL_ROTATION);
 	M5.Lcd.fillScreen(BLACK);
 	M5.Lcd.fillTriangle(110, 50, 110, 80, 130, 65, TFT_GREEN);
 	M5.Lcd.setTextFont(2);
-}
 
-void drvInit() {
-
+	M5.Lcd.drawString("Rotation test.", 5, 5);
 }
 
 void setup() {

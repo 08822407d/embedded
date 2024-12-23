@@ -12,7 +12,7 @@ using namespace ace_button;
 
 
 	// 使用宏定义来避免魔法数字
-	#define ACEBUTTON_POLL_INTERVAL_MS	20
+	#define ACEBUTTON_POLL_INTERVAL_MS	10
 	#define ACEBUTTON_TASK_PRIORITY		3
 
 
@@ -46,21 +46,13 @@ using namespace ace_button;
 			// 注意: pin参数无用, 因为是虚拟引脚
 			switch (_direction) {
 			case JOY_DIR_UP:
-				// Serial.printf("  %d , %d\n", yVal, _tsY);
-				// return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
-				return !((abs(yVal) >= abs(xVal)) && (yVal >= _tsY));
+				return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
 			case JOY_DIR_DOWN:
-				// Serial.printf("  %d , %d\n", yVal, _tsY);
-				// return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
-				return !((abs(yVal) >= abs(xVal)) && (yVal <= -_tsY));
+				return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
 			case JOY_DIR_LEFT:
-				// Serial.printf("  %d , %d\n", xVal, _tsX);
-				// return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
-				return !((abs(xVal) >= abs(yVal)) && (xVal <= -_tsX));
+				return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
 			case JOY_DIR_RIGHT:
-				// Serial.printf("  %d , %d\n", xVal, _tsX);
-				// return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
-				return !((abs(xVal) >= abs(yVal)) && (xVal >= _tsX));
+				return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
 			}
 			return false;
 		}

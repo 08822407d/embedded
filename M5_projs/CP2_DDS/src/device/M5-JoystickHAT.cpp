@@ -21,7 +21,7 @@
 M5JoystickHAT::M5JoystickHAT()
 	:	_addr(0x00), _xVal(0), _yVal(0),
 		_Xmax(MAX_XY_VAL), _Ymax(MAX_XY_VAL),
-		lastUpdateMs(0)
+		_rotation(0), lastUpdateMs(0)
 {
 }
 
@@ -52,10 +52,42 @@ bool M5JoystickHAT::update() {
 	this->_wire->endTransmission();
 	this->_wire->requestFrom(this->_addr, (uint8_t)3);
 	if (this->_wire->available()) {
-		this->_xVal		= (int8_t)this->_wire->read();
-		this->_yVal		= (int8_t)this->_wire->read();
+		int _rawX		= (int8_t)this->_wire->read();
+		int _rawY		= (int8_t)this->_wire->read();
 		this->_midBtn	= (int8_t)this->_wire->read();
+
+		switch (this->_rotation) {
+			case 0:
+				this->_xVal	= -_rawX;
+				this->_yVal	= -_rawY;
+				break;
+			case 1:
+				this->_xVal	= -_rawY;
+				this->_yVal	= _rawX;
+				break;
+			case 2:
+				this->_xVal	= _rawX;
+				this->_yVal	= _rawY;
+				break;
+			case 3:
+				this->_xVal	= _rawY;
+				this->_yVal	= -_rawX;
+				break;
+			default:
+				this->_xVal	= -_rawX;
+				this->_yVal	= -_rawY;
+				break;
+		}
 	}
 	// Serial.printf("X: %d, Y: %d\n", this->getX(), this->getY());
 	return true;
+}
+
+void M5JoystickHAT::setRotation(uint8_t rotation) {
+	this->_rotation = rotation;
+	if (this->_rotation == 1 || this->_rotation == 3) {
+		int swap = this->_Xmax;
+		this->_Xmax = this->_Ymax;
+		this->_Ymax = swap;
+	}
 }

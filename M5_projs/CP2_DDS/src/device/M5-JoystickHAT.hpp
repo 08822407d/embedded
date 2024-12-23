@@ -46,11 +46,14 @@
 				uint8_t sda = STICKC_GPIO_SDA, uint8_t scl = STICKC_GPIO_SCL,
 				uint32_t speed = 400000UL);
 
-		bool update() override;
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
 		int getXmax() override { return _Xmax; }
 		int getYmax() override { return _Ymax; }
+
+		bool update() override;
+
+		void setRotation(uint8_t rotation);
 
 		const char* getName() const override {
 			return "M5JoystickHAT";
@@ -62,6 +65,7 @@
 		}
 
 	private:
+		uint8_t _rotation;
 		// 存储硬件读到的数据
 		int _xVal, _yVal, _midBtn;
 		int _Xmax, _Ymax;

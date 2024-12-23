@@ -9,6 +9,10 @@
 #include "driver/Joystick4WayButtons.hpp"
 
 
+#define GLOBAL_ROTATION				3
+#define JOYSTICK_TRIGGER_THRESAHOLD	0.3
+
+
 // 声明一个全局的 std::shared_ptr
 void initM5JoystickHAT(void);
 
