@@ -22,7 +22,6 @@
 
 	class M5JoystickHAT : public IJoystick {
 	public:
-		static int Xmax, Ymax;
 
 		uint8_t		_addr;
 		TwoWire		*_wire;
@@ -50,8 +49,8 @@
 		bool update() override;
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
-		// int getXmax() override { return _xMax; }
-		// int getYmax() override { return _yMax; }
+		int getXmax() override { return _Xmax; }
+		int getYmax() override { return _Ymax; }
 
 		const char* getName() const override {
 			return "M5JoystickHAT";
@@ -59,12 +58,13 @@
 		// 可选: 提供 setLongPressTime, setDoubleClickInterval, setDirectionThreshold 等
 
 		void debugPrintParams() {
-			Serial.printf("Joystick addr: 0x%x, XY Max: %d , %d\n", this, Xmax, Ymax);
+			Serial.printf("Joystick addr: 0x%x, XY Max: %d , %d\n", this, _Xmax, _Ymax);
 		}
 
 	private:
 		// 存储硬件读到的数据
 		int _xVal, _yVal, _midBtn;
+		int _Xmax, _Ymax;
 
 		// 事件判定相关
 		unsigned long lastUpdateMs;

@@ -30,18 +30,11 @@ using namespace ace_button;
 		Joystick4WayButtonConfig(IJoystick* js, double ts, JoystickDirectionID dir)
 			: ButtonConfig(), _joystick(js), _threshold(ts), _direction(dir)
 		{
-			_tsX = ts * js->Xmax;
-			_tsY = ts * js->Ymax;
-		}
+			_tsX = ts * js->getXmax();
+			_tsY = ts * js->getYmax();
 
-		// void postInit() {
-			// Serial.printf("%p , %p\n", &joystick, _joystick);
-			// int xMax = joystick.getXmax();
-			// int yMax = joystick.getYmax();
-			// _tsX = _threshold * xMax;
-			// _tsY = _threshold * yMax;
-			// Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", xMax, yMax, _tsX, _tsY);
-		// }
+			Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", js->getXmax(), js->getYmax(), _tsX, _tsY);
+		}
 
 		// 重写 readButton
 		// AceButton中在 button->check() 里会调用 _config->readButton(pin)
@@ -54,25 +47,26 @@ using namespace ace_button;
 			switch (_direction) {
 			case JOY_DIR_UP:
 				// Serial.printf("  %d , %d\n", yVal, _tsY);
-				return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
+				// return (abs(yVal) >= abs(xVal)) && (yVal >= _tsY);
+				return !((abs(yVal) >= abs(xVal)) && (yVal >= _tsY));
 			case JOY_DIR_DOWN:
 				// Serial.printf("  %d , %d\n", yVal, _tsY);
-				return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
+				// return (abs(yVal) >= abs(xVal)) && (yVal <= -_tsY);
+				return !((abs(yVal) >= abs(xVal)) && (yVal <= -_tsY));
 			case JOY_DIR_LEFT:
 				// Serial.printf("  %d , %d\n", xVal, _tsX);
-				return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
+				// return (abs(xVal) >= abs(yVal)) && (xVal <= -_tsX);
+				return !((abs(xVal) >= abs(yVal)) && (xVal <= -_tsX));
 			case JOY_DIR_RIGHT:
 				// Serial.printf("  %d , %d\n", xVal, _tsX);
-				return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
+				// return (abs(xVal) >= abs(yVal)) && (xVal >= _tsX);
+				return !((abs(xVal) >= abs(yVal)) && (xVal >= _tsX));
 			}
 			return false;
 		}
 
 		void debugPrintParams() {
-			// int xMax = _joystick->getXmax();
-			// int yMax = _joystick->getYmax();
-			// Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", xMax, yMax, _tsX, _tsY);
-			Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", _joystick->Xmax, _joystick->Ymax, _tsX, _tsY);
+			Serial.printf("xy Max: %d , %d ; Threshold: %d , %d\n", _joystick->getXmax(), _joystick->getYmax(), _tsX, _tsY);
 		}
 
 	private:

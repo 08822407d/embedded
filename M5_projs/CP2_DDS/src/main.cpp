@@ -14,8 +14,7 @@
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
 
-#include "include.h"
-#include "glo.hpp"
+#include "init.hpp"
 
 
 
@@ -95,6 +94,7 @@ void setup() {
 	delay(1000);
 
 	initM5JoystickHAT();
+	delay(500);
 
 	initJoystick4WayButtons();
 

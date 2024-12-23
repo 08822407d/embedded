@@ -10,15 +10,14 @@
 		/* data */
 		int _xVal;
 		int _yVal;
+		int _Xmax;
+		int _Ymax;
 
 	public:
-		int Xmax;
-		int Ymax;
-
 		virtual int getX() = 0;
 		virtual int getY() = 0;
-		// virtual int getXmax() = 0;
-		// virtual int getYmax() = 0;
+		virtual int getXmax() = 0;
+		virtual int getYmax() = 0;
 		virtual bool update() = 0;
 
 		/**

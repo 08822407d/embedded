@@ -18,11 +18,9 @@
 #include "driver/ModuleManager.hpp"
 
 
-int M5JoystickHAT::Xmax = MAX_XY_VAL;
-int M5JoystickHAT::Ymax = MAX_XY_VAL;
-
 M5JoystickHAT::M5JoystickHAT()
 	:	_addr(0x00), _xVal(0), _yVal(0),
+		_Xmax(MAX_XY_VAL), _Ymax(MAX_XY_VAL),
 		lastUpdateMs(0)
 {
 }
