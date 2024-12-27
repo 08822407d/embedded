@@ -1,5 +1,6 @@
 #include "display.hpp"
 
+// screen offset (40,53)
 #define TFT_HOR_RES		135
 #define TFT_VER_RES		240
 

@@ -6,31 +6,27 @@
 #include "unit_rolleri2c.hpp"
 
 
-#define IMU_SAMPLE_FREQ		200
+#define IMU_SAMPLE_FREQ		300
 #define IMU_SAMPLE_PERIOD	(1000 / (IMU_SAMPLE_FREQ))
+#define MAX_CURRENT			120000
 
 
 UnitRollerI2C RollerI2C;  // Create a UNIT_ROLLERI2C object
 Madgwick filter; 
 
-// PID相关
-double rollInput, rollOutput, rollSetpoint;
 
 // PID参数（根据实际情况调优）
-double Kp = 10.0; 
-double Ki = 0.5;
-double Kd = 0.1; 
-
-PID rollPID(&rollInput, &rollOutput, &rollSetpoint, Kp, Ki, Kd, DIRECT);
+double Kp = 10000.0; 
+double Ki = 10.0;
+double Kd = 1000.0; 
 
 // PID相关
 double pitchInput, pitchOutput, pitchSetpoint;
-
 PID pitchPID(&pitchInput, &pitchOutput, &pitchSetpoint, Kp, Ki, Kd, DIRECT);
 
-// 使用FreeRTOS计时
-TickType_t lastUpdate;
 
+
+extern void selfBalanceTask(void * parameter);
 
 void setup()
 {
@@ -43,182 +39,92 @@ void setup()
 
 	// 假设IMU更新频率约200Hz，可据实际情况修改
 	filter.begin(IMU_SAMPLE_FREQ); 
-	lastUpdate = xTaskGetTickCount(); // 获取当前tick计数
 
-	// 设置目标roll = 0度
-	rollSetpoint = 0.0;
+	// 设置目标 = 0度
+	pitchSetpoint = 3.0;
 
-	rollPID.SetMode(AUTOMATIC);
-	rollPID.SetOutputLimits(-1000, 1000);
 	pitchPID.SetMode(AUTOMATIC);
-	pitchPID.SetOutputLimits(-1000, 1000);
+	pitchPID.SetOutputLimits(-MAX_CURRENT, MAX_CURRENT);
 
 
 	RollerI2C.setOutput(0);
-	// RollerI2C.setMode(ROLLER_MODE_POSITION);
-	// RollerI2C.setPos(0);
-	RollerI2C.setMode(ROLLER_MODE_SPEED);
-	RollerI2C.setSpeed(0);
+	RollerI2C.setMode(ROLLER_MODE_CURRENT);
+	// RollerI2C.setMode(ROLLER_MODE_SPEED);
 	RollerI2C.setOutput(1);
+
+
+	// 创建FreeRTOS任务
+	xTaskCreate(
+		selfBalanceTask,			// Task function
+		"SelfBalance Task",			// Task name
+		8192,						// Stack size
+		NULL,						// Task input parameter
+		5,							// Priority
+		NULL						// Task handle
+	);
 }
 
 void loop()
 {
-	float ax, ay, az, gx, gy, gz;
-	m5::IMU_Class::imu_data_t data;
-	// 排空IMU的FIFO中的数据
-	while (M5.Imu.update()) {
-		data = M5.Imu.getImuData();
-	}
-
-	ax = data.accel.x;
-	ay = data.accel.y;
-	az = data.accel.z;
-	gx = data.gyro.x;
-	gy = data.gyro.y;
-	gz = data.gyro.z;
-
-		// 获取当前tick
-		TickType_t now = xTaskGetTickCount();
-
-		// 计算时间间隔（秒）
-		float dt = (now - lastUpdate) * portTICK_PERIOD_MS / 1000.0f;
-		lastUpdate = now;
-
-		// 将陀螺仪读数从deg/s转为rad/s（如果Madgwick库需要）
-		const float deg2rad = 3.14159265358979f / 180.0f;
-		filter.updateIMU(gx * deg2rad, gy * deg2rad, gz * deg2rad, ax, ay, az);
-
-		double roll = filter.getRoll(); // 获取roll角度
-		double pitch = filter.getPitch(); // 获取roll角度
-		
-		// // 将roll作为PID输入
-		// rollInput = roll;
-		// rollPID.Compute();
-
-		// pitchInput = pitch;
-		// pitchPID.Compute();
-
-		// 调试输出（减少打印频率以避免延迟）
-		static int printCounter = 0;
-		printCounter++;
-		if (printCounter >= 10) { // 每100次循环打印一次
-			printCounter = 0;
-			
-			M5.Lcd.setCursor(10, 10);
-			M5.Lcd.clear();
-			M5.Lcd.printf("%.2f\r\n", roll);
-			M5.Lcd.printf("%.2f\r\n", pitch);
-		}
-		// M5.Lcd.printf("PID - roll: %-4.2f\r\n", rollOutput);
-		// M5.Lcd.printf("PID - pitch: %-4.2f\r\n", pitchOutput);
-		// // 将PID输出作为电机速度指令
-		// motor.setSpeed(rollOutput);
-
-		// // 输出调试信息
-		// Serial.print("Roll: "); Serial.print(roll, 2);
-		// Serial.print(" | Output: "); Serial.print(rollOutput, 2);
-		// Serial.print(" | dt: "); Serial.println(dt, 4);
-
-
-		// RollerI2C.setOutput(0);
-		// RollerI2C.setSpeed(2000 * pitch);
-		// RollerI2C.setPos(pitch * 10000);
-		// RollerI2C.setOutput(1);
-
-	// 根据需要调整循环延时
-	vTaskDelay(pdMS_TO_TICKS(IMU_SAMPLE_PERIOD));
-
-
-	// // current mode
-	// RollerI2C.setMode(ROLLER_MODE_ENCODER);
-	// RollerI2C.setCurrent(120000);
-	// RollerI2C.setOutput(1);
-	// printf("current: %d\n", RollerI2C.getCurrent());
-	// delay(100);
-	// printf("actualCurrent: %d\n", RollerI2C.getCurrentReadback() / 100.0f);
-	// delay(5000);
-
-	// // position mode
-	// RollerI2C.setOutput(0);
-	// RollerI2C.setMode(ROLLER_MODE_SPEED);
-	// RollerI2C.setPos(2000000);
-	// RollerI2C.setPosMaxCurrent(100000);
-	// RollerI2C.setOutput(1);
-	// RollerI2C.getPosPID(&p, &i, &d);
-	// printf("PosPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
-	// delay(100);
-	// printf("pos: %d\n", RollerI2C.getPos());
-	// delay(100);
-	// printf("posMaxCurrent: %d\n", RollerI2C.getPosMaxCurrent() / 100.0f);
-	// delay(100);
-	// printf("actualPos: %d\n", RollerI2C.getPosReadback() / 100.f);
-	// delay(5000);
-
-	// // speed mode
-	// RollerI2C.setOutput(0);
-	// RollerI2C.setMode(ROLLER_MODE_SPEED);
-	// RollerI2C.setSpeed(240000);
-	// RollerI2C.setSpeedMaxCurrent(100000);
-	// RollerI2C.setOutput(1);
-	// RollerI2C.getSpeedPID(&p, &i, &d);
-	// printf("SpeedPID  P: %3.8f  I: %3.8f  D: %3.8f\n", p / 100000.0, i / 10000000.0, d / 100000.0);
-	// delay(100);
-	// printf("speed: %d\n", RollerI2C.getSpeed());
-	// delay(100);
-	// printf("speedMaxCurrent: %d\n", RollerI2C.getSpeedMaxCurrent() / 100.0f);
-	// delay(100);
-	// printf("actualSpeed: %d\n", RollerI2C.getSpeedReadback() / 100.0f);
-	// delay(5000);
-
-	// // encoder mode
-	// RollerI2C.setOutput(0);
-	// RollerI2C.setMode(ROLLER_MODE_ENCODER);
-	// RollerI2C.setDialCounter(240000);
-	// RollerI2C.setOutput(1);
-	// printf("DialCounter:%d\n", RollerI2C.getDialCounter());
-	// delay(5000);
-	// printf("temp:%d\n", RollerI2C.getTemp());
-	// delay(100);
-	// printf("Vin:%3.2f\n", RollerI2C.getVin() / 100.0);
-	// delay(100);
-	// printf("RGBBrightness:%d\n", RollerI2C.getRGBBrightness());
-	// delay(1000);
-	// RollerI2C.setRGBBrightness(100);
-	// delay(100);
-	// RollerI2C.setRGBMode(ROLLER_RGB_MODE_USER_DEFINED);
-	// delay(1000);
-	// RollerI2C.setRGB(TFT_WHITE);
-	// delay(1000);
-	// RollerI2C.setRGB(TFT_BLUE);
-	// delay(2000);
-	// RollerI2C.setRGB(TFT_YELLOW);
-	// delay(2000);
-	// RollerI2C.setRGB(TFT_RED);
-	// delay(2000);
-	// RollerI2C.setRGBMode(ROLLER_RGB_MODE_DEFAULT);
-	// delay(100);
-	// RollerI2C.setKeySwitchMode(1);
-	// delay(100);
-	// printf("I2CAddress:%d\n", RollerI2C.getI2CAddress());
-	// delay(100);
-	// printf("485 BPS:%d\n", RollerI2C.getBPS());
-	// delay(100);
-	// printf("485 motor id:%d\n", RollerI2C.getMotorID());
-	// delay(100);
-	// printf("motor output:%d\n", RollerI2C.getOutputStatus());
-	// delay(100);
-	// printf("SysStatus:%d\n", RollerI2C.getSysStatus());
-	// delay(100);
-	// printf("ErrorCode:%d\n", RollerI2C.getErrorCode());
-	// delay(100);
-	// printf("Button switching mode enable:%d\n", RollerI2C.getKeySwitchMode());
-	// delay(100);
-	// RollerI2C.getRGB(&r, &g, &b);
-	// printf("RGB-R: 0x%02X  RGB-G: 0x%02X  RGB-B: 0x%02X\n", r, g, b);
-	// delay(5000);
+	delay(1000);
 }
 
+
+float ax, ay, az, gx, gy, gz, mx, my, mz;
+int printCounter;
+// 任务实现
+void selfBalanceTask(void * parameter) {
+	(void) parameter; // 避免未使用参数的编译警告
+
+		while (1) {
+		// 记录任务开始时间
+		TickType_t taskStart = xTaskGetTickCount();
+
+
+		m5::IMU_Class::imu_data_t data;
+		if (!M5.Imu.update())
+			continue;;
+		data = M5.Imu.getImuData();
+
+		ax = data.accel.x;
+		ay = data.accel.y;
+		az = data.accel.z;
+		gx = data.gyro.x;
+		gy = data.gyro.y;
+		gz = data.gyro.z;
+
+		filter.updateIMU(gx, gy, gz, ax, ay, az);
+
+		pitchInput = filter.getPitch();
+		pitchPID.Compute();
+
+		// 调试输出（减少打印频率以避免延迟）
+		printCounter++;
+		if (printCounter >= 5) {
+			printCounter = 0;
+			M5.Lcd.setCursor(10, 10);
+			M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
+			M5.Lcd.printf("%.2f\r\n", pitchInput);
+			M5.Lcd.printf("PID: %-4.2f\r\n", pitchOutput);
+		}
+
+		RollerI2C.setOutput(0);
+		RollerI2C.setCurrent(pitchOutput);
+		RollerI2C.setOutput(1);
+
+
+		// 计算任务执行时间
+		TickType_t taskEnd = xTaskGetTickCount();
+		TickType_t elapsedTime = taskEnd - taskStart;
+
+		// 计算剩余延迟时间
+		uint32_t delayTime = (IMU_SAMPLE_PERIOD > (elapsedTime * portTICK_PERIOD_MS)) ? 
+							  IMU_SAMPLE_PERIOD - (elapsedTime * portTICK_PERIOD_MS) : 0;
+
+		// 延迟指定时间后再次执行
+		vTaskDelay(pdMS_TO_TICKS(delayTime));
+	}
+}
 
 
 
