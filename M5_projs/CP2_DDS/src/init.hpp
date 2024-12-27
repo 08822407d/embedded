@@ -4,9 +4,11 @@
 #include <Wire.h>
 
 #include <M5Unified.h>
+
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
 
+#include "modules/display.hpp"
 #include "modules/Number.hpp"
 #include "device/M5-JoystickHAT.hpp"
 #include "driver/ModuleManager.hpp"

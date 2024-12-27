@@ -10,8 +10,9 @@
 * Date: 2022/7/8
 *******************************************************************************
 */
-#include "init.hpp"
+#define LGFX_AUTODETECT
 
+#include "init.hpp"
 
 
 
@@ -87,6 +88,9 @@ void setup() {
 	// dds.begin(&Wire);
 	delay(1000);
 
+	initLvglDisplay();
+	delay(1000);
+
 	initM5JoystickHAT();
 	delay(500);
 
@@ -101,8 +105,10 @@ void loop() {
 	// 主循环可以保持空闲，所有功能由FreeRTOS任务处理
 	// 或者在此添加其他非关键任务
 
+	loopLvglDisplay();
+
 	// joystick.update();
 	// DevModManager.updateAll();
 	// Serial.printf("X: %d, Y: %d\n", joystick.getX(), joystick.getY());
-	delay(1000); // 防止主循环占用过多CPU
+	delay(50); // 防止主循环占用过多CPU
 }
