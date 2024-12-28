@@ -9,6 +9,7 @@
 #define IMU_SAMPLE_FREQ		300
 #define IMU_SAMPLE_PERIOD	(1000 / (IMU_SAMPLE_FREQ))
 #define MAX_CURRENT			120000
+#define MAX_SPEED			400000
 
 
 UnitRollerI2C RollerI2C;  // Create a UNIT_ROLLERI2C object
@@ -16,9 +17,9 @@ Madgwick filter;
 
 
 // PID参数（根据实际情况调优）
-double Kp = 10000.0; 
-double Ki = 10.0;
-double Kd = 1000.0; 
+double Kp = 2000.0; 
+double Ki = 0.3;
+double Kd = 0.1; 
 
 // PID相关
 double pitchInput, pitchOutput, pitchSetpoint;
@@ -41,15 +42,16 @@ void setup()
 	filter.begin(IMU_SAMPLE_FREQ); 
 
 	// 设置目标 = 0度
-	pitchSetpoint = 3.0;
+	pitchSetpoint = 0.0;
 
 	pitchPID.SetMode(AUTOMATIC);
-	pitchPID.SetOutputLimits(-MAX_CURRENT, MAX_CURRENT);
+	// pitchPID.SetOutputLimits(-MAX_CURRENT, MAX_CURRENT);
+	pitchPID.SetOutputLimits(-MAX_SPEED, MAX_SPEED);
 
 
 	RollerI2C.setOutput(0);
-	RollerI2C.setMode(ROLLER_MODE_CURRENT);
-	// RollerI2C.setMode(ROLLER_MODE_SPEED);
+	// RollerI2C.setMode(ROLLER_MODE_CURRENT);
+	RollerI2C.setMode(ROLLER_MODE_SPEED);
 	RollerI2C.setOutput(1);
 
 
@@ -109,7 +111,8 @@ void selfBalanceTask(void * parameter) {
 		}
 
 		RollerI2C.setOutput(0);
-		RollerI2C.setCurrent(pitchOutput);
+		// RollerI2C.setCurrent(pitchOutput);
+		RollerI2C.setSpeed(pitchOutput);
 		RollerI2C.setOutput(1);
 
 
