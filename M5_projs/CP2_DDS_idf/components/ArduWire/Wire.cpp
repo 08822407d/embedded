@@ -5,175 +5,251 @@ IdfTwoWire Wire(I2C_NUM_0);
 IdfTwoWire Wire1(I2C_NUM_1);
 
 
-IdfTwoWire::IdfTwoWire(i2c_port_t i2cPort = I2C_NUM_0)
-:	_i2cPort(i2cPort), _sdaPin(GPIO_NUM_NC),
-	_sclPin(GPIO_NUM_NC), _clockHz(100000), 
-	_transmissionAddress(0), _error(0)
+static const char *TAG = "IdfTwoWire";
+
+IdfTwoWire::IdfTwoWire(i2c_port_t i2cPort)
+: _i2cPort(i2cPort),
+  _busHandle(nullptr),
+  _devHandle(nullptr),
+  _sdaPin(-1),
+  _sclPin(-1),
+  _clockHz(100000),
+  _currentAddr(0),
+  _busInited(false),
+  _error(0),
+  _rxIndex(0)
 {
 	_txBuffer.reserve(ESP_SIMPLE_I2C_BUFFER_LENGTH);
+	_rxBuffer.reserve(ESP_SIMPLE_I2C_BUFFER_LENGTH);
 }
 
-
-esp_err_t IdfTwoWire::begin(
-		gpio_num_t sdaPin, gpio_num_t sclPin,
-		uint32_t frequency = 100000) {
-
-	_sdaPin = sdaPin;
-	_sclPin = sclPin;
+esp_err_t IdfTwoWire::begin(int sdaPin, int sclPin, uint32_t frequency)
+{
+	_sdaPin  = sdaPin;
+	_sclPin  = sclPin;
 	_clockHz = frequency;
 
-	i2c_config_t conf;
-	conf.mode = I2C_MODE_MASTER;
-	conf.sda_io_num = _sdaPin;
-	conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-	conf.scl_io_num = _sclPin;
-	conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-	conf.master.clk_speed = _clockHz;
-	conf.clk_flags = 0; // 某些版本可使用 I2C_SCLK_SRC_FLAG_* 进行配置
+	return initBus();
+}
 
-	esp_err_t err = i2c_param_config(_i2cPort, &conf);
-	if (err != ESP_OK) {
-		ESP_LOGE("EspSimpleI2C", "i2c_param_config fail: %s", esp_err_to_name(err));
-		return err;
+esp_err_t IdfTwoWire::end()
+{
+	// 若有devHandle, 移除
+	if (_devHandle) {
+		i2c_master_bus_rm_device(_devHandle);
+		_devHandle = nullptr;
 	}
-
-	err = i2c_driver_install(_i2cPort, conf.mode, 0, 0, 0);
-	if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-		ESP_LOGE("EspSimpleI2C", "i2c_driver_install fail: %s", esp_err_to_name(err));
-		return err;
+	// 若有busHandle, 删除
+	if (_busHandle) {
+		i2c_del_master_bus(_busHandle);
+		_busHandle = nullptr;
 	}
-	// 若已经安装过驱动，ESP_ERR_INVALID_STATE，可以忽略或做进一步处理
-
+	_busInited = false;
+	_currentAddr = 0;
 	return ESP_OK;
 }
 
-esp_err_t IdfTwoWire::setClock(uint32_t frequency) {
+esp_err_t IdfTwoWire::setClock(uint32_t frequency)
+{
 	_clockHz = frequency;
-	// 重新配置
-	i2c_config_t conf;
-	conf.mode = I2C_MODE_MASTER;
-	conf.sda_io_num = _sdaPin;
-	conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-	conf.scl_io_num = _sclPin;
-	conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-	conf.master.clk_speed = _clockHz;
-	conf.clk_flags = 0;
+	// 若 bus 已经 init, 需要重新配置
+	if (_busInited) {
+		// 先把devHandle移除
+		removeDeviceHandle();
 
-	esp_err_t err = i2c_param_config(_i2cPort, &conf);
-	if (err != ESP_OK) {
-		return err;
+		// 删除bus
+		i2c_del_master_bus(_busHandle);
+		_busHandle = nullptr;
+		_busInited = false;
+
+		// 重新 init
+		esp_err_t err = initBus();
+		if (err != ESP_OK) {
+			return err;
+		}
 	}
 	return ESP_OK;
 }
 
-void IdfTwoWire::beginTransmission(uint8_t address) {
-	_transmissionAddress = address;
+esp_err_t IdfTwoWire::initBus()
+{
+	if (_busHandle) {
+		// 若已存在，不再重复
+		return ESP_OK;
+	}
+
+	i2c_master_bus_config_t bus_conf = {
+		.i2c_port = _i2cPort,
+		.sda_io_num = static_cast<gpio_num_t>(_sdaPin),
+		.scl_io_num = static_cast<gpio_num_t>(_sclPin),
+		.clk_source = I2C_CLK_SRC_DEFAULT, // 或根据需要配置
+		.glitch_ignore_cnt = 7,
+		.flags = {
+			.enable_internal_pullup = true,
+		}
+	};
+	esp_err_t err = i2c_new_master_bus(&bus_conf, &_busHandle);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "i2c_new_master_bus fail: %s", esp_err_to_name(err));
+		return err;
+	}
+	_busInited = true;
+	return ESP_OK;
+}
+
+void IdfTwoWire::beginTransmission(uint8_t address)
+{
 	_txBuffer.clear();
 	_error = 0;
+
+	// 如果当前地址与新地址不一致，需要重新init device
+	if (address != _currentAddr) {
+		_error = reinitDeviceIfNeeded(address);
+	}
 }
 
-size_t IdfTwoWire::write(uint8_t data) {
+size_t IdfTwoWire::write(uint8_t data)
+{
 	if (_txBuffer.size() < ESP_SIMPLE_I2C_BUFFER_LENGTH) {
 		_txBuffer.push_back(data);
 		return 1;
-	} else {
-		// 缓存已满，可根据需要处理错误
-		return 0;
 	}
+	return 0;
 }
 
-size_t IdfTwoWire::write(const uint8_t *data, size_t length) {
-	size_t cnt = 0;
+size_t IdfTwoWire::write(const uint8_t *data, size_t length)
+{
+	size_t count = 0;
 	for (size_t i = 0; i < length; i++) {
-		cnt += write(data[i]);
+		count += write(data[i]);
 	}
-	return cnt;
+	return count;
 }
 
-uint8_t IdfTwoWire::endTransmission(bool sendStop = true) {
+uint8_t IdfTwoWire::endTransmission(bool /*sendStop*/)
+{
+	// 对于新 API，不存在“sendStop”可选项，这里仅保留兼容，但不使用
+	if (_devHandle == nullptr) {
+		_error = 10; // 没有有效的dev handle
+		return _error;
+	}
 	if (_txBuffer.empty()) {
-		// 没有数据写也可以，但通常要写至少一字节
+		// 允许空发送
 	}
 
-	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-	i2c_master_start(cmd);
-
-	// 写地址（WRITE）
-	i2c_master_write_byte(cmd, (_transmissionAddress << 1) | I2C_MASTER_WRITE, true);
-
-	// 写数据
-	if (!_txBuffer.empty()) {
-		i2c_master_write(cmd, _txBuffer.data(), _txBuffer.size(), true);
-	}
-
-	if (sendStop) {
-		i2c_master_stop(cmd);
-	}
-
-	esp_err_t err = i2c_master_cmd_begin(_i2cPort, cmd, pdMS_TO_TICKS(1000));
-	i2c_cmd_link_delete(cmd);
-
+	esp_err_t err = i2c_master_transmit(_devHandle,
+										_txBuffer.data(),
+										_txBuffer.size(),
+										1000 / portTICK_PERIOD_MS);
 	if (err != ESP_OK) {
-		_error = 4; // 简单用 4 表示传输失败
-		ESP_LOGE("EspSimpleI2C", "endTransmission error: %s", esp_err_to_name(err));
-	} else {
-		_error = 0;
+		ESP_LOGE(TAG, "endTransmission: i2c_master_transmit fail: %s", esp_err_to_name(err));
+		_error = 11;
+		return _error;
 	}
-	return _error;
+
+	_error = 0;
+	return 0;
 }
 
-size_t IdfTwoWire::requestFrom(uint8_t address, size_t quantity, bool sendStop = true) {
+size_t IdfTwoWire::requestFrom(uint8_t address, size_t quantity, bool /*sendStop*/)
+{
 	_rxBuffer.clear();
-	_rxBuffer.reserve(quantity);
+	_rxBuffer.resize(quantity, 0);
+	_rxIndex = 0;
 
-	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-	i2c_master_start(cmd);
-
-	// 写地址（READ）
-	i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_READ, true);
-
-	// 读取数据
-	if (quantity > 1) {
-		// 前 (quantity-1) 字节使用 ACK
-		i2c_master_read(cmd, _rxBuffer.data(), quantity - 1, I2C_MASTER_ACK);
-	}
-	// 最后一个字节使用 NACK
-	if (quantity > 0) {
-		_rxBuffer.push_back(0); // 先占位
-		i2c_master_read_byte(cmd, &_rxBuffer[0], I2C_MASTER_NACK); 
+	// 如果地址与当前不符，则重配
+	if (address != _currentAddr) {
+		_error = reinitDeviceIfNeeded(address);
+		if (_error != 0) {
+			return 0; // 设备初始化失败
+		}
 	}
 
-	if (sendStop) {
-		i2c_master_stop(cmd);
+	if (_devHandle == nullptr) {
+		_error = 20;
+		return 0;
 	}
 
-	esp_err_t err = i2c_master_cmd_begin(_i2cPort, cmd, pdMS_TO_TICKS(1000));
-	i2c_cmd_link_delete(cmd);
+	// 把当前 _txBuffer 当做“要先写出的数据”。若用户只是想读寄存器，_txBuffer里通常放寄存器地址。
+	esp_err_t err = ESP_OK;
+	if (!_txBuffer.empty()) {
+		// 同时写再读
+		err = i2c_master_transmit_receive(_devHandle,
+										  _txBuffer.data(), _txBuffer.size(),
+										  _rxBuffer.data(), quantity,
+										  1000 / portTICK_PERIOD_MS);
+	} else {
+		// 如果没有要写的，则纯读 => 需要另外的API? 
+		// 事实上 i2c_master_transmit_receive不写也行，但要传空指针
+		err = i2c_master_transmit_receive(_devHandle,
+										  nullptr, 0,
+										  _rxBuffer.data(), quantity,
+										  1000 / portTICK_PERIOD_MS);
+	}
+
+	// 清空 _txBuffer，因为一次 requestFrom 通常就结束了
+	_txBuffer.clear();
 
 	if (err != ESP_OK) {
-		_error = 5; 
-		ESP_LOGE("EspSimpleI2C", "requestFrom error: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "requestFrom: i2c_master_transmit_receive fail: %s", esp_err_to_name(err));
 		_rxBuffer.clear();
+		_error = 21;
 		return 0;
-	} else {
-		_error = 0;
 	}
 
-	// 注意：上述写法仅演示思路，若 quantity > 1，需要正确分配缓冲并依次读取
-	// 这里演示写法较简单，真实项目中需更严谨处理
-	// 可以改用 i2c_master_read(cmd, buffer, quantity, I2C_MASTER_LAST_NACK);
-	// 或分多步 read。
-	_rxIndex = 0; // 用于 read()
+	_error = 0;
 	return _rxBuffer.size();
 }
 
-int IdfTwoWire::read() {
+int IdfTwoWire::available()
+{
+	return (_rxBuffer.size() - _rxIndex);
+}
+
+int IdfTwoWire::read()
+{
 	if (_rxIndex < _rxBuffer.size()) {
 		return _rxBuffer[_rxIndex++];
 	}
 	return -1;
 }
 
-uint8_t IdfTwoWire::getLastError() const {
-	return _error;
+esp_err_t IdfTwoWire::reinitDeviceIfNeeded(uint8_t address)
+{
+	if (!_busInited) {
+		esp_err_t e = initBus();
+		if (e != ESP_OK) return e;
+	}
+
+	// 如果已有 devHandle，则先移除
+	if (_devHandle) {
+		i2c_master_bus_rm_device(_devHandle);
+		_devHandle = nullptr;
+	}
+
+	_currentAddr = address;
+
+	// 创建一个新的 device handle
+	i2c_device_config_t dev_conf = {
+		.dev_addr_length = I2C_ADDR_BIT_LEN_7,
+		.device_address  = address,
+		.scl_speed_hz    = _clockHz,
+	};
+	esp_err_t err = i2c_master_bus_add_device(_busHandle, &dev_conf, &_devHandle);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "reinitDevice: i2c_master_bus_add_device fail: %s", esp_err_to_name(err));
+		_devHandle = nullptr;
+		return err;
+	}
+	return ESP_OK;
+}
+
+esp_err_t IdfTwoWire::removeDeviceHandle()
+{
+	if (_devHandle) {
+		esp_err_t e = i2c_master_bus_rm_device(_devHandle);
+		_devHandle = nullptr;
+		return e;
+	}
+	return ESP_OK;
 }
