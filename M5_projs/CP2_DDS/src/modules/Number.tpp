@@ -57,8 +57,21 @@
 	template <typename T>
 	void Number<T>::setBase(BaseType newBase) {
 		this->base = newBase;
-		// 可选：根据新进制验证currentValue是否仍在合法范围
-		// 例如，重新计算digits或调整currentValue
+	}
+
+	// 获取指定位的数值
+	template <typename T>
+	int Number<T>::getDigit(int digitIndex) const {
+		T placeValue = static_cast<T>(std::pow(base, digitIndex));
+		return static_cast<int>(this->currentValue / placeValue);
+	}
+
+	// 设置指定位的数值
+	template <typename T>
+	void Number<T>::setDigit(int digitIndex, int value) {
+		T placeValue = static_cast<T>(std::pow(base, digitIndex));
+		this->currentValue = (this->currentValue / placeValue) * placeValue + value;
+		applyOverflow();
 	}
 
 	// 获取各个位的值（从高位到低位）
@@ -100,6 +113,14 @@
 
 	// 获取当前值
 	// getValue() 已在头文件中实现
+
+	// 重设当前值
+	template <typename T>
+	void Number<T>::setValue(T newValue) {
+		this->currentValue = newValue;
+		if (this->overflowBehavior != nullptr)
+			applyOverflow();
+	}
 
 	// 设置新的溢出行为
 	template <typename T>

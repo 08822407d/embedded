@@ -15,7 +15,6 @@
 #include "init.hpp"
 
 
-
 Unit_DDS dds;
 
 Number<uint64_t> Freq(1000, 100, 10000000);
@@ -85,7 +84,6 @@ void setup() {
 	Serial.begin(115200);
 	
 	uiInit();
-	// dds.begin(&Wire);
 	delay(1000);
 
 	initLvglDisplay();
@@ -110,5 +108,5 @@ void loop() {
 	// joystick.update();
 	// DevModManager.updateAll();
 	// Serial.printf("X: %d, Y: %d\n", joystick.getX(), joystick.getY());
-	delay(50); // 防止主循环占用过多CPU
+	delay(20); // 防止主循环占用过多CPU
 }

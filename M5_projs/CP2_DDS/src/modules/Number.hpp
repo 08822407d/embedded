@@ -40,12 +40,21 @@
 		void subDigit(int digitIndex, T value);
 		// 设置进制
 		void setBase(BaseType newBase);
+		// 获取当前进制
+		BaseType setBase() const { return base; }
+
+		// 获取指定位的数值
+		int getDigit(int digitIndex) const;
+		// 设置指定位的数值
+		void setDigit(int digitIndex, int value);
 		// 获取各个位的值（从高位到低位）
 		std::vector<int> getDigits() const;
 		// 将当前数值转换为字符串表示
 		std::string toString() const;
 		// 获取当前值
 		T getValue() const { return currentValue; }
+		// 重设当前值
+		void setValue(T newValue);
 		// 设置新的溢出行为
 		void setOverflowBehavior(OverflowBehavior<T>* newBehavior);
 

@@ -37,7 +37,7 @@ using namespace ace_button;
 
 			int Xmax = js->getXmax();
 			int Ymax = js->getYmax();
-			_threshold = (pow(Xmax, 2) + pow(Ymax, 2)) * ts / 2;
+			_threshold = (pow(Xmax, 2) + pow(Ymax, 2)) * pow(ts, 2);
 
 			Serial.printf("xy Max: %d , %d ; Threshold: %d\n", js->getXmax(), js->getYmax(), _threshold);
 		}

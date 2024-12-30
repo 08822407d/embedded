@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "conf.h"
 
 
 // screen offset (40,53)
@@ -83,7 +84,7 @@ void initLvglDisplay(void) {
 #if LV_USE_TFT_ESPI
 	/*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
 	disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf, sizeof(draw_buf));
-	lv_display_set_rotation(disp, TFT_ROTATION);
+	lv_display_set_rotation(disp, LVGL_ROTATION);
 #else
 	/*Else create a display yourself*/
 	disp = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
@@ -133,26 +134,33 @@ lv_obj_t * DigitRoller;
 
 void Joystick4WayRollerUp()
 {
-	uint32_t index = lv_roller_get_selected(DigitRoller);
-	index++;
-	lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
+	// uint32_t index = lv_roller_get_selected(DigitRoller);
+	// index++;
+	// lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
+
+	uint32_t t = LV_KEY_UP;
+	lv_obj_send_event(DigitRoller, LV_EVENT_KEY, &t);
 }
 
 void Joystick4WayRollerDown()
 {
-	uint32_t index = lv_roller_get_selected(DigitRoller);
-	index--;
-	lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
+	// uint32_t index = lv_roller_get_selected(DigitRoller);
+	// index--;
+	// lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
+
+	uint32_t t = LV_KEY_DOWN;
+	lv_obj_send_event(DigitRoller, LV_EVENT_KEY, &t);
 }
 
 static void event_handler(lv_event_t * e)
 {
 	// lv_event_code_t code = lv_event_get_code(e);
-	// lv_obj_t * obj = lv_event_get_target(e);
-	// if(code == LV_EVENT_VALUE_CHANGED) {
+	// lv_obj_t * obj = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
+	// if(code == LV_EVENT_KEY) {
 	// 	char buf[32];
 	// 	lv_roller_get_selected_str(obj, buf, sizeof(buf));
 	// 	LV_LOG_USER("Selected value: %s", buf);
+	// 	Serial.printf("Selected value: %s\n", buf);
 	// }
 }
 
@@ -172,7 +180,6 @@ void initRoller()
 						  LV_ROLLER_MODE_INFINITE);
     lv_roller_set_visible_row_count(DigitRoller, 3);
     lv_obj_add_style(DigitRoller, &style_sel, LV_PART_SELECTED);
-	lv_roller_set_visible_row_count(DigitRoller, 4);
 	lv_obj_center(DigitRoller);
 	lv_obj_add_event_cb(DigitRoller, event_handler, LV_EVENT_ALL, NULL);
 }

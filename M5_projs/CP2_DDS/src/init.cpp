@@ -19,7 +19,7 @@ void initM5JoystickHAT(void) {
 	DevModManager.registerModule(joystickPtr);
 
 	// joystick->debugPrintParams();
-	Serial.printf("Joystick XY Max: %d , %d\n", joystickPtr->getXmax(), joystickPtr->getYmax());
+	// Serial.printf("Joystick XY Max: %d , %d\n", joystickPtr->getXmax(), joystickPtr->getYmax());
 }
 
 
@@ -29,8 +29,6 @@ std::shared_ptr<AceButton> Joystick4WayButton = nullptr;
 extern void Joystick4WayRollerUp(void);
 extern void Joystick4WayRollerDown(void);
 void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	// String direction_str = "";
-
 	// 从 ButtonConfig 获取当前方向
 	Joystick4WayButtonConfig* config = static_cast<Joystick4WayButtonConfig*>(button->getButtonConfig());
 	if (config) {
@@ -38,30 +36,6 @@ void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState)
 		if (direction == JOY_NONE) {
 			return;		//	回正事件，不做处理
 		}
-
-		// M5.Lcd.clear();
-		// switch (direction) {
-		// 	case JOY_DIR_UP:
-		// 		// direction_str = "Up";
-		// 		M5.Lcd.drawTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
-		// 		break;
-		// 	case JOY_DIR_DOWN:
-		// 		// direction_str = "Down";
-		// 		M5.Lcd.drawTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
-		// 		break;
-		// 	case JOY_DIR_LEFT:
-		// 		// direction_str = "Left";
-		// 		M5.Lcd.drawTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
-		// 		break;
-		// 	case JOY_DIR_RIGHT:
-		// 		// direction_str = "Right";
-		// 		M5.Lcd.drawTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
-		// 		break;
-		// 	default:
-		// 		// direction_str = "Unknown";
-		// 		M5.Lcd.clear();
-		// 		break;
-		// }
 
 		switch (direction) {
 			case JOY_DIR_UP:
@@ -78,14 +52,6 @@ void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState)
 				break;
 		}
 	}
-		
-	// String event = "";
-	// if (eventType == AceButton::kEventPressed)
-	// 	event = "Pressed";
-	// else if (eventType == AceButton::kEventLongPressed)
-	// 	event = "LongPressed";
-
-	// Serial.println(direction_str + " " + event);
 }
 
 
@@ -104,7 +70,4 @@ void initJoystick4WayButtons(void) {
 
 	// 添加回调函数
 	Joystick4WayButton->setEventHandler(handleEvent4Ways);
-
-
-	// JoystickUpConfig->debugPrintParams();
 }
