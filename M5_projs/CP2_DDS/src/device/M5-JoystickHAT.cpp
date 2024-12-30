@@ -1,18 +1,3 @@
-// void readJoyStick_16bit(TwoWire *wire, JoyStickData_s *data)
-// {
-// 	wire->beginTransmission(JOY_ADDR);
-// 	wire->write(0x01);
-// 	wire->endTransmission();
-// 	wire->requestFrom(JOY_ADDR, 4);
-// 	if (Wire.available()) {
-// 		data->x			= wire->read();
-// 		data->x			|= wire->read() << 8;
-// 		data->y			= wire->read();
-// 		data->y			|= wire->read() << 8;
-// 	}
-// }
-
-
 #include <Arduino.h> // 或 esp-idf 头
 #include "M5-JoystickHAT.hpp"
 #include "driver/ModuleManager.hpp"
