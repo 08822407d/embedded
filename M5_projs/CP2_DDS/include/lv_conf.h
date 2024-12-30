@@ -72,6 +72,7 @@
  */
 #define LV_USE_LOG              0
 
-#define TFT_ROTATION            LV_DISPLAY_ROTATION_270 // 设置显示屏方向
+#define TFT_ROTATION            LV_DISPLAY_ROTATION_90 // 设置显示屏方向
+// #define TFT_ROTATION            LV_DISPLAY_ROTATION_270 // 设置显示屏方向
 
 #endif /* LV_CONF_H */

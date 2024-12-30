@@ -25,6 +25,9 @@ void initM5JoystickHAT(void) {
 
 std::shared_ptr<AceButton> Joystick4WayButton = nullptr;
 
+
+extern void Joystick4WayRollerUp(void);
+extern void Joystick4WayRollerDown(void);
 void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState) {
 	// String direction_str = "";
 
@@ -36,27 +39,42 @@ void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState)
 			return;		//	回正事件，不做处理
 		}
 
-		M5.Lcd.clear();
+		// M5.Lcd.clear();
+		// switch (direction) {
+		// 	case JOY_DIR_UP:
+		// 		// direction_str = "Up";
+		// 		M5.Lcd.drawTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
+		// 		break;
+		// 	case JOY_DIR_DOWN:
+		// 		// direction_str = "Down";
+		// 		M5.Lcd.drawTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
+		// 		break;
+		// 	case JOY_DIR_LEFT:
+		// 		// direction_str = "Left";
+		// 		M5.Lcd.drawTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
+		// 		break;
+		// 	case JOY_DIR_RIGHT:
+		// 		// direction_str = "Right";
+		// 		M5.Lcd.drawTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
+		// 		break;
+		// 	default:
+		// 		// direction_str = "Unknown";
+		// 		M5.Lcd.clear();
+		// 		break;
+		// }
+
 		switch (direction) {
 			case JOY_DIR_UP:
-				// direction_str = "Up";
-				M5.Lcd.drawTriangle(120, 45, 110, 55, 130, 55, TFT_GREEN);
+				Joystick4WayRollerUp();
 				break;
 			case JOY_DIR_DOWN:
-				// direction_str = "Down";
-				M5.Lcd.drawTriangle(120, 85, 110, 75, 130, 75, TFT_GREEN);
+				Joystick4WayRollerDown();
 				break;
-			case JOY_DIR_LEFT:
-				// direction_str = "Left";
-				M5.Lcd.drawTriangle(100, 65, 110, 55, 110, 75, TFT_GREEN);
-				break;
-			case JOY_DIR_RIGHT:
-				// direction_str = "Right";
-				M5.Lcd.drawTriangle(140, 65, 130, 55, 130, 75, TFT_GREEN);
-				break;
+			// case JOY_DIR_LEFT:
+			// 	break;
+			// case JOY_DIR_RIGHT:
+			// 	break;
 			default:
-				// direction_str = "Unknown";
-				M5.Lcd.clear();
 				break;
 		}
 	}
