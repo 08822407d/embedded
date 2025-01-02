@@ -182,4 +182,6 @@ void initRoller()
     lv_obj_add_style(DigitRoller, &style_sel, LV_PART_SELECTED);
 	lv_obj_center(DigitRoller);
 	lv_obj_add_event_cb(DigitRoller, event_handler, LV_EVENT_ALL, NULL);
+
+	
 }
