@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "ScreenPage.hpp"
 #include "conf.h"
 
 
@@ -10,6 +11,24 @@
 /*LVGL draw into this buffer, 1/10 screen size usually works well. The size is in bytes*/
 #define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
+
+
+// 主页面
+std::shared_ptr<ScreenPage> RootPage;
+
+// 设置DDS参数菜单页
+std::shared_ptr<ScreenPage> SetDDSPage;
+// 各设置项目页
+std::shared_ptr<ScreenPage> SetWaveFormPage;
+std::shared_ptr<ScreenPage> SetFrequencyPage;
+std::shared_ptr<ScreenPage> SetPhasePage;
+
+// 其他设置菜单页
+std::shared_ptr<ScreenPage> OtherSettingsPage;
+
+
+extern void initScreenPages(void);
+
 
 #if LV_USE_LOG != 0
 void my_print( lv_log_level_t level, const char * buf )
@@ -166,22 +185,46 @@ static void event_handler(lv_event_t * e)
 
 void initRoller()
 {
-	/*A style to make the selected option larger*/
-    static lv_style_t style_sel;
-    lv_style_init(&style_sel);
-    lv_style_set_text_font(&style_sel, &lv_font_montserrat_22);
-    lv_style_set_bg_color(&style_sel, lv_color_hex3(0xf88));
-    lv_style_set_border_width(&style_sel, 2);
-    lv_style_set_border_color(&style_sel, lv_color_hex3(0xf00));
+	// /*A style to make the selected option larger*/
+	// static lv_style_t style_sel;
+	// lv_style_init(&style_sel);
+	// lv_style_set_text_font(&style_sel, &lv_font_montserrat_22);
+	// lv_style_set_bg_color(&style_sel, lv_color_hex3(0xf88));
+	// lv_style_set_border_width(&style_sel, 2);
+	// lv_style_set_border_color(&style_sel, lv_color_hex3(0xf00));
 
-	DigitRoller = lv_roller_create(lv_screen_active());
-	lv_roller_set_options(DigitRoller,
-						  "0\n1\n2\n3\n4\n5\n6\n7\n8\n9",
-						  LV_ROLLER_MODE_INFINITE);
-    lv_roller_set_visible_row_count(DigitRoller, 3);
-    lv_obj_add_style(DigitRoller, &style_sel, LV_PART_SELECTED);
-	lv_obj_center(DigitRoller);
-	lv_obj_add_event_cb(DigitRoller, event_handler, LV_EVENT_ALL, NULL);
+	// DigitRoller = lv_roller_create(lv_screen_active());
+	// lv_roller_set_options(DigitRoller,
+	// 					  "0\n1\n2\n3\n4\n5\n6\n7\n8\n9",
+	// 					  LV_ROLLER_MODE_INFINITE);
+	// lv_roller_set_visible_row_count(DigitRoller, 3);
+	// lv_obj_add_style(DigitRoller, &style_sel, LV_PART_SELECTED);
+	// lv_obj_center(DigitRoller);
+	// lv_obj_add_event_cb(DigitRoller, event_handler, LV_EVENT_ALL, NULL);
 
-	
+	initScreenPages();
+}
+
+
+void initScreenPages(void) {
+	RootPage = std::make_shared<ScreenPage>("Root");
+
+	SetDDSPage = std::make_shared<ScreenPage>("Set DDS Parameters");
+	OtherSettingsPage = std::make_shared<ScreenPage>("Other Settings");
+
+	SetWaveFormPage = std::make_shared<ScreenPage>("Set WaveForm");
+	SetFrequencyPage = std::make_shared<ScreenPage>("Set Frequency");
+	SetPhasePage = std::make_shared<ScreenPage>("Set Phase");
+
+
+
+	RootPage->addChild(SetDDSPage);
+	RootPage->addChild(OtherSettingsPage);
+
+	SetDDSPage->addChild(SetWaveFormPage);
+	SetDDSPage->addChild(SetFrequencyPage);
+	SetDDSPage->addChild(SetPhasePage);
+
+	extern void initMenuScreens(std::shared_ptr<ScreenPage> RootPage);
+	initMenuScreens(RootPage);
 }
