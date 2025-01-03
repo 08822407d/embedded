@@ -12,7 +12,7 @@
 	#define EVENT_TASK_PRIORITY		3
 
 
-	class ModuleManager {
+	class HWModuleManager {
 	public:
 		/**
 		 * @brief 注册一个外设模块(子类实例)。
@@ -38,7 +38,7 @@
 	};
 
 
-	extern ModuleManager DevModManager;
-	void initModulePollTask(void);
+	extern HWModuleManager DevModManager;
+	void initHardWarePollTask(void);
 
 #endif /* _MODULE_MANAGER_H_ */

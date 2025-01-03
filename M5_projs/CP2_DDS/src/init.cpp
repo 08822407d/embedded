@@ -1,4 +1,5 @@
 #include "init.hpp"
+#include "debug_utils.hpp"
 
 
 // 全局智能指针定义并初始化为nullptr
@@ -9,6 +10,8 @@ void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState)
 
 
 void initM5JoystickHAT(void) {
+	MODULE_LOG_HEAD( M5JoystickHAT );
+
 	// 初始化摇杆
     joystickPtr = std::make_shared<M5JoystickHAT>();
 	M5JoystickHAT *joystick = joystickPtr.get();
@@ -24,9 +27,12 @@ void initM5JoystickHAT(void) {
 
 	// joystick->debugPrintParams();
 	// Serial.printf("Joystick XY Max: %d , %d\n", joystickPtr->getXmax(), joystickPtr->getYmax());
+	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
 
 void initJoystick4WayButtons(void) {
+	MODULE_LOG_HEAD( Joystick4WayButtons );
+
 	auto Joystick4WayConfig =
 		std::make_shared<Joystick4WayButtonConfig>(
 			joystickPtr.get(), JOYSTICK_TRIGGER_THRESAHOLD
@@ -41,4 +47,6 @@ void initJoystick4WayButtons(void) {
 
 	// 添加回调函数
 	Joystick4WayButton->setEventHandler(handleEvent4Ways);
+
+	MODULE_LOG_TAIL( " ... Setup done\n" );
 }

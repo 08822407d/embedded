@@ -1,6 +1,6 @@
 #include <Arduino.h> // 或 esp-idf 头
 #include "M5-JoystickHAT.hpp"
-#include "driver/ModuleManager.hpp"
+#include "driver/HWModuleManager.hpp"
 
 
 M5JoystickHAT::M5JoystickHAT()

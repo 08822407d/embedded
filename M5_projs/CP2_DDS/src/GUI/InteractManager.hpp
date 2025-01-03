@@ -15,7 +15,9 @@
 class InteractManager {
 public:
 	explicit InteractManager(std::shared_ptr<ScreenPage> RootPage)
-	: _root(RootPage) {}
+	: _root(RootPage) {
+		this->setCurrent(RootPage);
+	}
 
 	std::shared_ptr<ScreenPage> getCurrent() const { return _current; }
 	void setCurrent(std::shared_ptr<ScreenPage> page) { _current = page; }

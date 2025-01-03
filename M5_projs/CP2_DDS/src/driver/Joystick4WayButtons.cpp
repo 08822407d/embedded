@@ -1,4 +1,5 @@
 #include "Joystick4WayButtons.hpp"
+#include "debug_utils.hpp"
 
 
 extern std::shared_ptr<AceButton> Joystick4WayButton;
@@ -21,6 +22,8 @@ static void AceButtonCheckTask(void *pvParam) {
 }
 
 void initJoystick4WayButtonsCheckTask() {
+	MODULE_LOG_HEAD( 4WayButtons Polling Task );
+
 	// 通过 xTaskCreate() 创建轮询任务
 	xTaskCreate(
 		AceButtonCheckTask,			// 任务函数
@@ -30,5 +33,7 @@ void initJoystick4WayButtonsCheckTask() {
 		ACEBUTTON_TASK_PRIORITY,	// 任务优先级(宏定义)
 		NULL						// 任务句柄(可选)
 	);
+
+	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
 

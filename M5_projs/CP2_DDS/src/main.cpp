@@ -32,7 +32,9 @@ void setup() {
 	Serial.begin(115200);
 
 	initLvglDisplay();
-	delay(1000);
+	delay(500);
+	initScreenPages();
+	delay(500);
 
 	initM5JoystickHAT();
 	delay(500);
@@ -40,9 +42,8 @@ void setup() {
 	initJoystick4WayButtons();
 
 	initJoystick4WayButtonsCheckTask();
-	initModulePollTask();
+	initHardWarePollTask();
 
-	initScreenPages();
 }
 
 void loop() {

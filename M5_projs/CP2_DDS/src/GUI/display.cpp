@@ -4,6 +4,8 @@
 #include "menu_screen.hpp"
 #include "conf.h"
 
+#include "debug_utils.hpp"
+
 
 // screen offset (40,53)
 #define TFT_HOR_RES		135
@@ -42,7 +44,7 @@ void my_print( lv_log_level_t level, const char * buf )
 
 
 void initLvglDisplay(void) {
-	Serial.println( "LVGL_Arduino" );
+	MODULE_LOG_HEAD( LVGL_Arduino );
 
 	lv_init();
 
@@ -92,7 +94,7 @@ void initLvglDisplay(void) {
 
 	// lv_display_set_offset(disp, 40, 53);
 
-	Serial.println( "Setup done" );
+	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
 
 
@@ -119,9 +121,13 @@ void initRoller()
 
 
 void initScreenPages(void) {
+	MODULE_LOG_HEAD( ScreenPages );
+
 	// 页面树的根和管理对象
 	RootPage =
 		std::make_shared<ScreenPage>("Root");
+	RootPage->lvgl_widget =
+		createMenuScreen(RootPage->getName());
 	DDSInteractManager =
 		std::make_shared<InteractManager>(RootPage);
 
@@ -134,24 +140,24 @@ void initScreenPages(void) {
 	RootPage->addChild(SetDDSPage);
 
 
-	// 各个DDS具体参数设置页
-	SetWaveFormPage =
-		std::make_shared<ScreenPage>("WaveForm");
-	SetWaveFormPage->lvgl_widget =
-		creatTextMenuItems(SetDDSPage->lvgl_widget, SetWaveFormPage->getName());
-	SetDDSPage->addChild(SetWaveFormPage);
+	// // 各个DDS具体参数设置页
+	// SetWaveFormPage =
+	// 	std::make_shared<ScreenPage>("WaveForm");
+	// SetWaveFormPage->lvgl_widget =
+	// 	creatTextMenuItems(SetDDSPage->lvgl_widget, SetWaveFormPage->getName());
+	// SetDDSPage->addChild(SetWaveFormPage);
 
-	SetFrequencyPage =
-		std::make_shared<ScreenPage>("Frequency");
-	SetFrequencyPage->lvgl_widget =
-		creatTextMenuItems(SetDDSPage->lvgl_widget, SetFrequencyPage->getName());
-	SetDDSPage->addChild(SetFrequencyPage);
+	// SetFrequencyPage =
+	// 	std::make_shared<ScreenPage>("Frequency");
+	// SetFrequencyPage->lvgl_widget =
+	// 	creatTextMenuItems(SetDDSPage->lvgl_widget, SetFrequencyPage->getName());
+	// SetDDSPage->addChild(SetFrequencyPage);
 	
-	SetPhasePage =
-		std::make_shared<ScreenPage>("Phase");
-	SetPhasePage->lvgl_widget =
-		creatTextMenuItems(SetDDSPage->lvgl_widget, SetPhasePage->getName());
-	SetDDSPage->addChild(SetPhasePage);
+	// SetPhasePage =
+	// 	std::make_shared<ScreenPage>("Phase");
+	// SetPhasePage->lvgl_widget =
+	// 	creatTextMenuItems(SetDDSPage->lvgl_widget, SetPhasePage->getName());
+	// SetDDSPage->addChild(SetPhasePage);
 
 
 	// 其他设置总页
@@ -161,9 +167,9 @@ void initScreenPages(void) {
 		createMenuScreen(OtherSettingsPage->getName());
 	RootPage->addChild(OtherSettingsPage);
 
-	// extern void initMenuScreens(std::shared_ptr<ScreenPage> RootPage);
-	// initMenuScreens(RootPage);
 
-	DDSInteractManager->setCurrent(SetDDSPage);
-	lv_scr_load(SetDDSPage->lvgl_widget);
+	// DDSInteractManager->setCurrent(RootPage);
+	// lv_scr_load(RootPage->lvgl_widget);
+
+	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
