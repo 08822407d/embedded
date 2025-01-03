@@ -1,5 +1,7 @@
 #include "display.hpp"
 #include "ScreenPage.hpp"
+#include "InteractManager.hpp"
+#include "menu_screen.hpp"
 #include "conf.h"
 
 
@@ -27,7 +29,6 @@ std::shared_ptr<ScreenPage> SetPhasePage;
 std::shared_ptr<ScreenPage> OtherSettingsPage;
 
 
-extern void initScreenPages(void);
 
 
 #if LV_USE_LOG != 0
@@ -39,52 +40,6 @@ void my_print( lv_log_level_t level, const char * buf )
 }
 #endif
 
-/* LVGL calls it when a rendered image needs to copied to the display*/
-void my_disp_flush( lv_display_t *disp, const lv_area_t *area, uint8_t * px_map)
-{
-	/*Copy `px map` to the `area`*/
-
-	/*For example ("my_..." functions needs to be implemented by you)
-	uint32_t w = lv_area_get_width(area);
-	uint32_t h = lv_area_get_height(area);
-
-	my_set_window(area->x1, area->y1, w, h);
-	my_draw_bitmaps(px_map, w * h);
-	 */
-
-	/*Call it to tell LVGL you are ready*/
-	lv_display_flush_ready(disp);
-}
-
-/*Read the touchpad*/
-void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
-{
-	/*For example  ("my_..." functions needs to be implemented by you)
-	int32_t x, y;
-	bool touched = my_get_touch( &x, &y );
-
-	if(!touched) {
-		data->state = LV_INDEV_STATE_RELEASED;
-	} else {
-		data->state = LV_INDEV_STATE_PRESSED;
-
-		data->point.x = x;
-		data->point.y = y;
-	}
-	 */
-}
-
-/*use Arduinos millis() as tick source*/
-static uint32_t my_tick(void)
-{
-	return millis();
-}
-
-
-
-void loopLvglDisplay(void) {
-	lv_timer_handler(); /* let the GUI do its work */
-}
 
 void initLvglDisplay(void) {
 	Serial.println( "LVGL_Arduino" );
@@ -92,7 +47,7 @@ void initLvglDisplay(void) {
 	lv_init();
 
 	/*Set a tick source so that LVGL will know how much time elapsed. */
-	lv_tick_set_cb(my_tick);
+	lv_tick_set_cb((lv_tick_get_cb_t)millis);
 
 	/* register print function for debugging */
 #if LV_USE_LOG != 0
@@ -114,7 +69,7 @@ void initLvglDisplay(void) {
 	/*Initialize the (dummy) input device driver*/
 	lv_indev_t * indev = lv_indev_create();
 	lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); /*Touchpad should have POINTER type*/
-	lv_indev_set_read_cb(indev, my_touchpad_read);
+	lv_indev_set_read_cb(indev, NULL);
 
 	/* Create a simple label
 	 * ---------------------
@@ -137,51 +92,10 @@ void initLvglDisplay(void) {
 
 	// lv_display_set_offset(disp, 40, 53);
 
-	// lv_obj_t *label = lv_label_create( lv_screen_active() );
-	// lv_label_set_text( label, "Hello Arduino, I'm LVGL!" );
-	// lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
-
 	Serial.println( "Setup done" );
-
-	extern void initRoller(void);
-	initRoller();
 }
 
 
-
-lv_obj_t * DigitRoller;
-
-void Joystick4WayRollerUp()
-{
-	// uint32_t index = lv_roller_get_selected(DigitRoller);
-	// index++;
-	// lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
-
-	uint32_t t = LV_KEY_UP;
-	lv_obj_send_event(DigitRoller, LV_EVENT_KEY, &t);
-}
-
-void Joystick4WayRollerDown()
-{
-	// uint32_t index = lv_roller_get_selected(DigitRoller);
-	// index--;
-	// lv_roller_set_selected(DigitRoller, index, LV_ANIM_ON);
-
-	uint32_t t = LV_KEY_DOWN;
-	lv_obj_send_event(DigitRoller, LV_EVENT_KEY, &t);
-}
-
-static void event_handler(lv_event_t * e)
-{
-	// lv_event_code_t code = lv_event_get_code(e);
-	// lv_obj_t * obj = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
-	// if(code == LV_EVENT_KEY) {
-	// 	char buf[32];
-	// 	lv_roller_get_selected_str(obj, buf, sizeof(buf));
-	// 	LV_LOG_USER("Selected value: %s", buf);
-	// 	Serial.printf("Selected value: %s\n", buf);
-	// }
-}
 
 void initRoller()
 {
@@ -201,30 +115,55 @@ void initRoller()
 	// lv_obj_add_style(DigitRoller, &style_sel, LV_PART_SELECTED);
 	// lv_obj_center(DigitRoller);
 	// lv_obj_add_event_cb(DigitRoller, event_handler, LV_EVENT_ALL, NULL);
-
-	initScreenPages();
 }
 
 
 void initScreenPages(void) {
-	RootPage = std::make_shared<ScreenPage>("Root");
-
-	SetDDSPage = std::make_shared<ScreenPage>("Set DDS Parameters");
-	OtherSettingsPage = std::make_shared<ScreenPage>("Other Settings");
-
-	SetWaveFormPage = std::make_shared<ScreenPage>("Set WaveForm");
-	SetFrequencyPage = std::make_shared<ScreenPage>("Set Frequency");
-	SetPhasePage = std::make_shared<ScreenPage>("Set Phase");
+	// 页面树的根和管理对象
+	RootPage =
+		std::make_shared<ScreenPage>("Root");
+	DDSInteractManager =
+		std::make_shared<InteractManager>(RootPage);
 
 
-
+	// DDS参数设置总页
+	SetDDSPage =
+		std::make_shared<ScreenPage>("DDS Params");
+	SetDDSPage->lvgl_widget =
+		createMenuScreen(SetDDSPage->getName());
 	RootPage->addChild(SetDDSPage);
-	RootPage->addChild(OtherSettingsPage);
 
+
+	// 各个DDS具体参数设置页
+	SetWaveFormPage =
+		std::make_shared<ScreenPage>("WaveForm");
+	SetWaveFormPage->lvgl_widget =
+		creatTextMenuItems(SetDDSPage->lvgl_widget, SetWaveFormPage->getName());
 	SetDDSPage->addChild(SetWaveFormPage);
+
+	SetFrequencyPage =
+		std::make_shared<ScreenPage>("Frequency");
+	SetFrequencyPage->lvgl_widget =
+		creatTextMenuItems(SetDDSPage->lvgl_widget, SetFrequencyPage->getName());
 	SetDDSPage->addChild(SetFrequencyPage);
+	
+	SetPhasePage =
+		std::make_shared<ScreenPage>("Phase");
+	SetPhasePage->lvgl_widget =
+		creatTextMenuItems(SetDDSPage->lvgl_widget, SetPhasePage->getName());
 	SetDDSPage->addChild(SetPhasePage);
 
-	extern void initMenuScreens(std::shared_ptr<ScreenPage> RootPage);
-	initMenuScreens(RootPage);
+
+	// 其他设置总页
+	OtherSettingsPage =
+		std::make_shared<ScreenPage>("Other");
+	OtherSettingsPage->lvgl_widget =
+		createMenuScreen(OtherSettingsPage->getName());
+	RootPage->addChild(OtherSettingsPage);
+
+	// extern void initMenuScreens(std::shared_ptr<ScreenPage> RootPage);
+	// initMenuScreens(RootPage);
+
+	DDSInteractManager->setCurrent(SetDDSPage);
+	lv_scr_load(SetDDSPage->lvgl_widget);
 }

@@ -28,10 +28,10 @@ public:
 	// 3) 子页面树的管理
 	void addChild(std::shared_ptr<ScreenPage> child);
 	const std::vector<std::shared_ptr<ScreenPage>>& getChildren() const;
-	ScreenPage* getParent() const;
+	ScreenPage *getParent() const;
 
 protected:
 	std::string		_name;
-	ScreenPage*		_parent{nullptr};
+	ScreenPage		*_parent{nullptr};
 	std::vector<std::shared_ptr<ScreenPage>>	_children;
 };

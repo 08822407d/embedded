@@ -3,6 +3,10 @@
 
 // 全局智能指针定义并初始化为nullptr
 std::shared_ptr<M5JoystickHAT> joystickPtr = nullptr;
+std::shared_ptr<AceButton> Joystick4WayButton = nullptr;
+
+void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState);
+
 
 void initM5JoystickHAT(void) {
 	// 初始化摇杆
@@ -21,39 +25,6 @@ void initM5JoystickHAT(void) {
 	// joystick->debugPrintParams();
 	// Serial.printf("Joystick XY Max: %d , %d\n", joystickPtr->getXmax(), joystickPtr->getYmax());
 }
-
-
-std::shared_ptr<AceButton> Joystick4WayButton = nullptr;
-
-
-extern void Joystick4WayRollerUp(void);
-extern void Joystick4WayRollerDown(void);
-void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-	// 从 ButtonConfig 获取当前方向
-	Joystick4WayButtonConfig* config = static_cast<Joystick4WayButtonConfig*>(button->getButtonConfig());
-	if (config) {
-		JoystickDirectionID direction = config->getCurrDirection();
-		if (direction == JOY_NONE) {
-			return;		//	回正事件，不做处理
-		}
-
-		switch (direction) {
-			case JOY_DIR_UP:
-				Joystick4WayRollerUp();
-				break;
-			case JOY_DIR_DOWN:
-				Joystick4WayRollerDown();
-				break;
-			// case JOY_DIR_LEFT:
-			// 	break;
-			// case JOY_DIR_RIGHT:
-			// 	break;
-			default:
-				break;
-		}
-	}
-}
-
 
 void initJoystick4WayButtons(void) {
 	auto Joystick4WayConfig =

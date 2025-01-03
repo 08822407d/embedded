@@ -1,7 +1,6 @@
 #include "ScreenPage.hpp"
 
 
-
 void ScreenPage::init() {
 
 }

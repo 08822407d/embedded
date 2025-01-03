@@ -20,5 +20,5 @@ extern std::shared_ptr<ScreenPage> SetPhasePage;
 extern std::shared_ptr<ScreenPage> OtherSettingsPage;
 
 
-extern void loopLvglDisplay(void);
 extern void initLvglDisplay(void);
+extern void initScreenPages(void);
