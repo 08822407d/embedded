@@ -52,5 +52,5 @@ void loop() {
 
 	lv_timer_handler();		/* let the GUI do its work */
 
-	delay(20); // 防止主循环占用过多CPU
+	delay(50); // 防止主循环占用过多CPU
 }

@@ -12,17 +12,17 @@ using namespace ace_button;
 
 
 	// 使用宏定义来避免魔法数字
-	#define ACEBUTTON_POLL_INTERVAL_MS	25
+	#define ACEBUTTON_POLL_INTERVAL_MS	10
 	#define ACEBUTTON_TASK_PRIORITY		3
 
 
 	enum JoystickDirectionID {
-		JOY_NONE,
 		JOY_MID_BUTTON,
 		JOY_DIR_UP,
 		JOY_DIR_DOWN,
 		JOY_DIR_LEFT,
-		JOY_DIR_RIGHT
+		JOY_DIR_RIGHT,
+		JOY_NONE,
 	};
 
 

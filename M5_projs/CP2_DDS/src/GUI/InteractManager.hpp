@@ -5,7 +5,6 @@
 #include <string>
 
 #include <lvgl.h>
-// #include <AceButton.h>
 #include "driver/Joystick4WayButtons.hpp"
 
 #include "ScreenPage.hpp"
@@ -14,20 +13,29 @@
 
 class InteractManager {
 public:
-	explicit InteractManager(std::shared_ptr<ScreenPage> RootPage)
+	explicit InteractManager(ScreenPage *RootPage)
 	: _root(RootPage) {
 		this->setCurrent(RootPage);
 	}
 
-	std::shared_ptr<ScreenPage> getCurrent() const { return _current; }
-	void setCurrent(std::shared_ptr<ScreenPage> page) { _current = page; }
+	ScreenPage *getCurrent() const { return _current; }
+	void setCurrent(ScreenPage *page) { _current = page; }
 
-    void PeripheralEventRepeater(lv_key_t key);
+	void handleEvent4Ways(int keyIndex) {
+		// ScreenPage *page = this->getCurrent();
+		// lv_obj_t *lv_evt_target = page->lvgl_event_receiver;
+		// // Serial.printf("key: %d\n", key);
+		// lv_key_t key = page->KeyMap[keyIndex];
+		// lv_obj_send_event(lv_evt_target, LV_EVENT_KEY, &key);
+	}
 
 private:
-	std::shared_ptr<ScreenPage>	_current{ nullptr };
-	std::shared_ptr<ScreenPage>	_root{ nullptr };
+	ScreenPage	*_current{ nullptr };
+	ScreenPage	*_root{ nullptr };
 };
 
+
+extern lv_key_t MenuKeyMap[5];
+extern lv_key_t NormalKeyMap[5];
 
 extern std::shared_ptr<InteractManager> DDSInteractManager;

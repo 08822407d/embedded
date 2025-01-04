@@ -17,6 +17,6 @@
 #endif
 
 
-#define JOYSTICK_TRIGGER_THRESAHOLD	0.5
+#define JOYSTICK_TRIGGER_THRESAHOLD	0.3
 
 #endif /* _CONF_ */
