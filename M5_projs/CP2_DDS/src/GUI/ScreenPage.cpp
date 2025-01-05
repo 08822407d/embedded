@@ -1,21 +1,26 @@
 #include "ScreenPage.hpp"
 
 
-// void ScreenPage::init() {
+static lv_style_t *createDefualtMenuScreenStyle() {
+	// 创建一个新的样式
+	static lv_style_t style;
+	lv_style_init(&style);
+	// 设置背景颜色
+	lv_style_set_bg_color(&style, lv_color_hex(0x000000));
+	lv_style_set_bg_opa(&style, LV_OPA_COVER); // 完全不透明
+	return &style;
+}
 
-// }
+lv_obj_t *__createScreen(std::string name, lv_style_t *style = nullptr) {
+	lv_obj_t *ScreenObj = lv_obj_create(NULL);
 
-// void ScreenPage::dispose() {
-	
-// }
+	// 应用样式到屏幕对象
+	if (style == nullptr)
+		style = createDefualtMenuScreenStyle();
+	lv_obj_add_style(ScreenObj, style, LV_PART_MAIN);
 
-// void ScreenPage::enterPage() {
-
-// }
-
-// void ScreenPage::exitPage() {
-
-// }
+	return ScreenObj;
+}
 
 
 void ScreenPage::addChild(ScreenPage *child) {

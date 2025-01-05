@@ -22,11 +22,9 @@ public:
 	void setCurrent(ScreenPage *page) { _current = page; }
 
 	void handleEvent4Ways(int keyIndex) {
-		// ScreenPage *page = this->getCurrent();
-		// lv_obj_t *lv_evt_target = page->lvgl_event_receiver;
-		// // Serial.printf("key: %d\n", key);
-		// lv_key_t key = page->KeyMap[keyIndex];
-		// lv_obj_send_event(lv_evt_target, LV_EVENT_KEY, &key);
+		ScreenPage *page = this->getCurrent();
+		lv_key_t key = page->KeyMap[keyIndex];
+		page->lvgl_SendEvent(&key);
 	}
 
 private:

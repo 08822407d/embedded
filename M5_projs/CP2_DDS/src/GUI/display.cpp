@@ -18,17 +18,17 @@ uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
 
 // 主页面
-MenuScreenPage *RootPage;
+RollerMenuScreenPage *RootPage;
 
 // 设置DDS参数菜单页
-MenuScreenPage *SetDDSPage;
+RollerMenuScreenPage *SetDDSPage;
 // 各设置项目页
 ScreenPage *SetWaveFormPage;
 ScreenPage *SetFrequencyPage;
 ScreenPage *SetPhasePage;
 
 // 其他设置菜单页
-MenuScreenPage *OtherSettingsPage;
+RollerMenuScreenPage *OtherSettingsPage;
 
 
 
@@ -102,18 +102,18 @@ void initScreenPages(void) {
 	MODULE_LOG_HEAD( ScreenPages );
 
 	// 根菜单
-	RootPage = new MenuScreenPage("Root");
-	// RootPage->lvgl_event_receiver = createSettingsScreen(RootPage->getName());
-	// RootPage->lvgl_container = lv_obj_get_parent(RootPage->lvgl_event_receiver);
+	RootPage = new RollerMenuScreenPage("Root");
 	DDSInteractManager = std::make_shared<InteractManager>(RootPage);
 
 	// DDS设置菜单
-	SetDDSPage = new MenuScreenPage("WaveSettings");
-	// SetDDSPage->lvgl_event_receiver = createWaveSettingsScreen("WaveSettings");
-	// SetDDSPage->lvgl_container = lv_obj_get_parent(SetDDSPage->lvgl_event_receiver);
-	RootPage->addChild(SetDDSPage);
+	SetDDSPage = new RollerMenuScreenPage("Wave", RootPage);
+	RootPage->addItem(SetDDSPage);
 
-	DDSInteractManager->setCurrent(SetDDSPage);
-	// lv_scr_load(SetDDSPage->lvgl_container);
+	// 其他设置菜单
+	OtherSettingsPage = new RollerMenuScreenPage("Other", RootPage);
+	RootPage->addItem(OtherSettingsPage);
+
+	DDSInteractManager->setCurrent(RootPage);
+	lv_scr_load(RootPage->lvgl_GetScreen());
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
