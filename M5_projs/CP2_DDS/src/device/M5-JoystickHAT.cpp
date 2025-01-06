@@ -39,7 +39,7 @@ bool M5JoystickHAT::update() {
 	if (this->_wire->available()) {
 		int _rawX		= (int8_t)this->_wire->read();
 		int _rawY		= (int8_t)this->_wire->read();
-		this->_midBtn	= (int8_t)this->_wire->read();
+		this->_midBtn	= !(int8_t)this->_wire->read();
 
 		switch (this->_rotation) {
 			case 0:

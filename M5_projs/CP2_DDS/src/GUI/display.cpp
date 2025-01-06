@@ -108,12 +108,18 @@ void initScreenPages(void) {
 	// DDS设置菜单
 	SetDDSPage = new RollerMenuScreenPage("Wave", RootPage);
 	RootPage->addItem(SetDDSPage);
+	// DDS具体参数设置菜单
+	SetWaveFormPage = new RollerMenuScreenPage("WaveForm", SetDDSPage);
+	SetDDSPage->addItem(SetWaveFormPage);
+	SetFrequencyPage = new RollerMenuScreenPage("Frequency", SetDDSPage);
+	SetDDSPage->addItem(SetFrequencyPage);
+	SetPhasePage = new RollerMenuScreenPage("Phase", SetDDSPage);
+	SetDDSPage->addItem(SetPhasePage);
 
 	// 其他设置菜单
 	OtherSettingsPage = new RollerMenuScreenPage("Other", RootPage);
 	RootPage->addItem(OtherSettingsPage);
 
-	DDSInteractManager->setCurrent(RootPage);
-	lv_scr_load(RootPage->lvgl_GetScreen());
+	RootPage->enterPage();
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }

@@ -9,6 +9,9 @@ void RollerMenuScreenPage::dispose() {
 }
 
 void RollerMenuScreenPage::enterPage() {
+	DDSInteractManager->setCurrent(this);
+	lv_scr_load(this->lvgl_GetScreen());
+	lv_roller_set_selected(this->_lvgl_menu, this->_last_selected, LV_ANIM_OFF);
 }
 
 void RollerMenuScreenPage::exitPage() {
@@ -21,10 +24,25 @@ static void event_handler(lv_event_t *e)
 	lv_event_code_t code = lv_event_get_code(e);
 	lv_obj_t *obj = (lv_obj_t *)lv_event_get_target(e);
 	if(code == LV_EVENT_KEY) {
-        uint32_t key = lv_event_get_key(e);
-        // const char * key_name = lv_key_to_name(key);
+        lv_key_t key = static_cast<lv_key_t>(lv_event_get_key(e));
 		int index = lv_roller_get_selected(obj);
-		Serial.printf("Key: %d ; Selected value: %d\n", key, index);
+		// Serial.printf("Key: %d ; Selected value: %d\n", key, index);
+
+
+		MenuScreenPage *currPage = dynamic_cast<MenuScreenPage *>(DDSInteractManager->getCurrent());
+		currPage->setLastSelected(index);
+		// Serial.printf("Children count: %d\n", currPage->getChildren().size());
+		ScreenPage *selectedPage = nullptr;
+		if (key == LV_KEY_ENTER || key == LV_KEY_NEXT) {
+			selectedPage = currPage->getChild(index);
+		} else if (key == LV_KEY_PREV) {
+			selectedPage = currPage->getParent();
+		}
+		if (selectedPage != nullptr) {
+			// Serial.printf("Selected Page: %s\n", selectedPage->getName().c_str());
+			currPage->exitPage();
+			selectedPage->enterPage();
+		}
 	}
 }
 
@@ -66,6 +84,7 @@ void RollerMenuScreenPage::addItem(ScreenPage *ItemPage) {
 		this->_items_str.c_str(), LV_ROLLER_MODE_INFINITE);
 	
 	lv_roller_set_selected(this->_lvgl_menu, 0, LV_ANIM_OFF);
+	this->setLastSelected(0);
 
 	Serial.printf("Item_str Length: %d\n", this->_items_str.length());
 }

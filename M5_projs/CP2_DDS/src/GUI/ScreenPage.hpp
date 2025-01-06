@@ -37,6 +37,7 @@ public:
 
 	// 3) 子页面树的管理
 	void addChild(ScreenPage *child);
+	ScreenPage *getChild(int index) const;
 	const std::vector<ScreenPage *>& getChildren() const;
 	ScreenPage *getParent() const;
 
@@ -51,7 +52,6 @@ public:
 		lv_obj_t * focused_obj = lv_group_get_focused(this->_lvgl_group);
 		if(focused_obj) {
 			// 将事件转发给当前焦点对象
-			// lv_event_send(focused_obj, code, param);
 			lv_obj_send_event(focused_obj, LV_EVENT_KEY, key);
 		}
 	}

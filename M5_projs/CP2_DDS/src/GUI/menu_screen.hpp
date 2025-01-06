@@ -24,8 +24,11 @@ public:
 
 	lv_obj_t *getMenu() { return this->_lvgl_menu; }
 
+	void setLastSelected(int index) { this->_last_selected = index; }
+
 protected:
 	lv_obj_t	*_lvgl_menu;
+	int			_last_selected = -1;
 
 	using ScreenPage::addChild;
 };

@@ -47,6 +47,7 @@
 
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
+		int getMid() override { return _midBtn; }
 		int getXmax() override { return _Xmax; }
 		int getYmax() override { return _Ymax; }
 

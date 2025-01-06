@@ -48,21 +48,25 @@ using namespace ace_button;
 		virtual int readButton(uint8_t pin) override {
 			int xVal = _joystick->getX();
 			int yVal = _joystick->getY();
+			int midBtn = _joystick->getMid();
 			int dist = pow(xVal, 2) + pow(yVal, 2);
 
 			// Serial.printf("Threshold: %d ; Dist %d ; Direction: %d\n", _threshold, dist, _direction);
+			// Serial.printf("Joy : %d , %d ; Mid: %d\n", xVal, yVal, midBtn);
 
 			if ((dist > _threshold)) {
-				if (_direction == JOY_NONE) {
-					// 摇杆重新触发四向按钮
+				if (_direction == JOY_NONE) {	// 摇杆重新触发四向按钮
 					if (abs(xVal) > abs(yVal))
 						_direction = (xVal > 0) ? JOY_DIR_RIGHT : JOY_DIR_LEFT;
 					else
 						_direction = (yVal > 0) ? JOY_DIR_UP : JOY_DIR_DOWN;
-				}	// 或者已触发不再处理
+				}								// 或者已触发不再处理
 				return true;
-			} else {
-				_direction = JOY_NONE;	// 摇杆回正(四向按钮松开)
+			} else if (midBtn > 0) {			// 中键按下
+				_direction = JOY_MID_BUTTON;
+				return true;
+			} else {							// 摇杆回正(四向按钮松开)
+				_direction = JOY_NONE;
 				return false;
 			}
 		}

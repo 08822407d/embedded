@@ -28,6 +28,13 @@ void ScreenPage::addChild(ScreenPage *child) {
 	this->_children.push_back(child);
 }
 
+ScreenPage *ScreenPage::getChild(int index) const {
+	if (index < 0 || this->_children.size() <= 0 || index >= this->_children.size()) 
+		return nullptr;
+	else
+		return this->_children[index];
+}
+
 const std::vector<ScreenPage *>& ScreenPage::getChildren() const {
 	return this->_children;
 }
