@@ -24,7 +24,7 @@ public:
 	void handleEvent4Ways(int keyIndex) {
 		ScreenPage *page = this->getCurrent();
 		lv_key_t key = page->KeyMap[keyIndex];
-		page->lvgl_SendEvent(&key);
+		page->lvgl_RecieveKeyEvent(&key);
 	}
 
 private:
@@ -34,6 +34,8 @@ private:
 
 
 extern lv_key_t MenuKeyMap[5];
+extern lv_key_t SpinboxKeyMap[5];
+extern lv_key_t LeafPageKeyMap[5];
 extern lv_key_t NormalKeyMap[5];
 
 extern std::shared_ptr<InteractManager> DDSInteractManager;

@@ -23,6 +23,16 @@ lv_obj_t *__createScreen(std::string name, lv_style_t *style = nullptr) {
 }
 
 
+void ScreenPage::lvgl_RecieveKeyEvent(lv_key_t *key) {
+	this->__lvgl_KeyEventSpecial(key);
+	// 获取组中当前焦点的对象
+	lv_obj_t * focused_obj = lv_group_get_focused(this->_lvgl_group);
+	if(focused_obj) {
+		// 将事件转发给当前焦点对象
+		lv_obj_send_event(focused_obj, LV_EVENT_KEY, key);
+	}
+}
+
 void ScreenPage::addChild(ScreenPage *child) {
 	child->_parent = this;
 	this->_children.push_back(child);
@@ -41,4 +51,7 @@ const std::vector<ScreenPage *>& ScreenPage::getChildren() const {
 
 ScreenPage* ScreenPage::getParent() const {
 	return this->_parent;
+}
+
+void ScreenPage::__lvgl_KeyEventSpecial(lv_key_t *key) {
 }

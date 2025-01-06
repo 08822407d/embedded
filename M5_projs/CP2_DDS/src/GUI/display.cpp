@@ -2,6 +2,7 @@
 #include "ScreenPage.hpp"
 #include "InteractManager.hpp"
 #include "menu_screen.hpp"
+#include "digit_editor_screen.hpp"
 #include "conf.h"
 
 #include "debug_utils.hpp"
@@ -24,8 +25,8 @@ RollerMenuScreenPage *RootPage;
 RollerMenuScreenPage *SetDDSPage;
 // 各设置项目页
 ScreenPage *SetWaveFormPage;
-ScreenPage *SetFrequencyPage;
-ScreenPage *SetPhasePage;
+DigitEditorScreenPage *SetFrequencyPage;
+DigitEditorScreenPage *SetPhasePage;
 
 // 其他设置菜单页
 RollerMenuScreenPage *OtherSettingsPage;
@@ -111,15 +112,15 @@ void initScreenPages(void) {
 	// DDS具体参数设置菜单
 	SetWaveFormPage = new RollerMenuScreenPage("WaveForm", SetDDSPage);
 	SetDDSPage->addItem(SetWaveFormPage);
-	SetFrequencyPage = new RollerMenuScreenPage("Frequency", SetDDSPage);
+	SetFrequencyPage = new DigitEditorScreenPage("Frequency", SetDDSPage, 0, 10000000);
 	SetDDSPage->addItem(SetFrequencyPage);
-	SetPhasePage = new RollerMenuScreenPage("Phase", SetDDSPage);
+	SetPhasePage = new DigitEditorScreenPage("Phase", SetDDSPage, 0, 360);
 	SetDDSPage->addItem(SetPhasePage);
 
 	// 其他设置菜单
 	OtherSettingsPage = new RollerMenuScreenPage("Other", RootPage);
 	RootPage->addItem(OtherSettingsPage);
 
-	RootPage->enterPage();
+	RootPage->enterPage(LV_SCR_LOAD_ANIM_NONE);
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }

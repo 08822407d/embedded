@@ -7,24 +7,26 @@
 
 class MenuScreenPage : public ScreenPage {
 public:
+	MenuScreenPage(std::string name,
+			ScreenPage *parent = nullptr)
+	:	ScreenPage(name, parent, MenuKeyMap) {}
+	~MenuScreenPage() {}
 
 	// 1) 生命周期
 	virtual void init() = 0;		// 在系统初始化阶段调用
 	virtual void dispose() = 0;		// 资源或内存回收
-	virtual void enterPage() = 0;	// 当切换进本页面
-	virtual void exitPage() = 0;	// 当切换离开本页面
+	virtual void enterPage(lv_screen_load_anim_t anim) = 0;	// 当切换进本页面
+	virtual void exitPage(lv_screen_load_anim_t anim) = 0;	// 当切换离开本页面
 
-	MenuScreenPage(std::string name,
-			ScreenPage *parent = nullptr)
-	:	ScreenPage(name, parent, MenuKeyMap) {}
+	// 2) 接收事件
+	// virtual void lvgl_RecieveKeyEvent(int keyIndex) = 0;
 
-	~MenuScreenPage() {}
-
+	// 3) 子页面树的管理
 	virtual void addItem(ScreenPage *ItemPage) {}
+	void setLastSelected(int index) { this->_last_selected = index; }
 
 	lv_obj_t *getMenu() { return this->_lvgl_menu; }
 
-	void setLastSelected(int index) { this->_last_selected = index; }
 
 protected:
 	lv_obj_t	*_lvgl_menu;
@@ -40,22 +42,21 @@ public:
 	RollerMenuScreenPage(
 		std::string name,
 		ScreenPage *parent = nullptr,
-		lv_style_t *style = nullptr);
+		lv_style_t *style = nullptr
+	);
 
 	~RollerMenuScreenPage() {}
 
 	void init();
 	void dispose();
-	void enterPage();
-	void exitPage();
+	void enterPage(lv_screen_load_anim_t anim);
+	void exitPage(lv_screen_load_anim_t anim);
 
 	void addItem(ScreenPage *child);
 
 
 protected:
 	std::string	_items_str;
-
-	lv_obj_t *__createRollerMenu(std::string name, lv_style_t *style);
 
 
 private:

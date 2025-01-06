@@ -9,6 +9,22 @@ lv_key_t MenuKeyMap[5] = {
 	[JOY_DIR_RIGHT] = LV_KEY_NEXT,
 };
 
+lv_key_t SpinboxKeyMap[5] = {
+	[JOY_MID_BUTTON] = LV_KEY_ESC,
+	[JOY_DIR_UP] = LV_KEY_UP,
+	[JOY_DIR_DOWN] = LV_KEY_DOWN,
+	[JOY_DIR_LEFT] = LV_KEY_LEFT,
+	[JOY_DIR_RIGHT] = LV_KEY_RIGHT,
+};
+
+lv_key_t LeafPageKeyMap[5] = {
+	[JOY_MID_BUTTON] = LV_KEY_ESC,
+	[JOY_DIR_UP] = LV_KEY_ESC,
+	[JOY_DIR_DOWN] = LV_KEY_ESC,
+	[JOY_DIR_LEFT] = LV_KEY_PREV,
+	[JOY_DIR_RIGHT] = LV_KEY_NEXT,
+};
+
 lv_key_t NormalKeyMap[5] = {
 	[JOY_MID_BUTTON] = LV_KEY_ENTER,
 	[JOY_DIR_UP] = LV_KEY_UP,
@@ -16,6 +32,7 @@ lv_key_t NormalKeyMap[5] = {
 	[JOY_DIR_LEFT] = LV_KEY_LEFT,
 	[JOY_DIR_RIGHT] = LV_KEY_RIGHT,
 };
+
 
 std::shared_ptr<InteractManager> DDSInteractManager = nullptr;
 
