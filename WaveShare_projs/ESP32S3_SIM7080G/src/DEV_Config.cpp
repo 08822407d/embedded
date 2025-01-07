@@ -43,9 +43,9 @@ void DEV_GPIO_Init(void) {
 
 	DEV_Digital_Write(PWR_EN_PIN, LOW);
 
-	DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
-	delay(500);
-	DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
+	// DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
+	// delay(500);
+	// DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
 /**
@@ -58,6 +58,12 @@ void module_power() {
 	DEV_Digital_Write(PWR_EN_PIN, HIGH); // Power On
 	DEV_Delay_ms(2500);
 	DEV_Digital_Write(PWR_EN_PIN, LOW); // Power Down
+}
+
+void module_wakeup() {
+	DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
+	delay(500);
+	DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
 /**
