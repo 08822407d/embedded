@@ -36,10 +36,16 @@ void DEV_Delay_us(UDOUBLE xus) {
  */
 void DEV_GPIO_Init(void) {
 	pinMode(PWR_EN_PIN, OUTPUT);
+	pinMode(MOD_WAKEUP_PIN, OUTPUT);
 	pinMode(UART2_RX, INPUT);
 	pinMode(UART2_TX, OUTPUT);
 
-	DEV_Digital_Write(PWR_EN_PIN, 0);
+
+	DEV_Digital_Write(PWR_EN_PIN, LOW);
+
+	DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
+	delay(500);
+	DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
 /**
@@ -49,9 +55,9 @@ void DEV_GPIO_Init(void) {
  */
 void module_power() {
 	// Example implementation:
-	DEV_Digital_Write(PWR_EN_PIN, 1); // Power On
+	DEV_Digital_Write(PWR_EN_PIN, HIGH); // Power On
 	DEV_Delay_ms(2500);
-	DEV_Digital_Write(PWR_EN_PIN, 0); // Power Down
+	DEV_Digital_Write(PWR_EN_PIN, LOW); // Power Down
 }
 
 /**
@@ -63,6 +69,7 @@ bool DEV_Module_Init(void) {
 
 	// Initialize Serial2 for UART communication
 	Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART2_RX, UART2_TX);
+	delay(1000);
 	Serial.println("Serial2 Initialized");
 
 	// Initialize ADC if needed
@@ -111,27 +118,17 @@ bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
 
 	while (millis() - startTime < timeout) {
 		while (Serial2.available()) {
-			// char c = Serial2.read();
-			// response += c;
 			b[i++] = Serial2.read();
 		}
 	}
-	if (strstr(b, back) == NULL)
-	{
-		Serial.printf("%s back: %s\r\n", str, b);
-		return 0;
-	}
-	else
-	{
-		Serial.printf("%s\r\n", b);
-		return 1;
-	}
-	printf("\r\n");
-	// Serial2.print(str);
-	// Serial2.print(" back: ");
-	// Serial2.println(response);
 
-	// return response.indexOf(back) != -1;
+	if (strstr(b, back) == NULL) {
+		Serial.printf("%s back: %s\r\n", str, b);
+		return false;
+	} else {
+		Serial.printf("%s\r\n", b);
+		return true;
+	}
 }
 
 /**
@@ -151,36 +148,17 @@ char* waitResp(const char *str, const char *back, int timeout) {
 
 	while (millis() - startTime < timeout) {
 		while (Serial2.available()) {
-			// char c = Serial2.read();
-			// response += c;
 			b[i++] = Serial2.read();
 		}
 	}
 
-	if (strstr(b, back) == NULL)
-	{
+	if (strstr(b, back) == NULL) {
 		Serial.printf("%s back:\t %s\r\n", str, b);
-	}
-	else
-	{
+	} else {
 		Serial.printf("%s \r\n", b);
 	}
 	Serial.printf("Response information is: %s\r\n", b);
 	return b;
-
-	// if (response.indexOf(back) == -1) {
-	// 	Serial2.print(str);
-	// 	Serial2.print(" back:\t ");
-	// 	Serial2.println(response);
-	// } else {
-	// 	Serial2.println(response);
-	// }
-
-	// static char respBuffer[500];
-	// response.toCharArray(respBuffer, sizeof(respBuffer));
-	// Serial2.print("Response information is: ");
-	// Serial2.println(respBuffer);
-	// return respBuffer;
 }
 
 /**
@@ -200,52 +178,24 @@ bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
 
 	while (millis() - startTime < timeout) {
 		while (Serial2.available()) {
-			// char c = Serial2.read();
-			// response += c;
 			b[i++] = Serial2.read();
 		}
 	}
 
-	if (strstr(b, back) == NULL)
-	{
+	if (strstr(b, back) == NULL) {
 		Serial.printf("%s back: %s\r\n", str, b);
-		return 0;
-	}
-	else
-	{
-		if (strstr(b, "CNACT?") == NULL)
-		{
+		return false;
+	} else {
+		if (strstr(b, "CNACT?") == NULL) {
 			Serial.printf("%s\r\n", b);
-		}
-		else
-		{
-			for (int i = 0; i < sizeof(b); i++)
-			{
+		} else {
+			for (int i = 0; i < sizeof(b); i++) {
 				Serial.printf("%c", b[i]);
 			}
 			Serial.printf("\r\n");
 		}
-
-		return 1;
+		return true;
 	}
-	Serial.printf("\r\n");
-
-	// if (response.indexOf(back) == -1) {
-	// 	Serial2.print(str);
-	// 	Serial2.print(" back: ");
-	// 	Serial2.println(response);
-	// 	return false;
-	// } else {
-	// 	if (response.indexOf("CNACT?") == -1) {
-	// 		Serial2.println(response);
-	// 	} else {
-	// 		for (int i = 0; i < response.length(); i++) {
-	// 			Serial2.print(response[i]);
-	// 		}
-	// 		Serial2.println();
-	// 	}
-	// 	return true;
-	// }
 }
 
 /**
@@ -258,7 +208,6 @@ void DEV_Module_Exit(void) {
 
 void genericInit() {
 	DEV_Module_Init();
-	// led_blink();
 	DEV_Delay_ms(5000);
 	check_start();
 }

@@ -26,6 +26,7 @@
 
 void setup() {
 	Serial.begin(115200);
+	delay(1000);
 
 	genericInit();
 	// genericNetInit();
@@ -33,5 +34,7 @@ void setup() {
 
 void loop() {
 	Serial.printf("test loop ...\n");
+
 	GPSTest();
+	// mqttTest();
 }

@@ -16,15 +16,16 @@
 	// GPIO Pins (Define according to your hardware setup)
 	// const int PWR_EN_PIN = 14;   // Example pin number for power enable
 	// const int LED_EN_PIN = 25;   // Example pin number for LED enable
-	const int PWR_EN_PIN	= 39;   // Example pin number for power enable
+	const int PWR_EN_PIN		= 39;   // Example pin number for power enable
+	const int MOD_WAKEUP_PIN	= 41;   // Example pin number for power enable
 
 	// UART Configuration
-	#define UART_BAUD_RATE	115200  // Set your desired baud rate
-	#define UART_TIMEOUT_MS	1000   // Default timeout for UART operations
+	#define UART_BAUD_RATE		115200  // Set your desired baud rate
+	#define UART_TIMEOUT_MS		1000   // Default timeout for UART operations
 
 	// GPIO Mode Constants
-	#define UART2_RX		12
-	#define UART2_TX		11
+	#define UART2_RX			12
+	#define UART2_TX			11
 
 
 	// Function Declarations

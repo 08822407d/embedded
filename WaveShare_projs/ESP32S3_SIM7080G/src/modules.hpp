@@ -2,6 +2,7 @@
 
 
 extern void GPSTest(void);
+extern void mqttTest(void);
 
 extern void check_start(void);
 extern void set_network(void);
