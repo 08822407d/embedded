@@ -12,8 +12,8 @@ using namespace ace_button;
 
 
 	// 使用宏定义来避免魔法数字
-	#define ACEBUTTON_POLL_INTERVAL_MS	10
-	#define ACEBUTTON_TASK_PRIORITY		3
+	#define ACEBUTTON_POLL_INTERVAL_MS	20
+	#define ACEBUTTON_TASK_PRIORITY		(tskIDLE_PRIORITY + 1)
 
 
 	enum JoystickDirectionID {

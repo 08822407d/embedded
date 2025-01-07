@@ -19,10 +19,10 @@ lv_key_t SpinboxKeyMap[5] = {
 
 lv_key_t LeafPageKeyMap[5] = {
 	[JOY_MID_BUTTON] = LV_KEY_ESC,
-	[JOY_DIR_UP] = LV_KEY_HOME,
-	[JOY_DIR_DOWN] = LV_KEY_HOME,
+	[JOY_DIR_UP] = LV_KEY_NEXT,
+	[JOY_DIR_DOWN] = LV_KEY_NEXT,
 	[JOY_DIR_LEFT] = LV_KEY_PREV,
-	[JOY_DIR_RIGHT] = LV_KEY_HOME,
+	[JOY_DIR_RIGHT] = LV_KEY_NEXT,
 };
 
 lv_key_t NormalKeyMap[5] = {

@@ -9,7 +9,7 @@
 
 	// 使用宏定义来避免魔法数字
 	#define EVENT_POLL_INTERVAL_MS	10
-	#define EVENT_TASK_PRIORITY		3
+	#define EVENT_TASK_PRIORITY		(tskIDLE_PRIORITY + 2)
 
 
 	class HWModuleManager {

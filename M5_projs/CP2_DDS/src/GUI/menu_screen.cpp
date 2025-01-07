@@ -65,9 +65,9 @@ RollerMenuScreenPage::RollerMenuScreenPage(
 		std::string name, ScreenPage *parent, lv_style_t *style)
 :	MenuScreenPage(name, parent) {
 	this->_lvgl_menu = createRollerMenu(this->_lvgl_container, style);
-	// 将默认滚轮添加到组
+	// 将交互控件添加到组
 	lv_group_add_obj(this->_lvgl_group, this->_lvgl_menu);
-	// 设置组的焦点到默认按钮
+	// 设置组的焦点到交互控件
 	lv_group_focus_obj(this->_lvgl_menu);
 	this->_items_str = "";
 	// Serial.printf("Item_str Length: %d\n", this->_items_str.length());
@@ -81,15 +81,15 @@ void RollerMenuScreenPage::dispose() {
 
 void RollerMenuScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
 	DDSInteractManager->setCurrent(this);
-	// lv_scr_load(this->lvgl_GetScreen());
-	// 2) 使用带动画的方式切换到 new_scr
-	lv_scr_load_anim(
-		this->lvgl_GetScreen(), 
-		anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
-		500,						// 动画时长 500ms
-		0,							// 无延时
-		false						// 动画结束后不自动删除旧screen
-	);
+	lv_scr_load(this->lvgl_GetScreen());
+	// // 使用带动画的方式切换到 new_scr
+	// lv_scr_load_anim(
+	// 	this->lvgl_GetScreen(), 
+	// 	anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
+	// 	500,						// 动画时长 500ms
+	// 	0,							// 无延时
+	// 	false						// 动画结束后不自动删除旧screen
+	// );
 	lv_roller_set_selected(this->_lvgl_menu, this->_last_selected, LV_ANIM_OFF);
 }
 
