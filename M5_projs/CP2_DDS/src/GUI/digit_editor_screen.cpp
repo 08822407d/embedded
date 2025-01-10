@@ -1,4 +1,5 @@
 #include "digit_editor_screen.hpp"
+#include "glob.hpp"
 
 
 void lv_spinbox_toggle_cursor_visibility(lv_obj_t * spinbox, bool en) {
@@ -79,6 +80,8 @@ void DigitEditorScreenPage::dispose() {
 }
 
 void DigitEditorScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
+	lv_spinbox_set_value(this->_lvgl_spinbox, globalDDSparams.getFrequency());
+
 	DDSInteractManager->setCurrent(this);
 	lv_scr_load(this->lvgl_GetScreen());
 	// // 使用带动画的方式切换到 new_scr
@@ -93,6 +96,8 @@ void DigitEditorScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_A
 }
 
 void DigitEditorScreenPage::exitPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
+	int freq = lv_spinbox_get_value(this->_lvgl_spinbox);
+	globalDDSparams.setFrequency(freq);
 }
 
 void DigitEditorScreenPage::__lvgl_KeyEventSpecial(lv_key_t *key) {

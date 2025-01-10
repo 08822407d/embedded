@@ -16,13 +16,8 @@
 
 
 Unit_DDS dds;
-
-Number<uint64_t> Freq(1000, 100, 10000000);
-
-
-int sawtooth_freq	= 13600;
-int phase			= 0;
-int modeIndex		= 0;
+// 定义全局单例实例引用
+DDSparams& globalDDSparams = DDSparams::getInstance();
 
 String modeName[] = {"Sine", "Square", "Triangle", "Sawtooth"};
 
@@ -44,6 +39,7 @@ void setup() {
 	initJoystick4WayButtonsCheckTask();
 	initHardWarePollTask();
 
+	globalDDSparams.setFrequency(100);
 }
 
 void loop() {

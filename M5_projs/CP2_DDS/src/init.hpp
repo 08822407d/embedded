@@ -9,6 +9,7 @@
 
 #include "Unit_DDS.h"
 #include "WaveIcon.c"
+#include "glob.hpp"
 
 #include "modules/Number.hpp"
 #include "device/M5-JoystickHAT.hpp"
