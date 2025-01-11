@@ -24,7 +24,6 @@ public:
 
 	void addChild(ScreenPage *child) = delete;
 
-	// void setLastSelected(int index) { this->_last_selected = index; }
 	void lvgl_restore_style(lv_style_t *style);
 
 protected:
@@ -32,7 +31,6 @@ protected:
 	bool		_edit_mode = false;
 	lv_style_t	_lvgl_noneditable_style;
 	lv_style_t	_lvgl_editable_style;
-	// int			_last_selected = -1;
 
 	void __lvgl_KeyEventSpecial(lv_key_t *key) override;
 };

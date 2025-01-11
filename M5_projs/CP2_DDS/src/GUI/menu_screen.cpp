@@ -3,7 +3,7 @@
 
 
 
-static void event_handler(lv_event_t *e)
+static void RollerMenu_EventHandler(lv_event_t *e)
 {
 	lv_event_code_t code = lv_event_get_code(e);
 	lv_obj_t *obj = (lv_obj_t *)lv_event_get_target(e);
@@ -34,7 +34,7 @@ static void event_handler(lv_event_t *e)
 }
 
 
-static lv_style_t *createDefualtRollerScreenStyle() {
+lv_style_t *createDefualtRollerScreenStyle() {
 	/*A style to make the selected option larger*/
 	static lv_style_t style_sel;
 	lv_style_init(&style_sel);
@@ -45,7 +45,7 @@ static lv_style_t *createDefualtRollerScreenStyle() {
 	return &style_sel;
 }
 
-lv_obj_t *createRollerMenu(lv_obj_t *parent, lv_style_t *style) {
+lv_obj_t *createRoller(lv_obj_t *parent, lv_style_t *style, void (*handler)(lv_event_t *e)) {
 	lv_obj_t *roller = lv_roller_create(parent);
 	lv_roller_set_options(roller,
 		"", LV_ROLLER_MODE_INFINITE);
@@ -55,7 +55,7 @@ lv_obj_t *createRollerMenu(lv_obj_t *parent, lv_style_t *style) {
 		lv_obj_add_style(roller, style, LV_PART_SELECTED);
 	lv_roller_set_visible_row_count(roller, 3);
 	lv_obj_center(roller);
-	lv_obj_add_event_cb(roller, event_handler, LV_EVENT_KEY, NULL);
+	lv_obj_add_event_cb(roller, handler, LV_EVENT_KEY, NULL);
 
 	return roller;
 }
@@ -64,7 +64,7 @@ lv_obj_t *createRollerMenu(lv_obj_t *parent, lv_style_t *style) {
 RollerMenuScreenPage::RollerMenuScreenPage(
 		std::string name, ScreenPage *parent, lv_style_t *style)
 :	MenuScreenPage(name, parent) {
-	this->_lvgl_menu = createRollerMenu(this->_lvgl_container, style);
+	this->_lvgl_menu = createRoller(this->_lvgl_container, style, RollerMenu_EventHandler);
 	// 将交互控件添加到组
 	lv_group_add_obj(this->_lvgl_group, this->_lvgl_menu);
 	// 设置组的焦点到交互控件

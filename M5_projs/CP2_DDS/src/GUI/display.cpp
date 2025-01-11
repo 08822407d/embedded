@@ -3,6 +3,7 @@
 #include "InteractManager.hpp"
 #include "menu_screen.hpp"
 #include "digit_editor_screen.hpp"
+#include "waveform_selector_screen.hpp"
 #include "conf.h"
 
 #include "debug_utils.hpp"
@@ -24,7 +25,7 @@ RollerMenuScreenPage *RootPage;
 // 设置DDS参数菜单页
 RollerMenuScreenPage *SetDDSPage;
 // 各设置项目页
-ScreenPage *SetWaveFormPage;
+RollerScreenPage *SetWaveFormPage;
 DigitEditorScreenPage *SetFrequencyPage;
 DigitEditorScreenPage *SetPhasePage;
 
@@ -110,7 +111,8 @@ void initScreenPages(void) {
 	SetDDSPage = new RollerMenuScreenPage("Wave", RootPage);
 	RootPage->addItem(SetDDSPage);
 	// DDS具体参数设置菜单
-	SetWaveFormPage = new RollerMenuScreenPage("WaveForm", SetDDSPage);
+	SetWaveFormPage = new RollerScreenPage("WaveForm", SetDDSPage);
+	SetWaveFormPage->addItem("Sine\nSquare\nTriangle\nSawtooth");
 	SetDDSPage->addItem(SetWaveFormPage);
 	SetFrequencyPage = new DigitEditorScreenPage("Frequency", SetDDSPage, 0, 10000000);
 	SetDDSPage->addItem(SetFrequencyPage);
