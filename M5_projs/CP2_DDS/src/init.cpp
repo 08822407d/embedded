@@ -5,28 +5,38 @@
 // 全局智能指针定义并初始化为nullptr
 std::shared_ptr<M5JoystickHAT> joystickPtr = nullptr;
 std::shared_ptr<AceButton> Joystick4WayButton = nullptr;
+std::shared_ptr<M5UnitDDS> ddsPtr = nullptr;
 
 void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState);
 
+
+void initM5UnitDDS(void) {
+	MODULE_LOG_HEAD( M5UnitDDS );
+
+	ddsPtr = std::make_shared<M5UnitDDS>();
+	ddsPtr->begin(&Wire);
+	ddsPtr->setWave(globalDDSparams.WaveForm,
+		globalDDSparams.Frequency,
+		globalDDSparams.Phase);
+
+	ddsPtr->end();
+	Wire.begin();
+	MODULE_LOG_TAIL( " ... Setup done\n" );
+}
 
 void initM5JoystickHAT(void) {
 	MODULE_LOG_HEAD( M5JoystickHAT );
 
 	// 初始化摇杆
     joystickPtr = std::make_shared<M5JoystickHAT>();
-	M5JoystickHAT *joystick = joystickPtr.get();
-
-	joystick->begin(&Wire, JOYSTICKHAT_ADDR,
-		STICKC_GPIO_SDA, STICKC_GPIO_SCL, 100000UL);
-	joystick->setRotation(GLOBAL_ROTATION);
+	joystickPtr->begin(&Wire);
+	joystickPtr->setRotation(GLOBAL_ROTATION);
 	
 	// Serial.printf("_addr:0x%x , _sda:%d , _scl:%d\n",
 	// 	joystick->_addr, joystick->_sda, joystick->_scl);
 	
 	DevModManager.registerModule(joystickPtr);
 
-	// joystick->debugPrintParams();
-	// Serial.printf("Joystick XY Max: %d , %d\n", joystickPtr->getXmax(), joystickPtr->getYmax());
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
 

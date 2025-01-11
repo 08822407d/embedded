@@ -24,11 +24,14 @@ public:
 	void addItem(std::string name);
 	void setLastSelected(int index) { this->_last_selected = index; }
 
+	void setDataReciever(uint32_t *data) { this->_data_reciever = data; }
+
 
 protected:
 	lv_obj_t	*_lvgl_roller;
 	std::string	_items_str;
 	int			_last_selected = -1;
+	uint32_t	*_data_reciever = nullptr;
 
 
 private:

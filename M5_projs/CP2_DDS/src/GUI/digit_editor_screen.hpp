@@ -26,11 +26,14 @@ public:
 
 	void lvgl_restore_style(lv_style_t *style);
 
+	void setDataReciever(int32_t *data) { this->_data_reciever = data; }
+
 protected:
 	lv_obj_t	*_lvgl_spinbox;
 	bool		_edit_mode = false;
 	lv_style_t	_lvgl_noneditable_style;
 	lv_style_t	_lvgl_editable_style;
+	int32_t		*_data_reciever = nullptr;
 
 	void __lvgl_KeyEventSpecial(lv_key_t *key) override;
 };

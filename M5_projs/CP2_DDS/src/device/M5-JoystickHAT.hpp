@@ -44,6 +44,8 @@
 		bool begin(TwoWire *wire = &Wire, uint8_t addr = JOYSTICKHAT_ADDR,
 				uint8_t sda = STICKC_GPIO_SDA, uint8_t scl = STICKC_GPIO_SCL,
 				uint32_t speed = 400000UL);
+		bool start();
+		bool end();
 
 		int getX() override { return _xVal; }
 		int getY() override { return _yVal; }
@@ -69,6 +71,8 @@
 		// 存储硬件读到的数据
 		int _xVal, _yVal, _midBtn;
 		int _Xmax, _Ymax;
+
+		bool _enabled = false;
 
 		// 事件判定相关
 		unsigned long lastUpdateMs;

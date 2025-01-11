@@ -1,6 +1,8 @@
 #include "menu_screen.hpp"
 #include "InteractManager.hpp"
 
+#include "init.hpp"
+
 
 
 static void RollerMenu_EventHandler(lv_event_t *e)

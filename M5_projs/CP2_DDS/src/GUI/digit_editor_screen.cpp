@@ -1,6 +1,8 @@
 #include "digit_editor_screen.hpp"
 #include "glob.hpp"
 
+#include "init.hpp"
+
 
 void lv_spinbox_toggle_cursor_visibility(lv_obj_t * spinbox, bool en) {
 	lv_obj_set_style_text_color(spinbox, lv_color_black(), LV_PART_MAIN);
@@ -80,7 +82,8 @@ void DigitEditorScreenPage::dispose() {
 }
 
 void DigitEditorScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
-	lv_spinbox_set_value(this->_lvgl_spinbox, globalDDSparams.getFrequency());
+	if (this->_data_reciever != nullptr)
+		lv_spinbox_set_value(this->_lvgl_spinbox, *this->_data_reciever);
 
 	DDSInteractManager->setCurrent(this);
 	lv_scr_load(this->lvgl_GetScreen());
@@ -92,12 +95,19 @@ void DigitEditorScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_A
 	// 	0,							// 无延时
 	// 	false						// 动画结束后不自动删除旧screen
 	// );
-	// lv_roller_set_selected(this->_lvgl_menu, this->_last_selected, LV_ANIM_OFF);
 }
 
 void DigitEditorScreenPage::exitPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
 	int freq = lv_spinbox_get_value(this->_lvgl_spinbox);
-	globalDDSparams.setFrequency(freq);
+	if (this->_data_reciever != nullptr)
+		*this->_data_reciever = freq;
+
+	ddsPtr->start();
+	ddsPtr->setWave(globalDDSparams.WaveForm,
+		globalDDSparams.Frequency,
+		globalDDSparams.Phase);
+	delay(100);
+	joystickPtr->start();
 }
 
 void DigitEditorScreenPage::__lvgl_KeyEventSpecial(lv_key_t *key) {

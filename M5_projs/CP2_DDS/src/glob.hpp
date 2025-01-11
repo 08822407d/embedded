@@ -15,17 +15,12 @@ enum WaveForm {
 
 class DDSparams {
 public:
+	static uint32_t		WaveForm;
+	static uint32_t		Frequency;
+	static uint32_t		Phase;
+
 	// 获取单例实例的接口，返回引用或指针都可以，这里演示返回引用
 	static DDSparams& getInstance();
-
-	// 下面是对三个私有静态成员的访问接口
-	unsigned int getFrequency() const;
-	unsigned int getPhase() const;
-	WaveForm getWaveForm() const;
-	void setFrequency(unsigned int freq);
-	void setPhase(unsigned int ph);
-	void setWaveForm(WaveForm form);
-
 
 private:
 	// 私有化构造函数，禁止从外部实例化
@@ -37,11 +32,6 @@ private:
 
 	// 唯一静态实例指针
 	static DDSparams		*instance;
-
-
-	static unsigned int		_frequency;
-	static unsigned int		_phase;
-	static WaveForm			_waveForm;
 };
 
 

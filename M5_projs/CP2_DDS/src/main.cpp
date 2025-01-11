@@ -15,7 +15,6 @@
 #include "init.hpp"
 
 
-Unit_DDS dds;
 // 定义全局单例实例引用
 DDSparams& globalDDSparams = DDSparams::getInstance();
 
@@ -31,15 +30,19 @@ void setup() {
 	initScreenPages();
 	delay(500);
 
+	initM5UnitDDS();
+	delay(500);
+
 	initM5JoystickHAT();
 	delay(500);
 
 	initJoystick4WayButtons();
+	delay(500);
 
 	initJoystick4WayButtonsCheckTask();
 	initHardWarePollTask();
 
-	globalDDSparams.setFrequency(100);
+	globalDDSparams.Frequency = 100;
 }
 
 void loop() {

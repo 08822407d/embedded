@@ -1,4 +1,6 @@
-#include "waveform_selector_screen.hpp"
+#include "roller_screen.hpp"
+
+#include "init.hpp"
 
 
 static void Roller_EventHandler(lv_event_t *e)
@@ -50,6 +52,9 @@ void RollerScreenPage::dispose() {
 }
 
 void RollerScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
+	if (this->_data_reciever != nullptr)
+		lv_roller_set_selected(this->_lvgl_roller, *this->_data_reciever, LV_ANIM_OFF);
+
 	DDSInteractManager->setCurrent(this);
 	lv_scr_load(this->lvgl_GetScreen());
 	// // 使用带动画的方式切换到 new_scr
@@ -60,10 +65,18 @@ void RollerScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_N
 	// 	0,							// 无延时
 	// 	false						// 动画结束后不自动删除旧screen
 	// );
-	lv_roller_set_selected(this->_lvgl_roller, this->_last_selected, LV_ANIM_OFF);
 }
 
 void RollerScreenPage::exitPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {
+	if (this->_data_reciever != nullptr)
+		*this->_data_reciever = this->_last_selected;
+
+	ddsPtr->start();
+	ddsPtr->setWave(globalDDSparams.WaveForm,
+		globalDDSparams.Frequency,
+		globalDDSparams.Phase);
+	delay(100);
+	joystickPtr->start();
 }
 
 void RollerScreenPage::addItem(std::string item_name) {

@@ -3,7 +3,7 @@
 
 
 extern std::shared_ptr<AceButton> Joystick4WayButton;
-
+TaskHandle_t AceButtonCheckTaskHandle = nullptr;
 
 static void checkAceButton(void) {
 	// 添加回调函数
@@ -16,6 +16,10 @@ static void AceButtonCheckTask(void *pvParam) {
 	TickType_t lastWakeTime = xTaskGetTickCount();
 
 	for (;;) {
+		UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(AceButtonCheckTaskHandle);
+		Serial.print("AceButtonCheckTask stack high water mark: ");
+		Serial.println(stackHighWaterMark);
+
 		checkAceButton();
 		vTaskDelayUntil(&lastWakeTime, period);
 	}
@@ -28,10 +32,10 @@ void initJoystick4WayButtonsCheckTask() {
 	xTaskCreate(
 		AceButtonCheckTask,			// 任务函数
 		"AceButtonCheckTask",		// 任务名称
-		8192,						// 堆栈大小(根据需求调整)
+		4096,						// 堆栈大小(根据需求调整)
 		NULL,						// 传递给任务的参数(指向manager)
 		ACEBUTTON_TASK_PRIORITY,	// 任务优先级(宏定义)
-		NULL						// 任务句柄(可选)
+		&AceButtonCheckTaskHandle	// 任务句柄(可选)
 	);
 
 	MODULE_LOG_TAIL( " ... Setup done\n" );
