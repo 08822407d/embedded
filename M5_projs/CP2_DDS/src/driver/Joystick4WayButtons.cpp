@@ -17,8 +17,11 @@ static void AceButtonCheckTask(void *pvParam) {
 
 	for (;;) {
 		UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(AceButtonCheckTaskHandle);
+		size_t freeHeap = xPortGetFreeHeapSize();
 		Serial.print("AceButtonCheckTask stack high water mark: ");
-		Serial.println(stackHighWaterMark);
+		Serial.print(stackHighWaterMark);
+		Serial.print(", free heap: ");
+		Serial.println(freeHeap);
 
 		checkAceButton();
 		vTaskDelayUntil(&lastWakeTime, period);

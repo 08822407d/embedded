@@ -30,8 +30,8 @@ void setup() {
 	initScreenPages();
 	delay(500);
 
-	initM5UnitDDS();
-	delay(500);
+	// initM5UnitDDS();
+	// delay(500);
 
 	initM5JoystickHAT();
 	delay(500);

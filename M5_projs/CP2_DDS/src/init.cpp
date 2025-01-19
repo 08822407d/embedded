@@ -20,7 +20,6 @@ void initM5UnitDDS(void) {
 		globalDDSparams.Phase);
 
 	ddsPtr->end();
-	Wire.begin();
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }
 

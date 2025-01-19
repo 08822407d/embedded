@@ -13,8 +13,11 @@ static void HardWarePollTask(void *pvParam) {
 
 	for (;;) {
 		UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(HardWarePollTaskHandle);
+		size_t freeHeap = xPortGetFreeHeapSize();
 		Serial.print("HardWarePollTask stack high water mark: ");
-		Serial.println(stackHighWaterMark);
+		Serial.print(stackHighWaterMark);
+		Serial.print(", free heap: ");
+		Serial.println(freeHeap);
 
 		mgr->updateAll();
 		vTaskDelayUntil(&lastWakeTime, period);
