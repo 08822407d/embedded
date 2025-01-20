@@ -22,8 +22,8 @@ int configSerial(int serial_fd) {
 		return 1;
 	}
 
-	cfsetospeed(&tty, B9600);
-	cfsetispeed(&tty, B9600);
+	cfsetospeed(&tty, B1152000);
+	cfsetispeed(&tty, B1152000);
 
 	tty.c_cflag &= ~PARENB;
 	tty.c_cflag &= ~CSTOPB;
@@ -36,4 +36,27 @@ int configSerial(int serial_fd) {
 	}
 
 	return 0;
+}
+
+int readSerial(int serial_fd, char *rx_buffer, int bufflen) {
+	int bytes_read = read(serial_fd, rx_buffer, bufflen);
+	assert(bytes_read < bufflen);
+	if (bytes_read > 0) {
+		rx_buffer[bytes_read] = '\0';
+		// printf("\rrx_buffer: \n %s ", rx_buffer);
+	} else {
+		// printf("No data received.\n");
+	}
+	return bytes_read;
+}
+
+int writeSerial(int serial_fd, char *tx_buffer, int bufflen) {
+	ssize_t bytes_written = write(serial_fd, tx_buffer, bufflen);
+	assert(bytes_written < bufflen);
+	if (bytes_written < 0) {
+		perror("Error writing to serial port");
+		close(serial_fd);
+		return -1;
+	}
+	return bytes_written;
 }
