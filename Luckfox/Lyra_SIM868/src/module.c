@@ -16,7 +16,7 @@ bool sendCMD_waitResp(int serial_fd, const char *str, const char *back) {
 	static char b[512];
 	memset(b, 0, sizeof(b));
 
-	printf("CMD: %s\r\n", str);
+	printf("CMD: %s\n", str);
 	writeSerial(serial_fd, (char *)str, strlen(str));
 
 	// unsigned long startTime = millis();
@@ -30,10 +30,10 @@ bool sendCMD_waitResp(int serial_fd, const char *str, const char *back) {
 	readSerial(serial_fd, b, sizeof(b));
 
 	if (strstr(b, back) == NULL) {
-		printf("%s back: %s\r\n", str, b);
+		printf("%s back: %s\n", str, b);
 		return false;
 	} else {
-		printf("%s\r\n", b);
+		printf("%s\n", b);
 		return true;
 	}
 }
@@ -168,11 +168,11 @@ bool DEV_Module_Init(void) {
 	Serial0_fd = openSerial(0);
 	configSerial(Serial0_fd);
 	delay(1000);
-	printf("Serial0 Initialized");
+	printf("Serial0 Initialized\n");
 
 	// Initialize ADC if needed
 	// Note: Arduino initializes ADC automatically. Use analogRead() as needed.
-	printf("DEV_Module_Init OK");
+	printf("DEV_Module_Init OK\n");
 
 	return true;
 }

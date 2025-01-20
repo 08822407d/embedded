@@ -8,7 +8,7 @@ int openSerial(int port) {
 	sprintf(serial_port, "/dev/ttyS%d", port);
 	serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
 	if (serial_fd == -1) {
-		perror("Failed to open serial port");
+		perror("Failed to open serial port\n");
 	}
 	return serial_fd;
 }
@@ -18,7 +18,7 @@ int configSerial(int serial_fd) {
 	memset(&tty, 0, sizeof(tty));
 
 	if (tcgetattr(serial_fd, &tty) != 0) {
-		perror("Error from tcgetattr");
+		perror("Error from tcgetattr\n");
 		return 1;
 	}
 
@@ -45,7 +45,7 @@ int readSerial(int serial_fd, char *rx_buffer, int bufflen) {
 	assert(bytes_read < bufflen);
 	if (bytes_read > 0) {
 		rx_buffer[bytes_read] = '\0';
-		printf("\rrx_buffer: \n %s ", rx_buffer);
+		printf("rx_buffer: %s \n", rx_buffer);
 	} else {
 		printf("No data received.\n");
 	}
@@ -56,7 +56,7 @@ int writeSerial(int serial_fd, char *tx_buffer, int bufflen) {
 	ssize_t bytes_written = write(serial_fd, tx_buffer, bufflen);
 	assert(bytes_written < bufflen);
 	if (bytes_written < 0) {
-		perror("Error writing to serial port");
+		perror("Error writing to serial port\n");
 		// close(serial_fd);
 		return -1;
 	}

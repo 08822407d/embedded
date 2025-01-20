@@ -4,10 +4,10 @@
 void check_start(int serial_fd)
 {
 	if (sendCMD_waitResp(serial_fd, "AT", "OK")) {
-		printf("------SIM7080G is ready------\r\n");
+		printf("------SIM7080G is ready------\n");
 	} else {
 		module_power();
-		printf("------SIM7080G is starting up, please wait------\r\n");
+		printf("------SIM7080G is starting up, please wait------\n");
 		delay(5000);
 	}
 	while (1) {
