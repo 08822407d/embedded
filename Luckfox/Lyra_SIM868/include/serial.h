@@ -4,7 +4,9 @@
 #include "common_headers.h"
 
 
-	int openSerial(int port);
-	int configSerial(int serial_fd);
+	extern int openSerial(int port);
+	extern int configSerial(int serial_fd);
+	extern int readSerial(int serial_fd, char *rx_buffer, int bufflen);
+	extern int writeSerial(int serial_fd, char *tx_buffer, int bufflen);
 
 #endif /* _SERIAL_H_ */

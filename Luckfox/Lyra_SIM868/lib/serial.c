@@ -7,6 +7,7 @@ int openSerial(int port) {
 	char serial_port[32];
 
 	sprintf(serial_port, "/dev/ttyS%d", serial_port_num);
+	serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
 	if (serial_fd == -1) {
 		perror("Failed to open serial port");
 	}
@@ -25,10 +26,12 @@ int configSerial(int serial_fd) {
 	cfsetospeed(&tty, B1152000);
 	cfsetispeed(&tty, B1152000);
 
-	tty.c_cflag &= ~PARENB;
-	tty.c_cflag &= ~CSTOPB;
-	tty.c_cflag &= ~CSIZE;
-	tty.c_cflag |= CS8;
+	tty.c_cflag &= ~PARENB;			// 禁用奇偶校验
+	tty.c_cflag &= ~CSTOPB;			// 使用1位停止位
+	tty.c_cflag &= ~CSIZE;			// 清除数据位设置
+	tty.c_cflag |= CS8;				// 设置8位数据位
+	// tty.c_cflag &= ~CRTSCTS;		// 禁用硬件流控制
+	tty.c_cflag |= CREAD | CLOCAL;	// 启用接收和本地模式
 
 	if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
 		perror("Error from tcsetattr");
@@ -55,7 +58,7 @@ int writeSerial(int serial_fd, char *tx_buffer, int bufflen) {
 	assert(bytes_written < bufflen);
 	if (bytes_written < 0) {
 		perror("Error writing to serial port");
-		close(serial_fd);
+		// close(serial_fd);
 		return -1;
 	}
 	return bytes_written;

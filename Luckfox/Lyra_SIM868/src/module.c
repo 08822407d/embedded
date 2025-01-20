@@ -4,102 +4,106 @@
 #include "module.h"
 
 
-// /**
-//  * Send Command and Wait for Response
-//  */
-// bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
-// 	uint16_t i = 0;
-// 	uint64_t t = 0;
-// 	static char b[500];
-// 	memset(b, 0, sizeof(b));
+int Serial0_fd = -1;
 
-// 	Serial.printf("CMD: %s\r\n", str);
-// 	Serial2.println(str);
 
-// 	unsigned long startTime = millis();
-// 	String response = "";
+/**
+ * Send Command and Wait for Response
+ */
+bool sendCMD_waitResp(int serial_fd, const char *str, const char *back) {
+	uint16_t i = 0;
+	uint64_t t = 0;
+	static char b[512];
+	memset(b, 0, sizeof(b));
 
-// 	while (millis() - startTime < timeout) {
-// 		while (Serial2.available()) {
-// 			b[i++] = Serial2.read();
-// 		}
-// 	}
+	printf("CMD: %s\r\n", str);
+	writeSerial(serial_fd, (char *)str, strlen(str));
 
-// 	if (strstr(b, back) == NULL) {
-// 		Serial.printf("%s back: %s\r\n", str, b);
-// 		return false;
-// 	} else {
-// 		Serial.printf("%s\r\n", b);
-// 		return true;
-// 	}
-// }
+	// unsigned long startTime = millis();
+	// String response = "";
+	// while (millis() - startTime < timeout) {
+	// 	while (Serial2.available()) {
+	// 		b[i++] = Serial2.read();
+	// 	}
+	// }
 
-// /**
-//  * Send Command and Wait for Response, Return Response String
-//  */
-// char* waitResp(const char *str, const char *back, int timeout) {
-// 	uint16_t i = 0;
-// 	uint64_t t = 0;
-// 	static char b[500];
-// 	memset(b, 0, sizeof(b));
+	readSerial(serial_fd, b, sizeof(b));
 
-// 	Serial.printf("CMD: %s\r\n", str);
-// 	Serial2.println(str);
+	if (strstr(b, back) == NULL) {
+		printf("%s back: %s\r\n", str, b);
+		return false;
+	} else {
+		printf("%s\r\n", b);
+		return true;
+	}
+}
 
-// 	unsigned long startTime = millis();
-// 	String response = "";
+/**
+ * Send Command and Wait for Response, Return Response String
+ */
+char* waitResp(const char *str, const char *back, int timeout) {
+	// uint16_t i = 0;
+	// uint64_t t = 0;
+	// static char b[500];
+	// memset(b, 0, sizeof(b));
 
-// 	while (millis() - startTime < timeout) {
-// 		while (Serial2.available()) {
-// 			b[i++] = Serial2.read();
-// 		}
-// 	}
+	// Serial.printf("CMD: %s\r\n", str);
+	// Serial2.println(str);
 
-// 	if (strstr(b, back) == NULL) {
-// 		Serial.printf("%s back:\t %s\r\n", str, b);
-// 	} else {
-// 		Serial.printf("%s \r\n", b);
-// 	}
-// 	Serial.printf("Response information is: %s\r\n", b);
-// 	return b;
-// }
+	// unsigned long startTime = millis();
+	// String response = "";
 
-// /**
-//  * Send Command and Wait for AT Response
-//  */
-// bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
-// 	uint16_t i = 0;
-// 	uint64_t t = 0;
-// 	static char b[114];
-// 	memset(b, 0, sizeof(b));
+	// while (millis() - startTime < timeout) {
+	// 	while (Serial2.available()) {
+	// 		b[i++] = Serial2.read();
+	// 	}
+	// }
 
-// 	Serial.printf("CMD: %s\r\n", str);
-// 	Serial2.println(str);
+	// if (strstr(b, back) == NULL) {
+	// 	Serial.printf("%s back:\t %s\r\n", str, b);
+	// } else {
+	// 	Serial.printf("%s \r\n", b);
+	// }
+	// Serial.printf("Response information is: %s\r\n", b);
+	// return b;
+}
 
-// 	unsigned long startTime = millis();
-// 	String response = "";
+/**
+ * Send Command and Wait for AT Response
+ */
+bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
+	// uint16_t i = 0;
+	// uint64_t t = 0;
+	// static char b[114];
+	// memset(b, 0, sizeof(b));
 
-// 	while (millis() - startTime < timeout) {
-// 		while (Serial2.available()) {
-// 			b[i++] = Serial2.read();
-// 		}
-// 	}
+	// Serial.printf("CMD: %s\r\n", str);
+	// Serial2.println(str);
 
-// 	if (strstr(b, back) == NULL) {
-// 		Serial.printf("%s back: %s\r\n", str, b);
-// 		return false;
-// 	} else {
-// 		if (strstr(b, "CNACT?") == NULL) {
-// 			Serial.printf("%s\r\n", b);
-// 		} else {
-// 			for (int i = 0; i < sizeof(b); i++) {
-// 				Serial.printf("%c", b[i]);
-// 			}
-// 			Serial.printf("\r\n");
-// 		}
-// 		return true;
-// 	}
-// }
+	// unsigned long startTime = millis();
+	// String response = "";
+
+	// while (millis() - startTime < timeout) {
+	// 	while (Serial2.available()) {
+	// 		b[i++] = Serial2.read();
+	// 	}
+	// }
+
+	// if (strstr(b, back) == NULL) {
+	// 	Serial.printf("%s back: %s\r\n", str, b);
+	// 	return false;
+	// } else {
+	// 	if (strstr(b, "CNACT?") == NULL) {
+	// 		Serial.printf("%s\r\n", b);
+	// 	} else {
+	// 		for (int i = 0; i < sizeof(b); i++) {
+	// 			Serial.printf("%c", b[i]);
+	// 		}
+	// 		Serial.printf("\r\n");
+	// 	}
+	// 	return true;
+	// }
+}
 
 
 /**
@@ -160,11 +164,11 @@ bool DEV_Module_Init(void) {
 	// Initialize GPIO
 	DEV_GPIO_Init();
 
-	// Initialize Serial2 for UART communication
-	int serial_fd = openSerial(0);
-	configSerial(serial_fd);
+	// Initialize Serial0 for UART communication
+	Serial0_fd = openSerial(0);
+	configSerial(Serial0_fd);
 	delay(1000);
-	printf("Serial2 Initialized");
+	printf("Serial0 Initialized");
 
 	// Initialize ADC if needed
 	// Note: Arduino initializes ADC automatically. Use analogRead() as needed.
@@ -177,7 +181,7 @@ bool DEV_Module_Init(void) {
 void genericInit() {
 	DEV_Module_Init();
 	delay(5000);
-	check_start();
+	check_start(Serial0_fd);
 }
 
 void genericNetInit() {

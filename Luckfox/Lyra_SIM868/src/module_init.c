@@ -1,23 +1,23 @@
 #include "module.h"
 
 
-void check_start()
+void check_start(int serial_fd)
 {
-	// if (sendCMD_waitResp("AT", "OK", 2000)) {
-	// 	Serial.printf("------SIM7080G is ready------\r\n");
-	// } else {
-	// 	module_power();
-	// 	Serial.printf("------SIM7080G is starting up, please wait------\r\n");
-	// 	DEV_Delay_ms(5000);
-	// }
-	// while (1) {
-	// 	if (sendCMD_waitResp("AT", "OK", 2000))
-	// 		break;
-	// 	DEV_Delay_ms(500);
-	// }
+	if (sendCMD_waitResp(serial_fd, "AT", "OK")) {
+		printf("------SIM7080G is ready------\r\n");
+	} else {
+		module_power();
+		printf("------SIM7080G is starting up, please wait------\r\n");
+		delay(5000);
+	}
+	while (1) {
+		if (sendCMD_waitResp(serial_fd, "AT", "OK"))
+			break;
+		delay(500);
+	}
 }
 
-void set_network()
+void set_network(int serial_fd)
 {
 	// Serial.printf("Setting to NB-IoT mode:\n");
 	// sendCMD_waitResp("AT+CFUN=0", "OK", 2000);
@@ -27,7 +27,7 @@ void set_network()
 	// DEV_Delay_ms(5000);
 }
 
-void check_network()
+void check_network(int serial_fd)
 {
 	// char *get_resp_info, getapn1[20];
 	// int j = 0, k = 0;
