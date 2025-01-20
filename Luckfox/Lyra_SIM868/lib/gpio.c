@@ -1,7 +1,5 @@
 #include "gpio.h"
 
-#include <assert.h>
-
 
 // 导出gpio引脚
 int pinExport(int pin)
