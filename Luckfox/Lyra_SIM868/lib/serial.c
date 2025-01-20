@@ -2,11 +2,10 @@
 
 
 int openSerial(int port) {
-	int serial_port_num;
 	int serial_fd;
 	char serial_port[32];
 
-	sprintf(serial_port, "/dev/ttyS%d", serial_port_num);
+	sprintf(serial_port, "/dev/ttyS%d", port);
 	serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
 	if (serial_fd == -1) {
 		perror("Failed to open serial port");
@@ -46,9 +45,9 @@ int readSerial(int serial_fd, char *rx_buffer, int bufflen) {
 	assert(bytes_read < bufflen);
 	if (bytes_read > 0) {
 		rx_buffer[bytes_read] = '\0';
-		// printf("\rrx_buffer: \n %s ", rx_buffer);
+		printf("\rrx_buffer: \n %s ", rx_buffer);
 	} else {
-		// printf("No data received.\n");
+		printf("No data received.\n");
 	}
 	return bytes_read;
 }
