@@ -6,8 +6,10 @@
 #include "serial.h"
 
 
-#define SIM868_PWR_PIN	3
-#define SIM868_WAKE_PIN	58
+// #define SIM868_PWR_PIN	3
+// #define SIM868_WAKE_PIN	58
+#define SIM868_PWR_PIN	56
+#define SIM868_WAKE_PIN	69
 
 	extern int Serial0_fd;
 

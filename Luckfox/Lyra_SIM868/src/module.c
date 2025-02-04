@@ -19,14 +19,6 @@ bool sendCMD_waitResp(int serial_fd, const char *str, const char *back) {
 	printf("CMD: %s\n", str);
 	writeSerial(serial_fd, (char *)str, strlen(str));
 
-	// unsigned long startTime = millis();
-	// String response = "";
-	// while (millis() - startTime < timeout) {
-	// 	while (Serial2.available()) {
-	// 		b[i++] = Serial2.read();
-	// 	}
-	// }
-
 	readSerial(serial_fd, b, sizeof(b));
 
 	if (strstr(b, back) == NULL) {
@@ -128,11 +120,9 @@ int DEV_GPIO_Init(void) {
 		perror("Failed to set SIM868_WAKE_pin pinMode\n");
 		return -1;
 	}
-	// pinMode(UART2_RX, INPUT);
-	// pinMode(UART2_TX, OUTPUT);
-
 
 	digitalWrite(SIM868_PWR_PIN, DIGITAL_LOW);
+	digitalWrite(SIM868_WAKE_PIN, DIGITAL_LOW);
 
 	// digitalWrite(MOD_WAKEUP_PIN, HIGH);
 	// delay(500);

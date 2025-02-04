@@ -42,7 +42,7 @@ int configSerial(int serial_fd) {
 
 int readSerial(int serial_fd, char *rx_buffer, int bufflen) {
 	int bytes_read = read(serial_fd, rx_buffer, bufflen);
-	assert(bytes_read < bufflen);
+	// assert(bytes_read < bufflen);
 	if (bytes_read > 0) {
 		rx_buffer[bytes_read] = '\0';
 		printf("rx_buffer: %s \n", rx_buffer);
@@ -54,7 +54,7 @@ int readSerial(int serial_fd, char *rx_buffer, int bufflen) {
 
 int writeSerial(int serial_fd, char *tx_buffer, int bufflen) {
 	ssize_t bytes_written = write(serial_fd, tx_buffer, bufflen);
-	assert(bytes_written < bufflen);
+	// assert(bytes_written < bufflen);
 	if (bytes_written < 0) {
 		perror("Error writing to serial port\n");
 		// close(serial_fd);
