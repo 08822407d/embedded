@@ -37,8 +37,8 @@ void DEV_Delay_us(UDOUBLE xus) {
 void DEV_GPIO_Init(void) {
 	pinMode(PWR_EN_PIN, OUTPUT);
 	pinMode(MOD_WAKEUP_PIN, OUTPUT);
-	pinMode(UART2_RX, INPUT);
-	pinMode(UART2_TX, OUTPUT);
+	// pinMode(UART2_RX, INPUT);
+	// pinMode(UART2_TX, OUTPUT);
 
 
 	DEV_Digital_Write(PWR_EN_PIN, LOW);
@@ -73,10 +73,10 @@ bool DEV_Module_Init(void) {
 	// Initialize GPIO
 	DEV_GPIO_Init();
 
-	// Initialize Serial2 for UART communication
-	Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART2_RX, UART2_TX);
-	delay(1000);
-	Serial.println("Serial2 Initialized");
+	// // Initialize Serial2 for UART communication
+	// Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART2_RX, UART2_TX);
+	// delay(1000);
+	// Serial.println("Serial2 Initialized");
 
 	// Initialize ADC if needed
 	// Note: Arduino initializes ADC automatically. Use analogRead() as needed.
@@ -117,14 +117,14 @@ bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
-	Serial2.println(str);
+	ModuleSerial.println(str);
 
 	unsigned long startTime = millis();
 	String response = "";
 
 	while (millis() - startTime < timeout) {
-		while (Serial2.available()) {
-			b[i++] = Serial2.read();
+		while (ModuleSerial.available()) {
+			b[i++] = ModuleSerial.read();
 		}
 	}
 
@@ -147,14 +147,14 @@ char* waitResp(const char *str, const char *back, int timeout) {
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
-	Serial2.println(str);
+	ModuleSerial.println(str);
 
 	unsigned long startTime = millis();
 	String response = "";
 
 	while (millis() - startTime < timeout) {
-		while (Serial2.available()) {
-			b[i++] = Serial2.read();
+		while (ModuleSerial.available()) {
+			b[i++] = ModuleSerial.read();
 		}
 	}
 
@@ -177,14 +177,14 @@ bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
-	Serial2.println(str);
+	ModuleSerial.println(str);
 
 	unsigned long startTime = millis();
 	String response = "";
 
 	while (millis() - startTime < timeout) {
-		while (Serial2.available()) {
-			b[i++] = Serial2.read();
+		while (ModuleSerial.available()) {
+			b[i++] = ModuleSerial.read();
 		}
 	}
 
@@ -219,6 +219,5 @@ void genericInit() {
 }
 
 void genericNetInit() {
-	set_network();
 	check_network();
 }

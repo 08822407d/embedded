@@ -7,6 +7,10 @@
 
 #include "modules.hpp"
 
+#define USING_SIM_MODULE	MODULE_SIM868
+
+	extern HardwareSerial ModuleSerial;
+	extern HardwareSerial MasterSerial;
 
 	// Type definitions
 	typedef uint16_t UWORD;
