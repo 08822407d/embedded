@@ -7,7 +7,7 @@
 
 #include "modules.hpp"
 
-#define USING_SIM_MODULE	MODULE_SIM868
+#define USING_SIM_MODULE	MODULE_SIM7080G
 
 	extern HardwareSerial ModuleSerial;
 	extern HardwareSerial MasterSerial;
