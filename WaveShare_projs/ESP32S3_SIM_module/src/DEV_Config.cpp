@@ -39,13 +39,6 @@ void DEV_GPIO_Init(void) {
 	pinMode(MOD_WAKEUP_PIN, OUTPUT);
 	// pinMode(UART2_RX, INPUT);
 	// pinMode(UART2_TX, OUTPUT);
-
-
-	DEV_Digital_Write(PWR_EN_PIN, LOW);
-
-	// DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
-	// delay(500);
-	// DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
 /**
@@ -57,12 +50,12 @@ void module_power() {
 	// Example implementation:
 	DEV_Digital_Write(PWR_EN_PIN, HIGH); // Power On
 	DEV_Delay_ms(2500);
-	DEV_Digital_Write(PWR_EN_PIN, LOW); // Power Down
+	// DEV_Digital_Write(PWR_EN_PIN, LOW); // Power Down
 }
 
 void module_wakeup() {
 	DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
-	delay(500);
+	delay(1000);
 	DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
@@ -72,6 +65,10 @@ void module_wakeup() {
 bool DEV_Module_Init(void) {
 	// Initialize GPIO
 	DEV_GPIO_Init();
+
+	module_power();
+	// delay(2500);
+	// module_wakeup();
 
 	// // Initialize Serial2 for UART communication
 	// Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART2_RX, UART2_TX);
