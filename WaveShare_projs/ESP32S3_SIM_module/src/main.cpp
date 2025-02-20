@@ -9,24 +9,6 @@
 
 #include "DEV_Config.hpp"
 
-
-// void setup() {
-// 	Serial.begin(115200);
-// 	delay(1000);
-
-// 	genericInit();
-// 	// genericNetInit();
-// }
-
-// void loop() {
-// 	Serial.printf("test loop ...\n");
-
-// 	GPSTest();
-// 	// mqttTest();
-// }
-
-
-
 #define MODULE_RX_PIN 12
 #define MODULE_TX_PIN 11
 // Echo 测试程序：主机端

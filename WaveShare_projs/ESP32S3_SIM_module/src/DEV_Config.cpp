@@ -46,11 +46,10 @@ void DEV_GPIO_Init(void) {
  * Assumes powerOn and powerDown are macros or functions to control power.
  * Replace with actual implementation as needed.
  */
-void module_power() {
+void module_power(UBYTE state) {
 	// Example implementation:
-	DEV_Digital_Write(PWR_EN_PIN, HIGH); // Power On
-	DEV_Delay_ms(2500);
-	// DEV_Digital_Write(PWR_EN_PIN, LOW); // Power Down
+	DEV_Digital_Write(PWR_EN_PIN, state); // Power On
+	DEV_Delay_ms(1000);
 }
 
 void module_wakeup() {
@@ -66,14 +65,10 @@ bool DEV_Module_Init(void) {
 	// Initialize GPIO
 	DEV_GPIO_Init();
 
-	module_power();
-	// delay(2500);
-	// module_wakeup();
-
-	// // Initialize Serial2 for UART communication
-	// Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART2_RX, UART2_TX);
-	// delay(1000);
-	// Serial.println("Serial2 Initialized");
+	Serial.println("DEV_Module_Init	Starting...");
+	module_power_on();
+	module_wakeup();
+	module_power_off();
 
 	// Initialize ADC if needed
 	// Note: Arduino initializes ADC automatically. Use analogRead() as needed.
@@ -110,7 +105,7 @@ void Hexstr_To_str(const char *source, unsigned char *dest, int sourceLen) {
 bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
 	uint16_t i = 0;
 	uint64_t t = 0;
-	static char b[500];
+	char b[500];
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
@@ -170,7 +165,7 @@ char* waitResp(const char *str, const char *back, int timeout) {
 bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
 	uint16_t i = 0;
 	uint64_t t = 0;
-	static char b[114];
+	char b[114];
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
@@ -211,7 +206,6 @@ void DEV_Module_Exit(void) {
 
 void genericInit() {
 	DEV_Module_Init();
-	DEV_Delay_ms(5000);
 	check_start();
 }
 

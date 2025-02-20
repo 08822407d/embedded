@@ -47,8 +47,11 @@
 	// LED Functions
 	void led_blink();
 
+	void module_wakeup(void);
 	// Module Power Control
-	void module_power();
+	void module_power(UBYTE state);
+	#define module_power_on()	module_power(HIGH)
+	#define module_power_off()	module_power(LOW)
 
 	// Module Initialization and Exit
 	bool DEV_Module_Init(void);

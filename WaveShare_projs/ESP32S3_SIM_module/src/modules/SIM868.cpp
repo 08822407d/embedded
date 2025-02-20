@@ -12,7 +12,7 @@
 				break;
 			}
 			else{
-				module_power();
+				module_power_on();
 				printf("SIM868 is starting up, please wait...\r\n");
 				DEV_Delay_ms(2000);
 			}

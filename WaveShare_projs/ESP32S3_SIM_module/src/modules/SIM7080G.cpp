@@ -4,34 +4,20 @@
 
 	void check_start()
 	{
-		// while(1){
-		// 	if(sendCMD_waitResp("AT", "OK", 2000) == 1){
-		// 		printf("------SIM7080G is ready------\r\n");
-		// 		break;
-		// 	}
-		// 	else{
-		// 		module_power();
-		// 		printf("------SIM7080G is starting up, please wait------\r\n");
-		// 		DEV_Delay_ms(2000);
-		// 	}
-		// }
+		module_power_on();
+		module_wakeup();
+		// DEV_Delay_ms(5000);
 
-		if (sendCMD_waitResp("AT", "OK", 2000) == 1)
+		printf("------SIM7080G is starting up, please wait------\r\n");
+		while (sendCMD_waitResp("AT", "OK", 2000) != 1)
 		{
-			printf("------SIM7080G is ready------\r\n");
-		}
-		else
-		{
-			module_power();
-			printf("------SIM7080G is starting up, please wait------\r\n");
-			DEV_Delay_ms(5000);
-		}
-		while (1)
-		{
-			if (sendCMD_waitResp("AT", "OK", 2000))
-				break;
+			printf(".");
 			DEV_Delay_ms(500);
 		}
+		printf("\r\n------SIM7080G is ready------\r\n");
+	
+		// DEV_Delay_ms(5000);
+		module_power_off();
 	}
 
 	void set_network()
