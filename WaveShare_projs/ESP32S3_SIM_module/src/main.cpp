@@ -24,11 +24,12 @@ void setup() {
 	ModuleSerial.begin(115200, SERIAL_8N1, MODULE_RX_PIN, MODULE_TX_PIN); // 初始化 UART 1
 	MasterSerial.begin(115200, SERIAL_8N1, MASTER_RX_PIN, MASTER_TX_PIN); // 初始化 UART 1
 	
-	delay(1000);
 	genericInit();
 	genericNetInit();
-	delay(1000);
 
+	// mqttTest();
+
+	delay(5000);
 	Serial.println("Start Repeat.");
 }
 

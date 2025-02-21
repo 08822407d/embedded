@@ -1,6 +1,8 @@
 #include "DEV_Config.hpp"
 
 
+static char b[512];
+
 /**
  * GPIO Write
  */
@@ -49,12 +51,12 @@ void DEV_GPIO_Init(void) {
 void module_power(UBYTE state) {
 	// Example implementation:
 	DEV_Digital_Write(PWR_EN_PIN, state); // Power On
-	DEV_Delay_ms(1000);
+	// DEV_Delay_ms(1000);
 }
 
 void module_wakeup() {
 	DEV_Digital_Write(MOD_WAKEUP_PIN, HIGH);
-	delay(1000);
+	DEV_Delay_ms(1000);
 	DEV_Digital_Write(MOD_WAKEUP_PIN, LOW);
 }
 
@@ -99,34 +101,60 @@ void Hexstr_To_str(const char *source, unsigned char *dest, int sourceLen) {
 	}
 }
 
+bool __waitSerialAvailable(HardwareSerial *serial, int timeout) {
+	unsigned long startTime = millis();
+	while (!serial->available()) {
+		if (timeout != -1 && (millis() - startTime >= timeout))
+			return false;
+		DEV_Delay_ms(50);
+	}
+	return true;
+}
+
 /**
  * Send Command and Wait for Response
  */
-bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
-	uint16_t i = 0;
-	uint64_t t = 0;
-	char b[500];
-	memset(b, 0, sizeof(b));
+bool __sendCMD(HardwareSerial *serial, const char *str, int timeout) {
+	// if (__waitSerialAvailable(serial, timeout)) {
+		serial->println(str);
+		return true;
+	// }
+	// return false;
+}
 
-	Serial.printf("CMD: %s\r\n", str);
-	ModuleSerial.println(str);
-
-	unsigned long startTime = millis();
-	String response = "";
-
-	while (millis() - startTime < timeout) {
-		while (ModuleSerial.available()) {
-			b[i++] = ModuleSerial.read();
+bool __recieveCMD(HardwareSerial *serial, char *buf, int timeout) {
+	if (__waitSerialAvailable(serial, timeout)) {
+		int i = 0;
+		while (serial->available()) {
+			buf[i++] = serial->read();
 		}
-	}
-
-	if (strstr(b, back) == NULL) {
-		Serial.printf("%s back: %s\r\n", str, b);
-		return false;
-	} else {
-		Serial.printf("%s\r\n", b);
 		return true;
 	}
+	return false;
+}
+
+/**
+ * Send Command and Wait for Response
+ */
+bool __sendCMD_WaitResp(const char *str, const char *back, char *recv_buf, uint16_t buflen, int timeout) {
+	__sendCMD(&ModuleSerial, str, -1);
+
+	memset(recv_buf, 0, buflen);
+	__recieveCMD(&ModuleSerial, recv_buf, timeout);
+
+	return (strstr(recv_buf, back) != NULL);
+}
+
+/**
+ * Send Command and Wait for Response
+ */
+void sendCMD_MustResp(const char *str, const char *back, int timeout) {
+	Serial.printf(">>> CMD: %s\r\n", str);
+
+	while (!__sendCMD_WaitResp(str, back, b, sizeof(b),timeout))
+		DEV_Delay_ms(200);
+	
+	Serial.printf("<<< %s back: %s\r\n", str, b);
 }
 
 /**
@@ -135,7 +163,7 @@ bool sendCMD_waitResp(const char *str, const char *back, int timeout) {
 char* waitResp(const char *str, const char *back, int timeout) {
 	uint16_t i = 0;
 	uint64_t t = 0;
-	static char b[500];
+	// static char b[500];
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);
@@ -165,7 +193,7 @@ char* waitResp(const char *str, const char *back, int timeout) {
 bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout) {
 	uint16_t i = 0;
 	uint64_t t = 0;
-	char b[114];
+	// static char b[114];
 	memset(b, 0, sizeof(b));
 
 	Serial.printf("CMD: %s\r\n", str);

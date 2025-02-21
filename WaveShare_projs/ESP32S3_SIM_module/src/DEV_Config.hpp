@@ -61,7 +61,9 @@
 	void Hexstr_To_str(const char *source, unsigned char *dest, int sourceLen);
 
 	// UART Communication Functions
-	bool sendCMD_waitResp(const char *str, const char *back, int timeout);
+
+	bool __sendCMD_WaitResp(const char *str, const char *back, int timeout);
+	void sendCMD_MustResp(const char *str, const char *back, int timeout);
 	char* waitResp(const char *str, const char *back, int timeout);
 	bool sendCMD_waitResp_AT(const char *str, const char *back, int timeout);
 
