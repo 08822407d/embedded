@@ -8,7 +8,6 @@
 
 #define IMU_SAMPLE_FREQ		100
 #define IMU_SAMPLE_PERIOD	(1000 / (IMU_SAMPLE_FREQ))
-#define MAX_SPEED			400000
 
 
 UnitRollerI2C RollerI2C;  // Create a UNIT_ROLLERI2C object
@@ -20,20 +19,20 @@ double angleInput  = 0.0;   // 输入：当前角度
 double angleOutput = 0.0;   // 输出：角度环PID结果
 double angleSetpoint = 0.0; // 目标角度(若想保持水平，通常为0)
 
-// ---- PID相关变量（速度环） ----
-double speedInput  = 0.0;   // 输入：当前速度
-double speedOutput = 0.0;   // 输出：速度环PID结果
-double speedSetpoint = 0.0; // 目标速度(平衡小车设为0)
+// // ---- PID相关变量（速度环） ----
+// double speedInput  = 0.0;   // 输入：当前速度
+// double speedOutput = 0.0;   // 输出：速度环PID结果
+// double speedSetpoint = 0.0; // 目标速度(平衡小车设为0)
 
 // ---- PID参数（示例值，需要根据实际情况调参） ----
 double angleKp = 3000.0, angleKi = 0.0, angleKd = 0.5;
-double speedKp = 0.0, speedKi = 0.0, speedKd = 0.0;
+// double speedKp = 0.0, speedKi = 0.0, speedKd = 0.0;
 
 // ---- 建立PID对象 ----
 // 角度PID：使用“DIRECT”或“REVERSE”，请根据实际方向调试
 PID anglePID(&angleInput, &angleOutput, &angleSetpoint, angleKp, angleKi, angleKd, DIRECT);
-// 速度PID：同上
-PID speedPID(&speedInput, &speedOutput, &speedSetpoint, speedKp, speedKi, speedKd, DIRECT);
+// // 速度PID：同上
+// PID speedPID(&speedInput, &speedOutput, &speedSetpoint, speedKp, speedKi, speedKd, DIRECT);
 
 // ---- 可选：对电机速度做简单低通滤波 ----
 static double speedFilter = 0.0;
@@ -55,18 +54,18 @@ void setup()
 
 	// 设置目标 = 0度
 	angleSetpoint = 0.0;
-	speedSetpoint = 0.0;
+	// speedSetpoint = 0.0;
 
 	// PID 模式设置
 	anglePID.SetMode(AUTOMATIC); 
-	speedPID.SetMode(AUTOMATIC);
+	// speedPID.SetMode(AUTOMATIC);
 	// 设置PID输出范围（根据需要可做限制）
-	anglePID.SetOutputLimits(-MAX_SPEED, MAX_SPEED);  // 示例
-	speedPID.SetOutputLimits(-MAX_SPEED, MAX_SPEED);
+	anglePID.SetOutputLimits(MIN_CURRENT, MAX_CURRENT);  // 示例
+	// speedPID.SetOutputLimits(MIN_CURRENT, MAX_CURRENT);
 
 
 	RollerI2C.setOutput(0);
-	RollerI2C.setMode(ROLLER_MODE_SPEED);
+	RollerI2C.setMode(ROLLER_MODE_CURRENT);
 	RollerI2C.setOutput(1);
 
 
@@ -98,27 +97,26 @@ void selfBalanceTask(void * parameter) {
 		TickType_t taskStart = xTaskGetTickCount();
 
 
-		extern void normal();
-		normal();
+		// extern void normal();
+		// normal();
 
-		// m5::IMU_Class::imu_data_t data;
-		// if (!M5.Imu.update())
-		// 	continue;;
-		// data = M5.Imu.getImuData();
+		m5::IMU_Class::imu_data_t data;
+		if (!M5.Imu.update())
+			continue;;
+		data = M5.Imu.getImuData();
 
-		// ax = data.accel.x;
-		// ay = data.accel.y;
-		// az = data.accel.z;
-		// gx = data.gyro.x;
-		// gy = data.gyro.y;
-		// gz = data.gyro.z;
+		ax = data.accel.x;
+		ay = data.accel.y;
+		az = data.accel.z;
+		gx = data.gyro.x;
+		gy = data.gyro.y;
+		gz = data.gyro.z;
 
-		// filter.updateIMU(gx, gy, gz, ax, ay, az);
+		filter.updateIMU(gx, gy, gz, ax, ay, az);
 
-		// angleInput = filter.getPitch();
+		angleInput = filter.getRoll();
 
 		// // 2. 从电机库获取速度(编码器/无感测的封装都由MotorFOC库自行处理)
-		// RollerI2C.setOutput(0);
 		// double currentSpeed = RollerI2C.getSpeed();
 		// RollerI2C.setOutput(1);
 
@@ -126,27 +124,28 @@ void selfBalanceTask(void * parameter) {
 		// speedFilter = 0.65 * speedFilter + 0.35 * currentSpeed;
 		// speedInput  = speedFilter;  // 若不需要滤波，可直接 speedInput = currentSpeed;
 
-		// // 3. 计算角度PID
-		// anglePID.Compute();  // 执行PID计算，输出存到 angleOutput
+		// 3. 计算角度PID
+		anglePID.Compute();  // 执行PID计算，输出存到 angleOutput
 		// // 4. 计算速度PID
 		// speedPID.Compute();  // 执行PID计算，输出存到 speedOutput
-		// // 5. 叠加两个环的结果
+		// 5. 叠加两个环的结果
 		// double finalCommand = angleOutput + speedOutput;
+		double finalCommand = angleOutput;
 
-		// // 调试输出（减少打印频率以避免延迟）
-		// printCounter++;
-		// if (printCounter >= 5) {
-		// 	printCounter = 0;
-		// 	M5.Lcd.setCursor(10, 10);
-		// 	M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
-		// 	M5.Lcd.printf("pitch %.2f\r\n", angleInput);
-		// 	M5.Lcd.printf("speed: %-4.2f\r\n", finalCommand);
-		// }
+		// 调试输出（减少打印频率以避免延迟）
+		printCounter++;
+		if (printCounter >= 5) {
+			printCounter = 0;
+			M5.Lcd.setCursor(10, 10);
+			M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
+			M5.Lcd.printf("pitch %.2f\r\n", angleInput);
+			M5.Lcd.printf("speed: %-4.2f\r\n", finalCommand);
+		}
 
 
-		// RollerI2C.setOutput(0);
-		// RollerI2C.setSpeed(finalCommand);
-		// RollerI2C.setOutput(1);
+		RollerI2C.setOutput(0);
+		RollerI2C.setCurrent(finalCommand);
+		RollerI2C.setOutput(1);
 
 
 		// 计算任务执行时间
@@ -239,7 +238,6 @@ void normal() {
     float Gyro_x  = gx;       // 获取 x 轴角速度 (deg/s 或 rad/s, 视库而定)
 
     // 2. 获取电机当前转速（>0 或 <0）
-	RollerI2C.setOutput(0);
 	double currentSpeed = RollerI2C.getSpeed();
 	RollerI2C.setOutput(1);
 
@@ -263,94 +261,6 @@ void normal() {
     // 7. 将结果写入电机
     //    这里不再做“限幅-方向-PWM”的手动处理，而是直接调用 FOC 库
     //    假设 finalPwm 即可直接用 setSpeed()，具体要看电机库对正负值的处理约定
-	RollerI2C.setOutput(0);
 	RollerI2C.setSpeed(finalSpeed);
 	RollerI2C.setOutput(1);
 }
-
-// #include "unit_roller485.hpp"
-// #include <Arduino.h>
-// #include <M5Unified.h>
-
-// UnitRoller485 Roller485;     // Create a UnitRoller485 object
-// HardwareSerial mySerial(1);  // Create a hardware serial port object
-// #define motor485Id 0x00
-// uint8_t rgbValues[3];  // Array to store R, G, B values
-// double speedPID[3];    // Array to   P I D values
-// void setup()
-// {
-//     M5.begin();
-//     // Call the begin function and pass arguments
-//     Roller485.begin(&mySerial, 115200, SERIAL_8N1, 22, 19, -1, false, 10000UL, 112U);
-//     // Set the motor mode to speed
-//     Roller485.setMode(motor485Id, ROLLER_MODE_SPEED);
-//     // Set speed Speed and current
-//     Roller485.setSpeedMode(motor485Id, 2400, 1200);
-//     // Set the motor to enable
-//     Roller485.setOutput(motor485Id, true);
-// }
-
-// void loop()
-// {
-//     int errorCode = Roller485.setMode(motor485Id, ROLLER_MODE_SPEED);
-//     if (errorCode == 1) {
-//         // Successful operation
-//         Serial.println("setMode() successful.");
-//     } else {
-//         // Print error code
-//         Serial.print("setMode() failed with error code: ");
-//         Serial.println(errorCode);
-//     }
-//     delay(1000);
-
-//     int32_t temperature = Roller485.getActualTemp(motor485Id);
-//     Serial.printf("temperature: %d\n", temperature);
-//     delay(1000);
-//     int32_t vin = Roller485.getActualVin(motor485Id);
-//     Serial.printf("vin: %d\n", vin);
-//     delay(1000);
-//     int32_t encoder = Roller485.getEncoder(motor485Id);
-//     Serial.printf("encoder: %d\n", encoder);
-//     delay(1000);
-//     int rgbBrightness = Roller485.getRGBBrightness(motor485Id);
-//     Serial.printf("rgbBrightness: %d\n", rgbBrightness);
-//     delay(1000);
-//     int32_t motorId = Roller485.getMotorId(motor485Id);
-//     Serial.printf("motorId: %d\n", motorId);
-//     delay(1000);
-//     int32_t speed = Roller485.getActualSpeed(motor485Id);
-//     Serial.printf("speed: %d\n", speed);
-//     delay(1000);
-//     int32_t position = Roller485.getActualPosition(motor485Id);
-//     Serial.printf("position: %d\n", position);
-//     delay(1000);
-//     int32_t current = Roller485.getActualCurrent(motor485Id);
-//     Serial.printf("current: %d\n", current);
-//     delay(1000);
-//     int8_t mode = Roller485.getMode(motor485Id);
-//     Serial.printf("mode: %d\n", mode);
-//     delay(1000);
-//     int8_t status = Roller485.getStatus(motor485Id);
-//     Serial.printf("status: %d\n", status);
-//     delay(1000);
-//     int8_t error = Roller485.getError(motor485Id);
-//     Serial.printf("error: %d\n", error);
-//     int8_t errorRGB = Roller485.getRGB(motor485Id, rgbValues);
-//     if (errorRGB != 1) {
-//         // Print error code
-//         Serial.print("getRGB failed with error code: ");
-//         Serial.println(errorRGB);
-//     } else {
-//         printf("RGB values: R=%d, G=%d, B=%d\n", rgbValues[0], rgbValues[1], rgbValues[2]);
-//     }
-
-//     int8_t errorSpeedPID = Roller485.getSpeedPID(motor485Id, speedPID);
-//     if (errorSpeedPID != 1) {
-//         Serial.print("getSpeedPID failed with error code: ");
-//         Serial.println(errorSpeedPID);
-//     } else {
-//         printf("speedPID values: P=%.8lf, I=%.8lf, D=%.8lf\n", speedPID[0], speedPID[1], speedPID[2]);
-//     }
-
-//     delay(1000);
-// }

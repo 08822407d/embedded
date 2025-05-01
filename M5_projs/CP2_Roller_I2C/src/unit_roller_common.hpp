@@ -21,37 +21,47 @@
 #else
 #endif
 
+
+#define MIN_SPEED		-2100000000
+#define MAX_SPEED		2100000000
+#define MIN_CURRENT		-120000
+#define MAX_CURRENT		120000
+#define MIN_POSITION	-2100000000
+#define MAX_POSITION	2100000000
+
+
+
 // Enum definition for error codes
 typedef enum {
-    ROLLER_WRITE_SUCCESS       = 1,  /**< Indicates a successful write operation. */
-    ROLLER_WRITE_FAILED        = 0,  /**< Indicates a failure during write or read operations. */
-    ROLLER_CRC_CHECK_FAIL      = -1, /**< Indicates a failure in CRC check. */
-    ROLLER_SERIAL_TIMEOUT      = -2, /**< Indicates a timeout in serial communication. */
-    ROLLER_UNEXPECTED_RESPONSE = -3, /**< Indicates an unexpected response received from the device. */
-    ROLLER_SERIAL_SEND_FAILURE = -4  /**< Indicates a failure in sending serial data. */
+	ROLLER_WRITE_SUCCESS       = 1,  /**< Indicates a successful write operation. */
+	ROLLER_WRITE_FAILED        = 0,  /**< Indicates a failure during write or read operations. */
+	ROLLER_CRC_CHECK_FAIL      = -1, /**< Indicates a failure in CRC check. */
+	ROLLER_SERIAL_TIMEOUT      = -2, /**< Indicates a timeout in serial communication. */
+	ROLLER_UNEXPECTED_RESPONSE = -3, /**< Indicates an unexpected response received from the device. */
+	ROLLER_SERIAL_SEND_FAILURE = -4  /**< Indicates a failure in sending serial data. */
 } roller_errcode_t;
 
 typedef enum {
-    ROLLER_MODE_SPEED = 1,  // Speed mode
-    ROLLER_MODE_POSITION,   // Position mode(2)
-    ROLLER_MODE_CURRENT,    // Current mode (3)
-    ROLLER_MODE_ENCODER     // Encoder mode (4)
+	ROLLER_MODE_SPEED = 1,  // Speed mode
+	ROLLER_MODE_POSITION,   // Position mode(2)
+	ROLLER_MODE_CURRENT,    // Current mode (3)
+	ROLLER_MODE_ENCODER     // Encoder mode (4)
 } roller_mode_t;
 
 typedef enum {
-    // 485
-    ROLLER_BPS_485_115200 = 0, /**< Baud rate of 115200 bps */
-    ROLLER_BPS_485_19200,      /**< Baud rate of 19200 bps */
-    ROLLER_BPS_485_9600,       /**< Baud rate of 9600 bps */
-    // CAN
-    ROLLER_BPS_CAN_1000000 = 0, /**< Baud rate of 1000 Kbps */
-    ROLLER_BPS_CAN_500000,      /**< Baud rate of 500 Kbps */
-    ROLLER_BPS_CAN_125000       /**< Baud rate of 125 Kbps */
+	// 485
+	ROLLER_BPS_485_115200 = 0, /**< Baud rate of 115200 bps */
+	ROLLER_BPS_485_19200,      /**< Baud rate of 19200 bps */
+	ROLLER_BPS_485_9600,       /**< Baud rate of 9600 bps */
+	// CAN
+	ROLLER_BPS_CAN_1000000 = 0, /**< Baud rate of 1000 Kbps */
+	ROLLER_BPS_CAN_500000,      /**< Baud rate of 500 Kbps */
+	ROLLER_BPS_CAN_125000       /**< Baud rate of 125 Kbps */
 } roller_bps_t;
 
 typedef enum {
-    ROLLER_RGB_MODE_DEFAULT = 0,  // System default mode
-    ROLLER_RGB_MODE_USER_DEFINED  // User-defined mode
+	ROLLER_RGB_MODE_DEFAULT = 0,  // System default mode
+	ROLLER_RGB_MODE_USER_DEFINED  // User-defined mode
 } roller_rgb_t;
 
 /**
