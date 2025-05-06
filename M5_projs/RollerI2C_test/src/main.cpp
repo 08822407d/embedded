@@ -22,7 +22,7 @@ void setup() {
 	RollerI2C.begin(&Wire, 0x64, 2, 1, 400000);
 
 	M5.Display.begin();
-	// M5.Display.setRotation(1);
+	M5.Display.setRotation(2);
 	M5.Display.setTextSize(1);
 	M5.Lcd.setTextColor(WHITE, DARKGREY);
 	M5.Display.setTextDatum(MR_DATUM);
@@ -51,8 +51,8 @@ void loop() {
 		// 	sensor.setLEDColor(2, 0x111100);
 		// }
 		last_value = encoder_value;
-		RollerI2C.setOutput(0);
-		RollerI2C.setSpeed(encoder_value * 5000);
+		// RollerI2C.setOutput(0);
+		RollerI2C.setSpeed(encoder_value * 100);
 		RollerI2C.setOutput(1);
 
 		M5.Display.drawString("    " + String(encoder_value), 112, 64, &fonts::Font7);
