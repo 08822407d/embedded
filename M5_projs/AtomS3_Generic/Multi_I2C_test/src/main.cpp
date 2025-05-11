@@ -1,28 +1,56 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <M5Unified.h>
-#include <M5GFX.h>
+// #include <M5StickCPlus2.h>
 
+#include "M5Unit_ScrollEncoder.hpp"
+#include "M5Unit_JoyStick2.hpp"
+
+
+M5UnitScroll scroll;
+M5UnitJoystick2 joystick2;
 
 extern void initBoard();
 
 void setup() {
+	delay(1000);
+
 	initBoard();
+
+	Wire.begin(38, 39, 400000UL);
+	scroll.begin(&Wire, UNIT_SCROLL_ADDR, 38, 39, 400000UL);
+	// joystick2.begin(&Wire1, UNIT_JOYSTICK2_ADDR, 19, 22);
+
+	delay(500);
+
+	Serial.printf("firmware version:%d, i2c address:0x%X\n", scroll.getFirmwareVersion(), scroll.getI2CAddress());
 }
 
 signed short int last_value = 0;
 
 void loop() {
-	delay(50);
+	// int16_t encoder_value = scroll.getEncoderValue();
+	// Serial.println(encoder_value);
+
+
+	// uint8_t bootloader_ver, firmware_ver;
+	// uint16_t adc_x, adc_y;
+	// bootloader_ver = joystick2.get_bootloader_version();
+	// firmware_ver   = joystick2.get_firmware_version();
+	// joystick2.get_joy_adc_16bits_value_xy(&adc_x, &adc_y);
+	// Serial.printf("bootloader ver:%d, firmware ver:%d, x adc:%d, y adc:%d\n", bootloader_ver, firmware_ver, adc_x,
+	// 		adc_y);
+
+
+	delay(100);
 }
 
 
 void initBoard() {
 	auto cfg = M5.config();
 
-#if defined ( ARDUINO )
 	cfg.serial_baudrate = 115200;   // default=115200. if "Serial" is not needed, set it to 0.
-#endif
+
 	cfg.clear_display = true;  // default=true. clear the screen when begin.
 	cfg.output_power  = true;  // default=true. use external port 5V output.
 	cfg.internal_imu  = true;  // default=true. use internal IMU.

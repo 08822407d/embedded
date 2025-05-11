@@ -7,7 +7,6 @@
 #include <unit_rolleri2c.hpp>
 
 #include "config.hpp"
-#include "PostureThread.hpp"
 
 
 UnitRollerI2C RollerI2C;  // Create a UNIT_ROLLERI2C object
@@ -21,7 +20,7 @@ double angleSetpoint = 0.0; // 目标角度(若想保持水平，通常为0)
 
 
 // ---- PID参数（示例值，需要根据实际情况调参） ----
-double angleKp = 4000.0, angleKi = 0.0, angleKd = 10.0;
+double angleKp = 1000.0, angleKi = 0.0, angleKd = 100.0;
 
 // ---- 建立PID对象 ----
 // 角度PID：使用“DIRECT”或“REVERSE”，请根据实际方向调试
@@ -31,10 +30,11 @@ PID anglePID(&angleInput, &angleOutput, &angleSetpoint, angleKp, angleKi, angleK
 static double speedFilter = 0.0;
 
 extern void selfBalanceTask(void * parameter);
+extern void normal(void);
 
 void setup()
 {
-	delay(2000);
+	delay(500);			// 等待一段时间以确保系统稳定
 
 	Serial.begin(115200);
 	Serial.printf("Serial print test\r\n");
@@ -43,7 +43,7 @@ void setup()
 	M5.begin(cfg);
 	M5.Lcd.setRotation(2);
 
-	RollerI2C.begin(&Wire, 0x64, 2, 1, 400000);
+	RollerI2C.begin(&Wire, 0x64, 2, 1, 115200);
 
 
 	// 假设IMU更新频率约200Hz，可据实际情况修改
@@ -63,8 +63,7 @@ void setup()
 	RollerI2C.setOutput(1);
 
 
-	delay(1000);			// 等待一段时间以确保系统稳定
-	creatPostureThread();	// 创建姿态线程
+	delay(500);			// 等待一段时间以确保系统稳定
 
 	// 创建FreeRTOS任务
 	xTaskCreate(
@@ -79,14 +78,6 @@ void setup()
 
 void loop()
 {
-	float systemAngle = getSystemAngle();
-	float motorSpeed = getMotorSpeed();
-
-	M5.Lcd.setCursor(10, 10);
-	M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
-	M5.Lcd.printf("pitch %.2f\r\n", systemAngle);
-	M5.Lcd.printf("speed: %-4.2f\r\n", motorSpeed);
-
 	vTaskDelay(pdMS_TO_TICKS(50));
 }
 
@@ -102,40 +93,41 @@ void selfBalanceTask(void * parameter) {
 		// 记录任务开始时间
 		TickType_t taskStart = xTaskGetTickCount();
 
-		// m5::IMU_Class::imu_data_t data;
-		// if (!M5.Imu.update())
-		// 	continue;;
-		// data = M5.Imu.getImuData();
+		// normal();
 
-		// ax = data.accel.x;
-		// ay = data.accel.y;
-		// az = data.accel.z;
-		// gx = data.gyro.x;
-		// gy = data.gyro.y;
-		// gz = data.gyro.z;
+		m5::IMU_Class::imu_data_t data;
+		if (!M5.Imu.update())
+			continue;;
+		data = M5.Imu.getImuData();
 
-		// filter.updateIMU(gx, gy, gz, ax, ay, az);
+		ax = data.accel.x;
+		ay = data.accel.y;
+		az = data.accel.z;
+		gx = data.gyro.x;
+		gy = data.gyro.y;
+		gz = data.gyro.z;
 
-		// angleInput = filter.getPitch();
-		angleInput = getSystemAngle();
+		filter.updateIMU(gx, gy, gz, ax, ay, az);
 
-		// // 2. 从电机库获取速度(编码器/无感测的封装都由MotorFOC库自行处理)
-		// double currentSpeed = RollerI2C.getSpeedReadback() / 100.0f;
+		angleInput = filter.getPitch();
+
+		// 2. 从电机库获取速度(编码器/无感测的封装都由MotorFOC库自行处理)
+		double currentSpeed = RollerI2C.getSpeedReadback() / 100.0f;
 
 		// 3. 计算角度PID
 		anglePID.Compute();  // 执行PID计算，输出存到 angleOutput
 		double finalCommand = angleOutput;
 
-		// // 调试输出（减少打印频率以避免延迟）
-		// printCounter++;
-		// if (printCounter >= 5) {
-		// 	printCounter = 0;
-		// 	M5.Lcd.setCursor(10, 10);
-		// 	M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
-		// 	M5.Lcd.printf("pitch %.2f\r\n", angleInput);
-		// 	M5.Lcd.printf("value: %-4.2f\r\n", finalCommand);
-		// 	M5.Lcd.printf("speed: %-4.2f\r\n", currentSpeed);
-		// }
+		// 调试输出（减少打印频率以避免延迟）
+		printCounter++;
+		if (printCounter >= 5) {
+			printCounter = 0;
+			M5.Lcd.setCursor(10, 10);
+			M5.Lcd.fillRect(10, 10, 50, 40, TFT_BLACK);
+			M5.Lcd.printf("pitch %.2f\r\n", angleInput);
+			M5.Lcd.printf("value: %-4.2f\r\n", finalCommand);
+			M5.Lcd.printf("speed: %-4.2f\r\n", currentSpeed);
+		}
 
 
 		RollerI2C.setCurrent(finalCommand);
@@ -231,7 +223,6 @@ void normal() {
 
     // 2. 获取电机当前转速（>0 或 <0）
 	double currentSpeed = RollerI2C.getSpeedReadback() / 100.0f;
-	RollerI2C.setOutput(1);
 
     // 3. 根据转速对重心 Center_Gravity 做微调（原始算法逻辑）
     if (currentSpeed > 10)       Center_Gravity -= 0.001;
