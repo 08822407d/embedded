@@ -10,7 +10,7 @@
 #include <EEPROM.h>
 
 // #include <DATASCOPE.h>      //这是PC端上位机的库文件
-#include <CBTimer.h>
+#include <FspTimer.h>
 #include <KalmanFilter.h>				//卡尔曼滤波
 #include <MPU6050_tockn.h>
 
@@ -31,7 +31,7 @@
 
 
 // DATASCOPE data;//实例化一个 上位机 对象，对象名称为 data
-CBTimer timer;
+FspTimer timer;
 MPU6050 Mpu6050(Wire); //实例化一个 MPU6050 对象，对象名称为 Mpu6050
 KalmanFilter KalFilter;//实例化一个卡尔曼滤波器对象，对象名称为 KalFilter
 
@@ -266,10 +266,21 @@ void control() {
 	static int Velocity_Count, Turn_Count, Encoder_Count;
 	static float Voltage_All,Voltage_Count;
 	int Temp;
+
 	// sei();//全局中断开启
-	Mpu6050.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  //获取MPU6050陀螺仪和加速度计的数据
+	// interrupts();
+	Serial.print(".");		//打印角度
+	// Mpu6050.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  //获取MPU6050陀螺仪和加速度计的数据
+	Mpu6050.update();  //更新MPU6050数据
+	ax = Mpu6050.getAccX();  //获取MPU6050的加速度计数据
+	ay = Mpu6050.getAccY();
+	az = Mpu6050.getAccZ();  //获取MPU6050的加速度计数据
+	gx = Mpu6050.getGyroX();  //获取MPU6050的陀螺仪数据
+	gy = Mpu6050.getGyroY();
+	gz = Mpu6050.getGyroZ();  //获取MPU6050的陀螺仪数据
+
 	KalFilter.Angletest(ax, ay, az, gx, gy, gz, dt, Q_angle, Q_gyro, R_angle, C_0, K1);          //通过卡尔曼滤波获取角度
-	// Angle = KalFilter.angle;//Angle是一个用于显示的整形变量
+	Angle = KalFilter.angle;	//Angle是一个用于显示的整形变量
 	// Balance_Pwm = balance(KalFilter.angle + ZHONGZHI , KalFilter.Gyro_x);//直立PD控制 控制周期5ms
 	// if (++Velocity_Count >= 8) //速度控制，控制周期40ms
 	// {
@@ -301,6 +312,12 @@ void control() {
 	返回  值：无
 **************************************************************************/
 void setup() {
+	Serial.begin(115200);				//开启串口，设置波特率为 9600
+	while (!Serial);
+
+	printf("Starting initiation\n");	//打印Hello World
+
+	printf("Setting pins ...\n");	//打印Hello World
 	pinMode(IN1, OUTPUT);			//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
 	pinMode(IN2, OUTPUT);			//TB6612控制引脚，
 	pinMode(IN3, OUTPUT);			//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
@@ -321,12 +338,13 @@ void setup() {
 	pinMode(8, INPUT);				//编码器引脚
 	pinMode(3, INPUT);				//按键引脚
 
+	printf("Starting Sensors ...\n");	//打印Hello World
 	Wire.begin();					//加入 IIC 总线
-	Serial.begin(9600);				//开启串口，设置波特率为 9600
-	delay(1500);					//延时等待初始化完成
+	delay(500);					//延时等待初始化完成
 
 	Mpu6050.begin();     //初始化MPU6050
-	delay(20); 
+	Mpu6050.calcGyroOffsets(false); // 自动校准陀螺仪偏移量:contentReference[oaicite:5]{index=5}
+	delay(500); 
 
 	// if(digitalRead(KEY)==0) {    //读取EEPROM的参数
 	// 	Balance_Kp =  (float)((EEPROM.read(addr+0)*256)+EEPROM.read(addr+1) )/100;
@@ -335,26 +353,48 @@ void setup() {
 	// 	Velocity_Ki = (float)((EEPROM.read(addr+6)*256)+EEPROM.read(addr+7))/100;
 	// }
 
-	// MsTimer2::set(5, control);  //使用Timer2设置5ms定时中断
-	// MsTimer2::start();          //使用中断使能
-	timer.begin(5 /* ms */, control);
 	// 若你需要延迟启动，可改为 timer.begin(5, control, false); 然后调用 timer.start();
-
-	// attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
-	// attachPinChangeInterrupt(4, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
-	// 左轮编码器：D2
-	attachInterrupt(
-		digitalPinToInterrupt(0),  // 将 D2 转为 EXTI 通道
-		READ_ENCODER_L,            // 中断服务函数
-		CHANGE                     // 模式：任意跳变触发
+	// timer.begin(5, control, true);
+	// timer.start();
+	// 获取可用定时器通道
+	uint8_t timerType;
+	int8_t ch = FspTimer::get_available_timer(timerType);
+	// if (ch < 0) {
+	// 	Serial.println("No timer available!");
+	// 	while (1);
+	// }
+	// 200 Hz → 5 ms 周期
+	timer.begin(
+		TIMER_MODE_PERIODIC,	// 周期模式
+		timerType,				// GPT 或 AGT
+		ch,						// 通道号
+		200.0f,					// 频率 (Hz)
+		0.0f,					// 占空比，无用
+		[](timer_callback_args_t*) {
+			control();			// 定时回调
+		}
 	);
+	timer.setup_overflow_irq();  // 使能中断向量
+	timer.open();               // 打开计时器
+	timer.start();              // 启动计数  
 
-	// 右轮编码器：D4
-	attachInterrupt(
-		digitalPinToInterrupt(4),  // 将 D4 转为 EXTI 通道
-		READ_ENCODER_R,            // 中断服务函数
-		CHANGE                     // 模式：任意跳变触发
-	);
+	// // attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
+	// // attachPinChangeInterrupt(4, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
+	// // 左轮编码器：D2
+	// attachInterrupt(
+	// 	digitalPinToInterrupt(0),  // 将 D2 转为 EXTI 通道
+	// 	READ_ENCODER_L,            // 中断服务函数
+	// 	CHANGE                     // 模式：任意跳变触发
+	// );
+
+	// // 右轮编码器：D4
+	// attachInterrupt(
+	// 	digitalPinToInterrupt(4),  // 将 D4 转为 EXTI 通道
+	// 	READ_ENCODER_R,            // 中断服务函数
+	// 	CHANGE                     // 模式：任意跳变触发
+	// );
+
+	delay(1000);	//延时等待初始化完成
 }
 /**************************************************************************
 函数功能：主循环程序体
@@ -362,6 +402,11 @@ void setup() {
 返回  值：无
 **************************************************************************/
 void loop() {
+	// Mpu6050.update();
+	// Serial.println("Imu: " + String(Mpu6050.getAccX()) + " " + String(Mpu6050.getAccY()) + " " + String(Mpu6050.getAccZ()) + " " + String(Mpu6050.getGyroX()) + " " + String(Mpu6050.getGyroY()) + " " + String(Mpu6050.getGyroZ()));	//打印IMU数据
+	// Serial.println("Angel: " + String(Angle));		//打印角度
+	delay(100);
+
 	int Voltage_Temp;
 	static unsigned char flag;
 	unsigned char
