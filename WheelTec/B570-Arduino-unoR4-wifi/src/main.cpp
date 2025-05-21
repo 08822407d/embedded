@@ -7,10 +7,10 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <FspTimer.h>
 #include <EEPROM.h>
 
 // #include <DATASCOPE.h>      //这是PC端上位机的库文件
-#include <FspTimer.h>
 #include <KalmanFilter.h>				//卡尔曼滤波
 #include <MPU6050_tockn.h>
 
@@ -31,25 +31,41 @@
 
 
 // DATASCOPE data;//实例化一个 上位机 对象，对象名称为 data
-FspTimer timer;
-MPU6050 Mpu6050(Wire); //实例化一个 MPU6050 对象，对象名称为 Mpu6050
-KalmanFilter KalFilter;//实例化一个卡尔曼滤波器对象，对象名称为 KalFilter
+FspTimer SendorTimer;
+MPU6050 Mpu6050(Wire);			//实例化一个 MPU6050 对象，对象名称为 Mpu6050
+KalmanFilter KalFilter;			//实例化一个卡尔曼滤波器对象，对象名称为 KalFilter
 
-int16_t	ax, ay, az, gx, gy, gz;  //MPU6050的三轴加速度和三轴陀螺仪数据
-int		Balance_Pwm, Velocity_Pwm, Turn_Pwm;   //直立 速度 转向环的PWM
-int		Motor1, Motor2;      //电机叠加之后的PWM
-float	Battery_Voltage;   //电池电压 单位是V
-volatile long	Velocity_L, Velocity_R = 0;   //左右轮编码器数据
-int		Velocity_Left, Velocity_Right = 0;     //左右轮速度
-int		Flag_Qian, Flag_Hou, Flag_Left, Flag_Right; //遥控相关变量
-int		Angle, Show_Data,PID_Send;  //用于显示的角度和临时变量
-unsigned char	Flag_Stop = 1,Send_Count,Flash_Send;  //停止标志位和上位机相关变量
-float	Balance_Kp=15,Balance_Kd=0.4,Velocity_Kp=2,Velocity_Ki=0.01;
+int16_t	ax, ay, az,
+		gx, gy, gz;				//MPU6050的三轴加速度和三轴陀螺仪数据
+int		Balance_Pwm,
+		Velocity_Pwm,
+		Turn_Pwm;				//直立 速度 转向环的PWM
+int		Motor1, Motor2;			//电机叠加之后的PWM
+float	Battery_Voltage;		//电池电压 单位是V
+volatile long
+		Velocity_L = 0,
+		Velocity_R = 0;			//左右轮编码器数据
+int		Velocity_Left,
+		Velocity_Right = 0;		//左右轮速度
+int		Flag_Qian, Flag_Hou,
+		Flag_Left, Flag_Right;	//遥控相关变量
+// int		Angle, Show_Data, PID_Send;  //用于显示的角度和临时变量
+int		Angle;					//用于显示的角度和临时变量
+unsigned char
+		Flag_Stop = 1,
+		Send_Count,
+		Flash_Send;				//停止标志位和上位机相关变量
+float	Balance_Kp = 15,
+		Balance_Kd = 0.4,
+		Velocity_Kp = 2,
+		Velocity_Ki = 0.01;
 //***************下面是卡尔曼滤波相关变量***************//
-float	K1 = 0.05; // 对加速度计取值的权重
-float	Q_angle = 0.001, Q_gyro = 0.005;
-float	R_angle = 0.5 , C_0 = 1;
-float	dt = 0.005; //注意：dt的取值为滤波器采样时间 5ms
+float	K1 = 0.05;				// 对加速度计取值的权重
+float	Q_angle = 0.001,
+		Q_gyro = 0.005;
+float	R_angle = 0.5,
+		C_0 = 1;
+float	dt = 0.005;				//注意：dt的取值为滤波器采样时间 5ms
 int		addr = 0;
 
 
@@ -228,20 +244,28 @@ int Put_Down(float Angle, int encoder_left, int encoder_right){
 //   Turn = -Turn_Target * Kp + gyro * Kd;         //===结合Z轴陀螺仪进行PD控制
 //   return Turn;
 // }
-// /**************************************************************************
-// 函数功能：赋值给PWM寄存器 作者：平衡小车之家
-// 入口参数：左轮PWM、右轮PWM
-// 返回  值：无
-// **************************************************************************/
-// void Set_Pwm(int moto1, int moto2)
-// {
-//   if (moto1 > 0)     digitalWrite(IN1, HIGH),      digitalWrite(IN2, LOW);  //TB6612的电平控制
-//   else             digitalWrite(IN1, LOW),       digitalWrite(IN2, HIGH); //TB6612的电平控制
-//   analogWrite(PWMA, abs(moto1)); //赋值给PWM寄存器
-//   if (moto2 < 0) digitalWrite(IN3, HIGH),     digitalWrite(IN4, LOW); //TB6612的电平控制
-//   else        digitalWrite(IN3, LOW),      digitalWrite(IN4, HIGH); //TB6612的电平控制
-//   analogWrite(PWMB, abs(moto2));//赋值给PWM寄存器
-// }
+/**************************************************************************
+	函数功能：赋值给PWM寄存器 作者：平衡小车之家
+	入口参数：左轮PWM、右轮PWM
+	返回  值：无
+**************************************************************************/
+void Set_Pwm(int moto1, int moto2)
+{
+	if (moto1 > 0)
+		digitalWrite(IN1, HIGH), digitalWrite(IN2, LOW);	//TB6612的电平控制
+	else
+		digitalWrite(IN1, LOW), digitalWrite(IN2, HIGH);	//TB6612的电平控制
+
+	analogWrite(PWMA, abs(moto1)); //赋值给PWM寄存器
+
+
+	if (moto2 < 0)
+		digitalWrite(IN3, HIGH), digitalWrite(IN4, LOW);	//TB6612的电平控制
+	else
+		digitalWrite(IN3, LOW), digitalWrite(IN4, HIGH);	//TB6612的电平控制
+
+	analogWrite(PWMB, abs(moto2));//赋值给PWM寄存器
+}
 // /**************************************************************************
 // 函数功能：限制PWM赋值  作者：平衡小车之家
 // 入口参数：无
@@ -262,15 +286,13 @@ int Put_Down(float Angle, int encoder_left, int encoder_right){
 	入口参数：无
 	返回  值：无
 **************************************************************************/
-void control() {
+void control(timer_callback_args_t __attribute((unused)) *p_args) {
 	static int Velocity_Count, Turn_Count, Encoder_Count;
 	static float Voltage_All,Voltage_Count;
 	int Temp;
 
 	// sei();//全局中断开启
-	// interrupts();
-	Serial.print(".");		//打印角度
-	// Mpu6050.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);  //获取MPU6050陀螺仪和加速度计的数据
+	interrupts();
 	Mpu6050.update();  //更新MPU6050数据
 	ax = Mpu6050.getAccX();  //获取MPU6050的加速度计数据
 	ay = Mpu6050.getAccY();
@@ -306,106 +328,120 @@ void control() {
 	// Voltage_All+=Temp;     //多次采样累积
 	// if(Voltage_Count==200) Battery_Voltage=Voltage_All*0.05371/200,Voltage_All=0,Voltage_Count=0;//求平均值
 }
+
+
+bool beginTimer(float rate) {
+	uint8_t timer_type = GPT_TIMER;
+	int8_t tindex = FspTimer::get_available_timer(timer_type);
+	if (tindex < 0){
+		tindex = FspTimer::get_available_timer(timer_type, true);
+	}
+	if (tindex < 0){
+		return false;
+	}
+
+	FspTimer::force_use_of_pwm_reserved_timer();
+
+	if(!SendorTimer.begin(TIMER_MODE_PERIODIC, timer_type, tindex, rate, 0.0f, control)){
+		return false;
+	}
+
+	if (!SendorTimer.setup_overflow_irq()){
+		return false;
+	}
+
+	if (!SendorTimer.open()){
+		return false;
+	}
+
+	if (!SendorTimer.start()){
+		return false;
+	}
+	return true;
+}
+
+
 /**************************************************************************
 	函数功能：初始化 相当于STM32里面的Main函数 作者：平衡小车之家
 	入口参数：无
 	返回  值：无
 **************************************************************************/
 void setup() {
-	Serial.begin(115200);				//开启串口，设置波特率为 9600
+	Serial.begin(115200);				//开启串口，设置波特率为
 	while (!Serial);
 
-	printf("Starting initiation\n");	//打印Hello World
+	printf("Starting initiation\n");
 
-	printf("Setting pins ...\n");	//打印Hello World
-	pinMode(IN1, OUTPUT);			//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
-	pinMode(IN2, OUTPUT);			//TB6612控制引脚，
-	pinMode(IN3, OUTPUT);			//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
-	pinMode(IN4, OUTPUT);			//TB6612控制引脚，
-	pinMode(PWMA, OUTPUT);			//TB6612控制引脚，电机PWM
-	pinMode(PWMB, OUTPUT);			//TB6612控制引脚，电机PWM
+	printf("Setting pins ...\n");		//开始设置引脚
+	pinMode(IN1, OUTPUT);				//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
+	pinMode(IN2, OUTPUT);				//TB6612控制引脚，
+	pinMode(IN3, OUTPUT);				//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
+	pinMode(IN4, OUTPUT);				//TB6612控制引脚，
+	pinMode(PWMA, OUTPUT);				//TB6612控制引脚，电机PWM
+	pinMode(PWMB, OUTPUT);				//TB6612控制引脚，电机PWM
 
-	digitalWrite(IN1, 0);			//TB6612控制引脚拉低
-	digitalWrite(IN2, 0);			//TB6612控制引脚拉低
-	digitalWrite(IN3, 0);			//TB6612控制引脚拉低
-	digitalWrite(IN4, 0);			//TB6612控制引脚拉低
-	analogWrite(PWMA, 0);			//TB6612控制引脚拉低
-	analogWrite(PWMB, 0);			//TB6612控制引脚拉低
+	digitalWrite(IN1, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN2, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN3, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN4, 0);				//TB6612控制引脚拉低
+	analogWrite(PWMA, 0);				//TB6612控制引脚拉低
+	analogWrite(PWMB, 0);				//TB6612控制引脚拉低
 
-	pinMode(2, INPUT);				//编码器引脚
-	pinMode(4, INPUT);				//编码器引脚
-	pinMode(5, INPUT);				//编码器引脚
-	pinMode(8, INPUT);				//编码器引脚
-	pinMode(3, INPUT);				//按键引脚
+	pinMode(2, INPUT);					//编码器引脚
+	pinMode(4, INPUT);					//编码器引脚
+	pinMode(5, INPUT);					//编码器引脚
+	pinMode(8, INPUT);					//编码器引脚
+	pinMode(3, INPUT);					//按键引脚
 
-	printf("Starting Sensors ...\n");	//打印Hello World
-	Wire.begin();					//加入 IIC 总线
-	delay(500);					//延时等待初始化完成
+	printf("Starting Sensors ...\n");	//开始传感器初始化
+	Wire.begin();						//加入 IIC 总线
+	delay(100);							//延时等待初始化完成
 
-	Mpu6050.begin();     //初始化MPU6050
-	Mpu6050.calcGyroOffsets(false); // 自动校准陀螺仪偏移量:contentReference[oaicite:5]{index=5}
-	delay(500); 
+	Mpu6050.begin();					//初始化MPU6050
+	Mpu6050.calcGyroOffsets(false);		// 自动校准陀螺仪偏移量
+	delay(100); 
 
-	// if(digitalRead(KEY)==0) {    //读取EEPROM的参数
+	// if(digitalRead(KEY)==0) {			//读取EEPROM的参数
 	// 	Balance_Kp =  (float)((EEPROM.read(addr+0)*256)+EEPROM.read(addr+1) )/100;
 	// 	Balance_Kd =  (float)((EEPROM.read(addr+2)*256)+EEPROM.read(addr+3))/100;
 	// 	Velocity_Kp = (float)((EEPROM.read(addr+4)*256)+EEPROM.read(addr+5))/100;
 	// 	Velocity_Ki = (float)((EEPROM.read(addr+6)*256)+EEPROM.read(addr+7))/100;
 	// }
 
-	// 若你需要延迟启动，可改为 timer.begin(5, control, false); 然后调用 timer.start();
-	// timer.begin(5, control, true);
-	// timer.start();
-	// 获取可用定时器通道
-	uint8_t timerType;
-	int8_t ch = FspTimer::get_available_timer(timerType);
-	// if (ch < 0) {
-	// 	Serial.println("No timer available!");
-	// 	while (1);
-	// }
-	// 200 Hz → 5 ms 周期
-	timer.begin(
-		TIMER_MODE_PERIODIC,	// 周期模式
-		timerType,				// GPT 或 AGT
-		ch,						// 通道号
-		200.0f,					// 频率 (Hz)
-		0.0f,					// 占空比，无用
-		[](timer_callback_args_t*) {
-			control();			// 定时回调
-		}
+	beginTimer(8000);
+
+	printf("Binding Encoder Intr ...\n");	//创建控制线程
+	// attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
+	// attachPinChangeInterrupt(4, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
+	// 左轮编码器：D2
+	attachInterrupt(
+		digitalPinToInterrupt(0),  // 将 D2 转为 EXTI 通道
+		READ_ENCODER_L,            // 中断服务函数
+		CHANGE                     // 模式：任意跳变触发
 	);
-	timer.setup_overflow_irq();  // 使能中断向量
-	timer.open();               // 打开计时器
-	timer.start();              // 启动计数  
 
-	// // attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
-	// // attachPinChangeInterrupt(4, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
-	// // 左轮编码器：D2
-	// attachInterrupt(
-	// 	digitalPinToInterrupt(0),  // 将 D2 转为 EXTI 通道
-	// 	READ_ENCODER_L,            // 中断服务函数
-	// 	CHANGE                     // 模式：任意跳变触发
-	// );
+	// 右轮编码器：D4
+	attachInterrupt(
+		digitalPinToInterrupt(4),  // 将 D4 转为 EXTI 通道
+		READ_ENCODER_R,            // 中断服务函数
+		CHANGE                     // 模式：任意跳变触发
+	);
 
-	// // 右轮编码器：D4
-	// attachInterrupt(
-	// 	digitalPinToInterrupt(4),  // 将 D4 转为 EXTI 通道
-	// 	READ_ENCODER_R,            // 中断服务函数
-	// 	CHANGE                     // 模式：任意跳变触发
-	// );
-
-	delay(1000);	//延时等待初始化完成
+	delay(500);						//延时等待初始化完成
+	printf("Initiation Finished.\n");	//创建控制线程
 }
 /**************************************************************************
 函数功能：主循环程序体
 入口参数：无
 返回  值：无
 **************************************************************************/
+
+int test_pwm = 128;
 void loop() {
-	// Mpu6050.update();
-	// Serial.println("Imu: " + String(Mpu6050.getAccX()) + " " + String(Mpu6050.getAccY()) + " " + String(Mpu6050.getAccZ()) + " " + String(Mpu6050.getGyroX()) + " " + String(Mpu6050.getGyroY()) + " " + String(Mpu6050.getGyroZ()));	//打印IMU数据
-	// Serial.println("Angel: " + String(Angle));		//打印角度
-	delay(100);
+	Serial.println("Angel: " + String(Angle) + "; Encoder_L: " +
+		String(Velocity_L) + "; Encoder_R: " + String(Velocity_R) + ";");
+
+	delay(50);
 
 	int Voltage_Temp;
 	static unsigned char flag;
