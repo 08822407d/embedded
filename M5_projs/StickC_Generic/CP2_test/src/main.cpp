@@ -8,101 +8,45 @@
  */
 
 #include <Arduino.h>
-#include "M5StickCPlus2.h"
+#include <M5StickCPlus2.h>
+#include <UNIT_MiniJoyC.hpp>
+#include <M5Unit_ScrollEncoder.hpp>
 
-// Function to convert voltage to percentage
-int voltageToPercentage(int voltage)
-{
-    // Assuming 3.7V is 0% and 4.2V is 100%
-    int percentage = map(voltage, 3700, 4200, 0, 100);
-    return constrain(percentage, 0, 100);
-}
 
-int getStableBatteryPercentage() {
-    const int numReadings = 10;
-    int totalVoltage = 0;
+UNIT_JOYC joyc;
+M5UnitScroll scroll;
 
-    for (int i = 0; i < numReadings; i++) {
-        totalVoltage += StickCP2.Power.getBatteryVoltage();
-        delay(10); // Small delay between readings
-    }
-
-    int averageVoltage = totalVoltage / numReadings;
-    return voltageToPercentage(averageVoltage);
-}
-
-bool displayPaused = false;
 
 void setup()
 {   
-    auto cfg = M5.config();
-    StickCP2.begin(cfg);
-    Serial.begin(115200);
-    Serial.println("M5StickCPlus2 initialized");
-    delay(2000);
+	auto cfg = M5.config();
+	StickCP2.begin(cfg);
+	Serial.begin(115200);
+	Serial.println("M5StickCPlus2 initialized");
+	delay(2000);
 
-    StickCP2.Display.setBrightness(25);
-    StickCP2.Display.setRotation(1);
-    StickCP2.Display.setTextColor(GREEN);
-    StickCP2.Display.setTextDatum(middle_center);
-    StickCP2.Display.setTextFont(&fonts::Orbitron_Light_24);
-    StickCP2.Display.setTextSize(1);
+	Wire.end();
+	Wire1.end();
 
-    pinMode(32, INPUT_PULLUP); // Enable internal pull-down resistor for pin 32.
-    pinMode(33, INPUT_PULLDOWN);
-    pinMode(19, OUTPUT);    // Set pin 19 as an output.
+	while (!(joyc.begin(&Wire, JoyC_ADDR, 0, 26, 100000UL))) {
+		delay(100);
+		Serial.println("I2C Error!\r\n");
+	}
+	while (!(scroll.begin(&Wire1, UNIT_SCROLL_ADDR, 32, 33, 400000UL))) {
+		delay(100);
+		Serial.println("I2C Error!\r\n");
+	}
 }
 
 void loop()
 {
-    StickCP2.update(); // Update button states
+	uint16_t adc_x = joyc.getADCValue(POS_X);
+	uint16_t adc_y = joyc.getADCValue(POS_Y);
 
-    // if (StickCP2.BtnB.wasClicked()) {
-    //     StickCP2.Display.clear();
-    //     // StickCP2.Speaker.tone(8000, 20);
-    // }
+	int16_t encoder_value = scroll.getEncoderValue();
+	bool btn_stauts       = scroll.getButtonStatus();
 
-    // if (StickCP2.BtnA.wasPressed()) {
-    //     displayPaused = !displayPaused; // Toggle display update state
-    // }
+	Serial.printf("ADC X: %d, ADC Y: %d, Encoder Value: %d\n", adc_x, adc_y, encoder_value);
 
-    if (!displayPaused) {
-        StickCP2.Display.clear();
-        int percentage = getStableBatteryPercentage();
-        StickCP2.Display.setCursor(10, 30);
-        StickCP2.Display.printf("BAT: %d%%\n", percentage);
-        StickCP2.Display.setCursor(10, 50);
-        StickCP2.Display.setTextSize(0.7);
-        StickCP2.Display.printf("%dmV\n", StickCP2.Power.getBatteryVoltage());
-        StickCP2.Display.setTextSize(1);
-
-        int analog = analogRead(33);
-        int digital = digitalRead(32);
-
-        if (analog < 1500 && digital == 1) // No sensor attached
-        {
-            StickCP2.Display.setCursor(10, 120);
-            StickCP2.Display.printf("No sensor\n");
-        }
-        else
-        {       
-            digitalWrite(19, digital);
-
-            StickCP2.Display.setCursor(10, 90);
-            StickCP2.Display.printf("Analog:%d\n", analog);
-
-            if (digital == 1)
-            {
-                StickCP2.Display.setCursor(10, 120);
-                StickCP2.Display.printf("NEEDS WATER\n");
-            }
-            else
-            {
-                StickCP2.Display.setCursor(10, 120);
-                StickCP2.Display.printf("All good\n");
-            }
-        }
-    }
-
-    delay(1000);
+	delay(20);
 }
