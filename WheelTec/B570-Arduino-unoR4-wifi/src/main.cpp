@@ -37,6 +37,7 @@ KalmanFilter KalFilter;			//实例化一个卡尔曼滤波器对象，对象名�
 
 int16_t	ax, ay, az,
 		gx, gy, gz;				//MPU6050的三轴加速度和三轴陀螺仪数据
+float	AngleX, AngleY, AngleZ;	//MPU6050的三轴角度
 int		Balance_Pwm,
 		Velocity_Pwm,
 		Turn_Pwm;				//直立 速度 转向环的PWM
@@ -367,68 +368,60 @@ bool beginTimer(float rate) {
 	返回  值：无
 **************************************************************************/
 void setup() {
-	Serial.begin(115200);				//开启串口，设置波特率为
-	while (!Serial);
+	Serial.begin(115200);		//开启串口
+	while (Serial == NULL);
 
-	printf("Starting initiation\n");
+	Serial.println("Initiating Pins ...");
+	pinMode(IN1, OUTPUT);		//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
+	pinMode(IN2, OUTPUT);		//TB6612控制引脚，
+	pinMode(IN3, OUTPUT);		//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
+	pinMode(IN4, OUTPUT);		//TB6612控制引脚，
+	pinMode(PWMA, OUTPUT);		//TB6612控制引脚，电机PWM
+	pinMode(PWMB, OUTPUT);		//TB6612控制引脚，电机PWM
+	digitalWrite(IN1, 0);		//TB6612控制引脚拉低
+	digitalWrite(IN2, 0);		//TB6612控制引脚拉低
+	digitalWrite(IN3, 0);		//TB6612控制引脚拉低
+	digitalWrite(IN4, 0);		//TB6612控制引脚拉低
+	analogWrite(PWMA, 0);		//TB6612控制引脚拉低
+	analogWrite(PWMB, 0);		//TB6612控制引脚拉低
+	pinMode(ENCODER_L, INPUT);		//编码器引脚
+	pinMode(ENCODER_R, INPUT);		//编码器引脚
+	pinMode(DIRECTION_L, INPUT);	//编码器引脚
+	pinMode(DIRECTION_R, INPUT);	//编码器引脚
+	pinMode(KEY, INPUT);		//按键引脚
 
-	printf("Setting pins ...\n");		//开始设置引脚
-	pinMode(IN1, OUTPUT);				//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
-	pinMode(IN2, OUTPUT);				//TB6612控制引脚，
-	pinMode(IN3, OUTPUT);				//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
-	pinMode(IN4, OUTPUT);				//TB6612控制引脚，
-	pinMode(PWMA, OUTPUT);				//TB6612控制引脚，电机PWM
-	pinMode(PWMB, OUTPUT);				//TB6612控制引脚，电机PWM
+	Serial.println("Initiating I2C ...");
+	Wire.begin();             //加入 IIC 总线
+	delay(400);              //延时等待初始化完成
 
-	digitalWrite(IN1, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN2, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN3, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN4, 0);				//TB6612控制引脚拉低
-	analogWrite(PWMA, 0);				//TB6612控制引脚拉低
-	analogWrite(PWMB, 0);				//TB6612控制引脚拉低
+	// Serial.println("Initiating IMU ...");
+	// Mpu6050.begin();					//初始化MPU6050
+	// Mpu6050.calcGyroOffsets(false);		// 自动校准陀螺仪偏移量
+	// delay(200); 
 
-	pinMode(2, INPUT);					//编码器引脚
-	pinMode(4, INPUT);					//编码器引脚
-	pinMode(5, INPUT);					//编码器引脚
-	pinMode(8, INPUT);					//编码器引脚
-	pinMode(3, INPUT);					//按键引脚
+	// Serial.println("Starting timer Intr ...");
+	// MsTimer2::set(5, control);  //使用Timer2设置5ms定时中断
+	// MsTimer2::start();          //使用中断使能
+	// delay(200);              //延时等待初始化完成
 
-	printf("Starting Sensors ...\n");	//开始传感器初始化
-	Wire.begin();						//加入 IIC 总线
-	delay(100);							//延时等待初始化完成
 
-	Mpu6050.begin();					//初始化MPU6050
-	Mpu6050.calcGyroOffsets(false);		// 自动校准陀螺仪偏移量
-	delay(100); 
-
-	// if(digitalRead(KEY)==0) {			//读取EEPROM的参数
-	// 	Balance_Kp =  (float)((EEPROM.read(addr+0)*256)+EEPROM.read(addr+1) )/100;
-	// 	Balance_Kd =  (float)((EEPROM.read(addr+2)*256)+EEPROM.read(addr+3))/100;
-	// 	Velocity_Kp = (float)((EEPROM.read(addr+4)*256)+EEPROM.read(addr+5))/100;
-	// 	Velocity_Ki = (float)((EEPROM.read(addr+6)*256)+EEPROM.read(addr+7))/100;
-	// }
-
-	beginTimer(8000);
-
-	printf("Binding Encoder Intr ...\n");	//创建控制线程
-	// attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
-	// attachPinChangeInterrupt(4, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
+	Serial.println("Starting Encoder Intr ...");
 	// 左轮编码器：D2
 	attachInterrupt(
-		digitalPinToInterrupt(0),  // 将 D2 转为 EXTI 通道
-		READ_ENCODER_L,            // 中断服务函数
-		CHANGE                     // 模式：任意跳变触发
+		0,  					// 将 D2 转为 EXTI 通道
+		READ_ENCODER_L,			// 中断服务函数
+		CHANGE					// 模式：任意跳变触发
 	);
 
 	// 右轮编码器：D4
 	attachInterrupt(
-		digitalPinToInterrupt(4),  // 将 D4 转为 EXTI 通道
-		READ_ENCODER_R,            // 中断服务函数
-		CHANGE                     // 模式：任意跳变触发
+		digitalPinToInterrupt(ENCODER_R),	// 将 D4 转为 EXTI 通道
+		READ_ENCODER_R,				// 中断服务函数
+		CHANGE						// 模式：任意跳变触发
 	);
 
 	delay(500);						//延时等待初始化完成
-	printf("Initiation Finished.\n");	//创建控制线程
+	Serial.println("Initiation Finished.");
 }
 /**************************************************************************
 函数功能：主循环程序体
@@ -438,9 +431,11 @@ void setup() {
 
 int test_pwm = 128;
 void loop() {
-	Serial.println("Angel: " + String(Angle) + "; Encoder_L: " +
-		String(Velocity_L) + "; Encoder_R: " + String(Velocity_R) + ";");
-
+	// Serial.println("Angle: " + String(KalFilter.angle) + "  Gyro: " + String(KalFilter.Gyro_x) + "  Voltage: " + String(Battery_Voltage));
+	// Serial.println("Velocity Left: " + String(Velocity_Left) + "  Velocity Right: " + String(Velocity_Right));
+	Serial.println("AngleX: " + String(AngleX) + "; Velocity_L: " +
+		String(Velocity_L) + "; Velocity_R: " + String(Velocity_R) + ";");
+	// Serial.print("*");
 	delay(50);
 
 	int Voltage_Temp;
@@ -522,14 +517,14 @@ void loop() {
 返回  值：无
 **************************************************************************/
 void READ_ENCODER_L() {
-	if (digitalRead(ENCODER_L) == LOW) {		//如果是下降沿触发的中断
+	if (digitalRead(ENCODER_L) == LOW) {	//如果是下降沿触发的中断
 		if (digitalRead(DIRECTION_L) == LOW)
-			Velocity_L--;		//根据另外一相电平判定方向
+			Velocity_L--;	//根据另外一相电平判定方向
 		else
 			Velocity_L++;
-	} else {									//如果是上升沿触发的中断
+	} else {								//如果是上升沿触发的中断
 		if (digitalRead(DIRECTION_L) == LOW)
-			Velocity_L++;		//根据另外一相电平判定方向
+			Velocity_L++;	//根据另外一相电平判定方向
 		else
 			Velocity_L--;
 	}
@@ -540,89 +535,15 @@ void READ_ENCODER_L() {
 返回  值：无
 **************************************************************************/
 void READ_ENCODER_R() {
-	if (digitalRead(ENCODER_R) == LOW) {		//如果是下降沿触发的中断
+	if (digitalRead(ENCODER_R) == LOW) {	//如果是下降沿触发的中断
 		if (digitalRead(DIRECTION_R) == LOW)
-			Velocity_R--;		//根据另外一相电平判定方向
+			Velocity_R--;	//根据另外一相电平判定方向
 		else
 			Velocity_R++;
-	} else {									//如果是上升沿触发的中断
+	} else {								//如果是上升沿触发的中断
 		if (digitalRead(DIRECTION_R) == LOW)
-			Velocity_R++;		//根据另外一相电平判定方向
+			Velocity_R++;	//根据另外一相电平判定方向
 		else
 			Velocity_R--;
 	}
 }
-// /**************************************************************************
-// 函数功能：串口接收中断
-// 入口参数：无
-// 返回  值：无
-// **************************************************************************/
-// void serialEvent() 
-// {    
-// 	static unsigned char Flag_PID,Receive[10],Receive_Data,i,j;
-//    static float Data;
-
-//    while (Serial.available()) {
-
-// 	Receive_Data=Serial.read();  
-// 	if(Receive_Data==0x7B) Flag_PID=1;  //参数指令起始位
-// 	if(Receive_Data==0x7D) Flag_PID=2;  //参数指令停止位
-// 	if(Flag_PID==1)
-// 	 {
-// 	  Receive[i]=Receive_Data;     //记录数据
-// 	  i++;
-// 	 }
-// 	else  if(Flag_PID==2)  //执行指令
-// 	 {
-// 		   if(Receive[3]==0x50)          PID_Send=1;   //获取PID参数
-// 		   else  if(Receive[3]==0x57)    Flash_Send=1; //掉电保存参数
-// 		   else  if(Receive[1]!=0x23)    //更新PID参数
-// 		   {                
-// 			for(j=i;j>=4;j--)
-// 			{
-// 			  Data+=(Receive[j-1]-48)*pow(10,i-j);   //通讯协议
-// 			}
-// 			switch(Receive[1])
-// 			 {
-// 			   case 0x30:  Balance_Kp=Data/100;break;
-// 			   case 0x31:  Balance_Kd=Data/100;break;
-// 			   case 0x32:  Velocity_Kp=Data/100;break;
-// 			   case 0x33:  Velocity_Ki=Data/100;break;
-// 			   case 0x34:  break; //9个通道，预留5个
-// 			   case 0x35:  break;
-// 			   case 0x36:  break;
-// 			   case 0x37:  break;
-// 			   case 0x38:  break;
-// 			 }
-// 		   }         
-// 		   Flag_PID=0; //相关标志位清零
-// 		   i=0;
-// 		   j=0;
-// 		   Data=0;
-// 	 }
-// 	   else  //蓝牙遥控指令
-// 	   {
-// 			  switch (Receive_Data)   {
-// 				 //这是MinibalanceV1.0的APP发送指令
-// 				  case 0x01: Flag_Qian = 1, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 0;   break;              //前进
-// 				  case 0x02: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;              //右转
-// 				  case 0x03: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;              //右转
-// 				  case 0x04: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;              //右转
-// 				  case 0x05: Flag_Qian = 0, Flag_Hou = 1, Flag_Left = 0, Flag_Right = 0;   break;              //后退
-// 				  case 0x06: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;   break;               //左转
-// 				  case 0x07: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;   break;               //左转
-// 				  case 0x08: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;   break;               //左转
-// 				  //这是MinibalanceV3.5的APP发送指令
-// 				  case 0x41: Flag_Qian = 1, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 0;   break;              //前进
-// 				  case 0x42: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;             //右转
-// 				  case 0x43: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;             //右转
-// 				  case 0x44: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 1;   break;              //右转
-// 				  case 0x45:  Flag_Qian = 0, Flag_Hou = 1, Flag_Left = 0, Flag_Right = 0;   break;             //后退
-// 				  case 0x46: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;    break;               //左转
-// 				  case 0x47: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;   break;               //左转
-// 				  case 0x48: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 1, Flag_Right = 0;   break;             //左转
-// 				  default: Flag_Qian = 0, Flag_Hou = 0, Flag_Left = 0, Flag_Right = 0;    break;                //停止
-// 				}
-// 		}
-//    }
-// }

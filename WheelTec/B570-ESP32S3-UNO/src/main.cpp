@@ -4,10 +4,8 @@
 // ****************************************************************************/
 #include <Arduino.h>
 #include <Wire.h>
-#include <MsTimer2.h>
-#include <MPU6050_tockn.h>
-#include <PinChangeInterrupt.h>
 #include <EEPROM.h>
+#include <MPU6050_tockn.h>
 
 
 #define KEY				3	//按键引脚
@@ -193,19 +191,19 @@ void READ_ENCODER_R() {
 **************************************************************************/
 void control()
 {
-	sei();//全局中断开启
-	// Serial.print(".");
+	// sei();//全局中断开启
+	// // Serial.print(".");
 
-	Mpu6050.update();				//更新MPU6050数据
-	ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
-	ay = Mpu6050.getAccY();
-	az = Mpu6050.getAccZ();			//获取MPU6050的加速度计数据
-	gx = Mpu6050.getGyroX();		//获取MPU6050的陀螺仪数据
-	gy = Mpu6050.getGyroY();
-	gz = Mpu6050.getGyroZ();		//获取MPU6050的陀螺仪数据
-	AngleX = Mpu6050.getAngleX();
-	AngleY = Mpu6050.getAngleY();
-	AngleZ = Mpu6050.getAngleZ();
+	// Mpu6050.update();				//更新MPU6050数据
+	// ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
+	// ay = Mpu6050.getAccY();
+	// az = Mpu6050.getAccZ();			//获取MPU6050的加速度计数据
+	// gx = Mpu6050.getGyroX();		//获取MPU6050的陀螺仪数据
+	// gy = Mpu6050.getGyroY();
+	// gz = Mpu6050.getGyroZ();		//获取MPU6050的陀螺仪数据
+	// AngleX = Mpu6050.getAngleX();
+	// AngleY = Mpu6050.getAngleY();
+	// AngleZ = Mpu6050.getAngleZ();
 
 	// KalFilter.Angletest(ax, ay, az, gx, gy, gz, dt, Q_angle, Q_gyro, R_angle, C_0, K1);          //通过卡尔曼滤波获取角度
 	// Angle = KalFilter.angle;//Angle是一个用于显示的整形变量
@@ -218,46 +216,46 @@ void control()
 返回  值：无
 **************************************************************************/
 void setup() {
-	Serial.begin(9600);				//开启串口，设置波特率为 9600
+	delay(1000);
+
+	Serial.begin(115200);				//开启串口，设置波特率为 9600
 
 	Serial.println("Initiating Pins ...");
-	pinMode(IN1, OUTPUT);		//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
-	pinMode(IN2, OUTPUT);		//TB6612控制引脚，
-	pinMode(IN3, OUTPUT);		//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
-	pinMode(IN4, OUTPUT);		//TB6612控制引脚，
-	pinMode(PWMA, OUTPUT);		//TB6612控制引脚，电机PWM
-	pinMode(PWMB, OUTPUT);		//TB6612控制引脚，电机PWM
-	digitalWrite(IN1, 0);		//TB6612控制引脚拉低
-	digitalWrite(IN2, 0);		//TB6612控制引脚拉低
-	digitalWrite(IN3, 0);		//TB6612控制引脚拉低
-	digitalWrite(IN4, 0);		//TB6612控制引脚拉低
-	analogWrite(PWMA, 0);		//TB6612控制引脚拉低
-	analogWrite(PWMB, 0);		//TB6612控制引脚拉低
+	pinMode(IN1, OUTPUT);				//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
+	pinMode(IN2, OUTPUT);				//TB6612控制引脚，
+	pinMode(IN3, OUTPUT);				//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
+	pinMode(IN4, OUTPUT);				//TB6612控制引脚，
+	pinMode(PWMA, OUTPUT);				//TB6612控制引脚，电机PWM
+	pinMode(PWMB, OUTPUT);				//TB6612控制引脚，电机PWM
+	digitalWrite(IN1, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN2, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN3, 0);				//TB6612控制引脚拉低
+	digitalWrite(IN4, 0);				//TB6612控制引脚拉低
+	analogWrite(PWMA, 0);				//TB6612控制引脚拉低
+	analogWrite(PWMB, 0);				//TB6612控制引脚拉低
 	pinMode(ENCODER_L, INPUT);			//编码器引脚
-	pinMode(ENCODER_R, INPUT_PULLUP);	//编码器引脚
+	pinMode(ENCODER_R, INPUT);			//编码器引脚
 	pinMode(DIRECTION_L, INPUT);		//编码器引脚
-	pinMode(DIRECTION_R, INPUT_PULLUP);	//编码器引脚
-	pinMode(KEY, INPUT);		//按键引脚
+	pinMode(DIRECTION_R, INPUT);		//编码器引脚
+	pinMode(KEY, INPUT);				//按键引脚
 
 	Serial.println("Initiating I2C ...");
-	Wire.begin();             //加入 IIC 总线
-	delay(400);              //延时等待初始化完成
+	Wire.begin();						//加入 IIC 总线
+	delay(400);							//延时等待初始化完成
 
 	// Serial.println("Initiating IMU ...");
 	// Mpu6050.begin();					//初始化MPU6050
 	// Mpu6050.calcGyroOffsets(false);		// 自动校准陀螺仪偏移量
 	// delay(200); 
 
-	Serial.println("Starting timer Intr ...");
-	MsTimer2::set(5, control);  //使用Timer2设置5ms定时中断
-	MsTimer2::start();          //使用中断使能
-	delay(200);              //延时等待初始化完成
+	// Serial.println("Starting timer Intr ...");
+	// MsTimer2::set(5, control);  //使用Timer2设置5ms定时中断
+	// MsTimer2::start();          //使用中断使能
+	// delay(200);              //延时等待初始化完成
 
 	Serial.println("Starting Encoder Intr ...");
-	attachInterrupt(0, READ_ENCODER_L, CHANGE);           //开启外部中断 编码器接口1
-	attachPinChangeInterrupt(ENCODER_R, READ_ENCODER_R, CHANGE);  //开启外部中断 编码器接口2
-	// PCICR |= (1 << PCIE2);		// 启用端口D（引脚0-7）的中断
-	// PCMSK2 |= (1 << PCINT20);	// 启用引脚4（PD4）的
+	attachInterrupt(2, READ_ENCODER_L, CHANGE);		//开启外部中断 编码器接口1
+	attachInterrupt(4, READ_ENCODER_R, CHANGE);		//开启外部中断 编码器接口2
 	delay(200);				//延时等待初始化完成
 
 	Serial.println("Initiation Finished.");
@@ -273,5 +271,6 @@ void loop() {
 	Serial.println("AngleX: " + String(AngleX) + "; Velocity_L: " +
 		String(Velocity_L) + "; Velocity_R: " + String(Velocity_R) + ";");
 	// Serial.print("*");
+
 	delay(50);
 }
