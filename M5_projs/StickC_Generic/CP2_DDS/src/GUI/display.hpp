@@ -1,7 +1,6 @@
 #pragma once
 
 #include <lvgl.h>
-#include <TFT_eSPI.h>
 
 #include "ScreenPage.hpp"
 #include "menu_screen.hpp"
