@@ -87,14 +87,14 @@ void DigitEditorScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_A
 
 	DDSInteractManager->setCurrent(this);
 	lv_scr_load(this->lvgl_GetScreen());
-	// // 使用带动画的方式切换到 new_scr
-	// lv_scr_load_anim(
-	// 	this->lvgl_GetScreen(), 
-	// 	anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
-	// 	500,						// 动画时长 500ms
-	// 	0,							// 无延时
-	// 	false						// 动画结束后不自动删除旧screen
-	// );
+	// 使用带动画的方式切换到 new_scr
+	lv_scr_load_anim(
+		this->lvgl_GetScreen(), 
+		anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
+		500,						// 动画时长 500ms
+		0,							// 无延时
+		false						// 动画结束后不自动删除旧screen
+	);
 }
 
 void DigitEditorScreenPage::exitPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {

@@ -22,7 +22,7 @@ static void Roller_EventHandler(lv_event_t *e)
 			selectedPage = currPage->getParent();
             if (selectedPage == nullptr)
                 return;
-			// anim = LV_SCR_LOAD_ANIM_OVER_RIGHT;
+			anim = LV_SCR_LOAD_ANIM_OVER_RIGHT;
 			// Serial.printf("Selected Page: %s\n", selectedPage->getName().c_str());
 			currPage->exitPage(anim);
 			selectedPage->enterPage(anim);
@@ -57,14 +57,14 @@ void RollerScreenPage::enterPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_N
 
 	DDSInteractManager->setCurrent(this);
 	lv_scr_load(this->lvgl_GetScreen());
-	// // 使用带动画的方式切换到 new_scr
-	// lv_scr_load_anim(
-	// 	this->lvgl_GetScreen(), 
-	// 	anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
-	// 	500,						// 动画时长 500ms
-	// 	0,							// 无延时
-	// 	false						// 动画结束后不自动删除旧screen
-	// );
+	// 使用带动画的方式切换到 new_scr
+	lv_scr_load_anim(
+		this->lvgl_GetScreen(), 
+		anim,						// 动画类型: 旧屏幕从右往左滑动出去, 新屏幕从右往左滑入
+		500,						// 动画时长 500ms
+		0,							// 无延时
+		false						// 动画结束后不自动删除旧screen
+	);
 }
 
 void RollerScreenPage::exitPage(lv_screen_load_anim_t anim = LV_SCR_LOAD_ANIM_NONE) {

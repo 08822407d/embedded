@@ -13,9 +13,10 @@
 #include "debug_utils.hpp"
 
 
-// screen offset (40,53)
-#define TFT_HOR_RES		135
-#define TFT_VER_RES		240
+// #define TFT_HOR_RES		135
+// #define TFT_VER_RES		240
+#define TFT_HOR_RES		240
+#define TFT_VER_RES		135
 
 #undef DRAW_BUF_SIZE
 /*LVGL draw into this buffer, 1/10 screen size usually works well. The size is in bytes*/
@@ -39,10 +40,18 @@ RollerMenuScreenPage *OtherSettingsPage;
 
 
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p) {
-	uint32_t w = area->x2 - area->x1 + 1;
-	uint32_t h = area->y2 - area->y1 + 1;
-	// // 若颜色格式为 RGB565，需要交换高低字节以匹配 ST7789 格式
-	// lv_draw_sw_rgb565_swap(color_p, w * h);  // 可选
+	int16_t x1 = area->x1;
+	int16_t y1 = area->y1;
+	int16_t x2 = area->x2;
+	int16_t y2 = area->y2;
+	uint16_t w = x2 - x1 + 1;
+	uint16_t h = y2 - y1 + 1;
+
+
+	// uint32_t w = area->x2 - area->x1 + 1;
+	// uint32_t h = area->y2 - area->y1 + 1;
+	// 若颜色格式为 RGB565，需要交换高低字节以匹配 ST7789 格式
+	lv_draw_sw_rgb565_swap(color_p, w * h);  // 可选
 	// 调用 M5Unified 提供的API将像素数据写入屏幕区域
 	M5.Display.pushImage(area->x1, area->y1, w, h, (uint16_t*)color_p);
 	lv_display_flush_ready(disp);  // 通知 LVGL 刷新完成
@@ -102,8 +111,6 @@ void initLvglDisplay(void) {
 
 	 lv_demo_widgets();
 	 */
-
-	// lv_display_set_offset(disp, 40, 53);
 
 	MODULE_LOG_TAIL( " ... Setup done\n" );
 }

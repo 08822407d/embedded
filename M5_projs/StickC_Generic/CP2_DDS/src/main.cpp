@@ -24,14 +24,21 @@ String modeName[] = {"Sine", "Square", "Triangle", "Sawtooth"};
 void setup() {
 	M5.begin();
 	Serial.begin(115200);
+	M5.Display.setRotation(GLOBAL_ROTATION);
+
+	Wire.end();
+	Wire1.end();
+	Wire.begin(0, 26, 400000UL);
+	Wire1.begin(32, 33, 400000UL);
+
 
 	initLvglDisplay();
 	delay(500);
 	initScreenPages();
 	delay(500);
 
-	// initM5UnitDDS();
-	// delay(500);
+	initM5UnitDDS();
+	delay(500);
 
 	initM5JoystickHAT();
 	delay(500);

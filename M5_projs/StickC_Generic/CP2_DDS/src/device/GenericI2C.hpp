@@ -5,7 +5,7 @@
 
 	class GenericI2C {
 	public:
-		virtual GenericI2C();
+		GenericI2C();
 		virtual ~GenericI2C();
 
         virtual bool begin() = 0;

@@ -10,11 +10,11 @@ std::shared_ptr<M5UnitDDS> ddsPtr = nullptr;
 void handleEvent4Ways(AceButton* button, uint8_t eventType, uint8_t buttonState);
 
 
-void initM5UnitDDS(void) {
+void initM5UnitDDS() {
 	MODULE_LOG_HEAD( M5UnitDDS );
 
 	ddsPtr = std::make_shared<M5UnitDDS>();
-	ddsPtr->begin(&Wire);
+	ddsPtr->begin(&Wire1);
 	ddsPtr->setWave(globalDDSparams.WaveForm,
 		globalDDSparams.Frequency,
 		globalDDSparams.Phase);
