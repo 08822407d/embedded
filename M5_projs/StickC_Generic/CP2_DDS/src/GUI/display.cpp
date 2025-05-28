@@ -1,3 +1,5 @@
+#include <M5Unified.h>
+
 #include "display.hpp"
 #include "ScreenPage.hpp"
 #include "InteractManager.hpp"
@@ -36,6 +38,16 @@ RollerMenuScreenPage *OtherSettingsPage;
 
 
 
+void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p) {
+	uint32_t w = area->x2 - area->x1 + 1;
+	uint32_t h = area->y2 - area->y1 + 1;
+	// // 若颜色格式为 RGB565，需要交换高低字节以匹配 ST7789 格式
+	// lv_draw_sw_rgb565_swap(color_p, w * h);  // 可选
+	// 调用 M5Unified 提供的API将像素数据写入屏幕区域
+	M5.Display.pushImage(area->x1, area->y1, w, h, (uint16_t*)color_p);
+	lv_display_flush_ready(disp);  // 通知 LVGL 刷新完成
+}
+
 
 #if LV_USE_LOG != 0
 void my_print( lv_log_level_t level, const char * buf )
@@ -61,16 +73,11 @@ void initLvglDisplay(void) {
 #endif
 
 	lv_display_t * disp;
-#if LV_USE_TFT_ESPI
-	/*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
-	disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf, sizeof(draw_buf));
-	lv_display_set_rotation(disp, LVGL_ROTATION);
-#else
+
 	/*Else create a display yourself*/
 	disp = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
 	lv_display_set_flush_cb(disp, my_disp_flush);
 	lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
-#endif
 
 	/*Initialize the (dummy) input device driver*/
 	lv_indev_t * indev = lv_indev_create();
