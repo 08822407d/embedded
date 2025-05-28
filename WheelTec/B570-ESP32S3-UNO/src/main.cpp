@@ -5,7 +5,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <EEPROM.h>
+#include <timers.h>
 #include <MPU6050_tockn.h>
+#include <MadgwickAHRS.h>
 
 
 #define KEY				3	//按键引脚
@@ -23,10 +25,12 @@
 #define DIFFERENCE		2
 
 
+TaskHandle_t	imuTaskHandle = NULL;
+MPU6050			Mpu6050(Wire);				//实例化一个 MPU6050 对象，对象名称为 Mpu6050
+int16_t			ax, ay, az, gx, gy, gz;		//MPU6050的三轴加速度和三轴陀螺仪数据
+float			AngleX, AngleY, AngleZ;		//MPU6050的三轴角度
+Madgwick		filter;
 
-MPU6050		Mpu6050(Wire);				//实例化一个 MPU6050 对象，对象名称为 Mpu6050
-int16_t		ax, ay, az, gx, gy, gz;		//MPU6050的三轴加速度和三轴陀螺仪数据
-float		AngleX, AngleY, AngleZ;		//MPU6050的三轴角度
 // int Balance_Pwm, Velocity_Pwm, Turn_Pwm;   //直立 速度 转向环的PWM
 int			Motor1, Motor2;				//电机叠加之后的PWM
 // float Battery_Voltage;   //电池电压 单位是V
@@ -171,7 +175,7 @@ void READ_ENCODER_L() {
 **************************************************************************/
 // ISR(PCINT2_vect) {
 void READ_ENCODER_R() {
-	Serial.println("R");
+	// Serial.println("R");
 	if (digitalRead(ENCODER_R) == LOW) {	//如果是下降沿触发的中断
 		if (digitalRead(DIRECTION_R) == LOW)
 			Velocity_R--;	//根据另外一相电平判定方向
@@ -189,10 +193,12 @@ void READ_ENCODER_R() {
 入口参数：无
 返回  值：无
 **************************************************************************/
-void control()
+void IRAM_ATTR control()
 {
-	// sei();//全局中断开启
-	// // Serial.print(".");
+	// portENTER_CRITICAL_ISR(&timerMux);
+	// // 在此处执行需要保护的操作
+
+	// Serial.print(".");
 
 	// Mpu6050.update();				//更新MPU6050数据
 	// ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
@@ -208,6 +214,32 @@ void control()
 	// KalFilter.Angletest(ax, ay, az, gx, gy, gz, dt, Q_angle, Q_gyro, R_angle, C_0, K1);          //通过卡尔曼滤波获取角度
 	// Angle = KalFilter.angle;//Angle是一个用于显示的整形变量
 	// Balance_Pwm = balance(KalFilter.angle + ZHONGZHI , KalFilter.Gyro_x);//直立PD控制 控制周期5ms
+
+	// portEXIT_CRITICAL_ISR(&timerMux);
+}
+void imuTask(void *pvParameters) {
+	const TickType_t xFrequency = pdMS_TO_TICKS(5); // 5 毫秒
+	TickType_t xLastWakeTime = xTaskGetTickCount();
+
+	for (;;) {
+		Mpu6050.update();				//更新MPU6050数据
+		ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
+		ay = Mpu6050.getAccY();
+		az = Mpu6050.getAccZ();			//获取MPU6050的加速度计数据
+		gx = Mpu6050.getGyroX();		//获取MPU6050的陀螺仪数据
+		gy = Mpu6050.getGyroY();
+		gz = Mpu6050.getGyroZ();		//获取MPU6050的陀螺仪数据
+		AngleX = Mpu6050.getAngleX();
+		AngleY = Mpu6050.getAngleY();
+		AngleZ = Mpu6050.getAngleZ();
+
+		// 在此处添加处理姿态角的代码，例如输出到串口或用于控制算法
+		// filter.updateIMU(gx, gy, gz, ax, ay, az);
+		// AngleX = filter.getRoll();
+
+		// 延迟至下一个周期
+		vTaskDelayUntil(&xLastWakeTime, xFrequency);
+	}
 }
 
 /**************************************************************************
@@ -240,23 +272,30 @@ void setup() {
 	pinMode(KEY, INPUT);				//按键引脚
 
 	Serial.println("Initiating I2C ...");
-	Wire.begin();						//加入 IIC 总线
+	Wire.begin(18, 1);					//加入 IIC 总线
 	delay(400);							//延时等待初始化完成
 
-	// Serial.println("Initiating IMU ...");
-	// Mpu6050.begin();					//初始化MPU6050
-	// Mpu6050.calcGyroOffsets(false);		// 自动校准陀螺仪偏移量
-	// delay(200); 
+	Serial.println("Initiating IMU ...");
+	Mpu6050.begin();					//初始化MPU6050
+	Mpu6050.calcGyroOffsets(true);		// 自动校准陀螺仪偏移量
+	delay(200); 
 
-	// Serial.println("Starting timer Intr ...");
-	// MsTimer2::set(5, control);  //使用Timer2设置5ms定时中断
-	// MsTimer2::start();          //使用中断使能
-	// delay(200);              //延时等待初始化完成
+	Serial.println("Starting IMU Task ...");
+	xTaskCreatePinnedToCore(
+		imuTask,			// 任务函数
+		"IMU Task",			// 任务名称
+		4096,				// 栈大小（字节）
+		NULL,				// 任务参数
+		3,					// 任务优先级
+		&imuTaskHandle,		// 任务句柄
+		1					// 绑定到核心 1
+	);
+	delay(200);							//延时等待初始化完成
 
 	Serial.println("Starting Encoder Intr ...");
 	attachInterrupt(2, READ_ENCODER_L, CHANGE);		//开启外部中断 编码器接口1
 	attachInterrupt(4, READ_ENCODER_R, CHANGE);		//开启外部中断 编码器接口2
-	delay(200);				//延时等待初始化完成
+	delay(200);							//延时等待初始化完成
 
 	Serial.println("Initiation Finished.");
 }
@@ -266,6 +305,7 @@ void setup() {
 返回  值：无
 **************************************************************************/
 void loop() {
+	// control();	//调用控制函数，更新MPU6050数据
 	// Serial.println("Angle: " + String(KalFilter.angle) + "  Gyro: " + String(KalFilter.Gyro_x) + "  Voltage: " + String(Battery_Voltage));
 	// Serial.println("Velocity Left: " + String(Velocity_Left) + "  Velocity Right: " + String(Velocity_Right));
 	Serial.println("AngleX: " + String(AngleX) + "; Velocity_L: " +
