@@ -31,18 +31,26 @@ int16_t			ax, ay, az, gx, gy, gz;		//MPU6050的三轴加速度和三轴陀螺仪
 float			AngleX, AngleY, AngleZ;		//MPU6050的三轴角度
 Madgwick		filter;
 
-// int Balance_Pwm, Velocity_Pwm, Turn_Pwm;   //直立 速度 转向环的PWM
-int			Motor1, Motor2;				//电机叠加之后的PWM
+int				Balance_Pwm,
+				Velocity_Pwm,
+				Turn_Pwm;					//直立 速度 转向环的PWM
+int				Motor1, Motor2;				//电机叠加之后的PWM
 // float Battery_Voltage;   //电池电压 单位是V
-volatile long	Velocity_L	= 0,
-				Velocity_R	= 0;		//左右轮编码器数据
-int			Velocity_Left	= 0,
-			Velocity_Right	= 0;		//左右轮速度
-int			Flag_Qian, Flag_Hou, Flag_Left, Flag_Right; //遥控相关变量
+volatile long	Velocity_L		= 0,
+				Velocity_R		= 0;		//左右轮编码器数据
+int				Velocity_Left	= 0,
+				Velocity_Right	= 0;		//左右轮速度
+int				Flag_Qian, Flag_Hou,
+				Flag_Left, Flag_Right;		//遥控相关变量
 // int		Angle,
 // 		Show_Data, PID_Send;	//用于显示的角度和临时变量
-unsigned char Flag_Stop = 1,Send_Count,Flash_Send;  //停止标志位和上位机相关变量
-float Balance_Kp=15,Balance_Kd=0.4,Velocity_Kp=2,Velocity_Ki=0.01;
+unsigned char	Flag_Stop = 1,
+				Send_Count,
+				Flash_Send;					//停止标志位和上位机相关变量
+float			Balance_Kp = 15,
+				Balance_Kd = 0.4,
+				Velocity_Kp = 2,
+				Velocity_Ki = 0.01;
 // //***************下面是卡尔曼滤波相关变量***************//
 // float	K1			= 0.05;		// 对加速度计取值的权重
 // float	Q_angle		= 0.001,
@@ -193,33 +201,12 @@ void READ_ENCODER_R() {
 入口参数：无
 返回  值：无
 **************************************************************************/
-void IRAM_ATTR control()
-{
-	// portENTER_CRITICAL_ISR(&timerMux);
-	// // 在此处执行需要保护的操作
-
-	// Serial.print(".");
-
-	// Mpu6050.update();				//更新MPU6050数据
-	// ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
-	// ay = Mpu6050.getAccY();
-	// az = Mpu6050.getAccZ();			//获取MPU6050的加速度计数据
-	// gx = Mpu6050.getGyroX();		//获取MPU6050的陀螺仪数据
-	// gy = Mpu6050.getGyroY();
-	// gz = Mpu6050.getGyroZ();		//获取MPU6050的陀螺仪数据
-	// AngleX = Mpu6050.getAngleX();
-	// AngleY = Mpu6050.getAngleY();
-	// AngleZ = Mpu6050.getAngleZ();
-
-	// KalFilter.Angletest(ax, ay, az, gx, gy, gz, dt, Q_angle, Q_gyro, R_angle, C_0, K1);          //通过卡尔曼滤波获取角度
-	// Angle = KalFilter.angle;//Angle是一个用于显示的整形变量
-	// Balance_Pwm = balance(KalFilter.angle + ZHONGZHI , KalFilter.Gyro_x);//直立PD控制 控制周期5ms
-
-	// portEXIT_CRITICAL_ISR(&timerMux);
-}
 void imuTask(void *pvParameters) {
 	const TickType_t xFrequency = pdMS_TO_TICKS(5); // 5 毫秒
 	TickType_t xLastWakeTime = xTaskGetTickCount();
+
+	static int Velocity_Count, Turn_Count, Encoder_Count;
+	static float Voltage_All,Voltage_Count;
 
 	for (;;) {
 		Mpu6050.update();				//更新MPU6050数据
@@ -236,6 +223,34 @@ void imuTask(void *pvParameters) {
 		// 在此处添加处理姿态角的代码，例如输出到串口或用于控制算法
 		// filter.updateIMU(gx, gy, gz, ax, ay, az);
 		// AngleX = filter.getRoll();
+
+		Balance_Pwm = balance(AngleX + ZHONGZHI , gx);//直立PD控制 控制周期5ms
+		if (++Velocity_Count >= 8) //速度控制，控制周期40ms
+		{
+			Velocity_Left = Velocity_L;    Velocity_L = 0;  //读取左轮编码器数据，并清零，这就是通过M法测速（单位时间内的脉冲数）得到速度。
+			Velocity_Right = Velocity_R;    Velocity_R = 0; //读取右轮编码器数据，并清零
+			Velocity_Pwm = velocity(Velocity_Left, Velocity_Right);//速度PI控制，控制周期40ms
+			Velocity_Count = 0;
+		}
+		// if (++Turn_Count >= 4)//转向控制，控制周期20ms
+		// {
+		// 	Turn_Pwm = turn(gz);
+		// 	Turn_Count = 0;
+		// }
+		Motor1 = Balance_Pwm - Velocity_Pwm + Turn_Pwm;		//直立速度转向环的叠加
+		Motor2 = Balance_Pwm - Velocity_Pwm - Turn_Pwm;		//直立速度转向环的叠加
+		Xianfu_Pwm();//限幅
+		// if (Pick_Up(az, KalFilter.angle, Velocity_Left, Velocity_Right))
+		// 	Flag_Stop = 1;						//===如果被拿起就关闭电机//===检查是否小车被那起
+		// if (Put_Down(KalFilter.angle, Velocity_Left, Velocity_Right))
+		// 	Flag_Stop = 0;						//===检查是否小车被放下
+		// if (Turn_Off(KalFilter.angle, Battery_Voltage) == 0)
+			Set_Pwm(Motor1, Motor2);			//如果不存在异常，赋值给PWM寄存器控制电机
+		// if (My_click()) Flag_Stop = !Flag_Stop;   //中断剩余的时间扫描一下按键状态
+		// Temp = analogRead(0);  //采集一下电池电压
+		// Voltage_Count++;       //平均值计数器
+		// Voltage_All+=Temp;     //多次采样累积
+		// if(Voltage_Count==200) Battery_Voltage=Voltage_All*0.05371/200,Voltage_All=0,Voltage_Count=0;//求平均值
 
 		// 延迟至下一个周期
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
