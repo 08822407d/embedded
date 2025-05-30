@@ -21,7 +21,7 @@
 #define DIRECTION_L		5
 #define ENCODER_R		4
 #define DIRECTION_R		8
-#define ZHONGZHI		2	//小车的机械中值  DIFFERENCE
+#define ZHONGZHI		0	//小车的机械中值  DIFFERENCE
 #define DIFFERENCE		2
 
 
@@ -74,8 +74,10 @@ int balance(float Angle, float Gyro)
 {
 	float Bias;
 	int balance;
-	Bias = Angle - 0;   //===求出平衡的角度中值 和机械相关
-	balance = Balance_Kp * Bias + Gyro * Balance_Kd; //===计算平衡控制的电机PWM  PD控制   kp是P系数 kd是D系数
+	Bias = Angle;				//===求出平衡的角度中值 和机械相关
+	balance =
+		Balance_Kp * Bias +
+		Gyro * Balance_Kd;		//===计算平衡控制的电机PWM  PD控制   kp是P系数 kd是D系数
 	return balance;
 }
 /**************************************************************************
