@@ -10,19 +10,19 @@
 #include <MadgwickAHRS.h>
 
 
-#define KEY				3	//按键引脚
-#define IN1				12	//TB6612FNG驱动模块控制信号 共6个
-#define IN2				13
-#define IN3				7
-#define IN4				6
-#define PWMA			10
-#define PWMB			9
-#define ENCODER_L		2	//编码器采集引脚 每路2个 共4个
-#define DIRECTION_L		5
-#define ENCODER_R		4
-#define DIRECTION_R		8
-#define ZHONGZHI		0	//小车的机械中值  DIFFERENCE
-#define DIFFERENCE		2
+#define PIN_KEY				3	//按键引脚
+#define PIN_IN1				12	//TB6612FNG驱动模块控制信号 共6个
+#define PIN_IN2				13
+#define PIN_IN3				7
+#define PIN_IN4				6
+#define PIN_PWMA			10
+#define PIN_PWMB			9
+#define PIN_ENCODER_L		2	//编码器采集引脚 每路2个 共4个
+#define PIN_DIRECTION_L		5
+#define PIN_ENCODER_R		4
+#define PIN_DIRECTION_R		8
+#define ZHONGZHI			0	//小车的机械中值  DIFFERENCE
+#define DIFFERENCE			2
 
 
 TaskHandle_t	imuTaskHandle = NULL;
@@ -36,21 +36,23 @@ int				Balance_Pwm,
 				Turn_Pwm;					//直立 速度 转向环的PWM
 int				Motor1, Motor2;				//电机叠加之后的PWM
 // float Battery_Voltage;   //电池电压 单位是V
-volatile long	Velocity_L		= 0,
-				Velocity_R		= 0;		//左右轮编码器数据
-int				Velocity_Left	= 0,
-				Velocity_Right	= 0;		//左右轮速度
-int				Flag_Qian, Flag_Hou,
-				Flag_Left, Flag_Right;		//遥控相关变量
+volatile long	Encoder_L		= 0,
+				Encoder_R		= 0;		//左右轮编码器数据
+int				Velocity_L		= 0,
+				Velocity_R		= 0;		//左右轮速度
+int				Flag_Qian		= 0,
+				Flag_Hou		= 0,
+				Flag_Left		= 0,
+				Flag_Right		= 0;		//遥控相关变量
 // int		Angle,
 // 		Show_Data, PID_Send;	//用于显示的角度和临时变量
-unsigned char	Flag_Stop = 1,
+unsigned char	Flag_Stop		= 1,
 				Send_Count,
 				Flash_Send;					//停止标志位和上位机相关变量
-float			Balance_Kp = 15,
-				Balance_Kd = 0.4,
-				Velocity_Kp = 2,
-				Velocity_Ki = 0.01;
+float			Balance_Kp		= 25,
+				Balance_Kd		= 0.4,
+				Velocity_Kp		= 2,
+				Velocity_Ki		= 0.01;
 // //***************下面是卡尔曼滤波相关变量***************//
 // float	K1			= 0.05;		// 对加速度计取值的权重
 // float	Q_angle		= 0.001,
@@ -89,24 +91,33 @@ int velocity(int encoder_left, int encoder_right)
 {
 	static float Velocity, Encoder_Least, Encoder, Movement;
 	static float Encoder_Integral, Target_Velocity;
-	float kp = 2, ki = kp / 200;    //PI参数
-	if       ( Flag_Qian == 1)Movement = 600;
-	else   if ( Flag_Hou == 1)Movement = -600;
-	else    //这里是停止的时候反转，让小车尽快停下来
+	float kp = 2, ki = kp / 200;	//PI参数
+
+	if ( Flag_Qian == 1)
+		Movement = 600;
+	else if ( Flag_Hou == 1)
+		Movement = -600;
+	else							//这里是停止的时候反转，让小车尽快停下来
 	{
 		Movement = 0;
-		if (Encoder_Integral > 300)   Encoder_Integral -= 200;
-		if (Encoder_Integral < -300)  Encoder_Integral += 200;
+		if (Encoder_Integral > 300)
+			Encoder_Integral -= 200;
+		if (Encoder_Integral < -300)
+			Encoder_Integral += 200;
 	}
 	//=============速度PI控制器=======================//
-	Encoder_Least = (encoder_left + encoder_right) - 0;               //===获取最新速度偏差==测量速度（左右编码器之和）-目标速度（此处为零）
-	Encoder *= 0.7;                                                   //===一阶低通滤波器
-	Encoder += Encoder_Least * 0.3;                                   //===一阶低通滤波器
-	Encoder_Integral += Encoder;                                      //===积分出位移 积分时间：40ms
-	Encoder_Integral = Encoder_Integral - Movement;                   //===接收遥控器数据，控制前进后退
-	if (Encoder_Integral > 21000)    Encoder_Integral = 21000;        //===积分限幅
-	if (Encoder_Integral < -21000) Encoder_Integral = -21000;         //===积分限幅
-	Velocity = Encoder * Velocity_Kp + Encoder_Integral * Velocity_Ki;                  //===速度控制
+	Encoder_Least = (encoder_left + encoder_right) - 0;	//===获取最新速度偏差==测量速度（左右编码器之和）-目标速度（此处为零）
+	Encoder *= 0.7;										//===一阶低通滤波器
+	Encoder += Encoder_Least * 0.3;						//===一阶低通滤波器
+	Encoder_Integral += Encoder;						//===积分出位移 积分时间：40ms
+	Encoder_Integral = Encoder_Integral - Movement;		//===接收遥控器数据，控制前进后退
+	if (Encoder_Integral > 21000)
+		Encoder_Integral = 21000;						//===积分限幅
+	if (Encoder_Integral < -21000)
+		Encoder_Integral = -21000;						//===积分限幅
+	Velocity =
+		Encoder * Velocity_Kp +
+		Encoder_Integral * Velocity_Ki;					//===速度控制
 	// if (Turn_Off(KalFilter.angle, Battery_Voltage) == 1 || Flag_Stop == 1)   
 	// 	Encoder_Integral = 0;//小车停止的时候积分清零
 	return Velocity;
@@ -118,14 +129,27 @@ int velocity(int encoder_left, int encoder_right)
 **************************************************************************/
 int turn(float gyro)//转向控制
 {
-	static float Turn_Target, Turn, Turn_Convert = 3;
-	float Turn_Amplitude = 80, Kp = 2, Kd = 0.001;  //PD参数
-	if (1 == Flag_Left)             Turn_Target += Turn_Convert;  //根据遥控指令改变转向偏差
-	else if (1 == Flag_Right)       Turn_Target -= Turn_Convert;//根据遥控指令改变转向偏差
-	else Turn_Target = 0;
-	if (Turn_Target > Turn_Amplitude)  Turn_Target = Turn_Amplitude; //===转向速度限幅
-	if (Turn_Target < -Turn_Amplitude) Turn_Target = -Turn_Amplitude;
-	Turn = -Turn_Target * Kp + gyro * Kd;         //===结合Z轴陀螺仪进行PD控制
+	static float
+		Turn_Target		= 0,
+		Turn			= 0,
+		Turn_Convert	= 3;
+	float
+		Turn_Amplitude	= 80,
+		Kp				= 2,
+		Kd				= 0.001;			//PD参数
+
+	if (1 == Flag_Left)
+		Turn_Target += Turn_Convert;		//根据遥控指令改变转向偏差
+	else if (1 == Flag_Right)
+		Turn_Target -= Turn_Convert;		//根据遥控指令改变转向偏差
+	else
+		Turn_Target = 0;
+	if (Turn_Target > Turn_Amplitude)
+		Turn_Target = Turn_Amplitude;		//===转向速度限幅
+	if (Turn_Target < -Turn_Amplitude)
+		Turn_Target = -Turn_Amplitude;
+
+	Turn = -Turn_Target * Kp + gyro * Kd;	//===结合Z轴陀螺仪进行PD控制
 	return Turn;
 }
 /**************************************************************************
@@ -135,12 +159,19 @@ int turn(float gyro)//转向控制
 **************************************************************************/
 void Set_Pwm(int moto1, int moto2)
 {
-	if (moto1 > 0)     digitalWrite(IN1, HIGH),      digitalWrite(IN2, LOW);  //TB6612的电平控制
-	else             digitalWrite(IN1, LOW),       digitalWrite(IN2, HIGH); //TB6612的电平控制
-	analogWrite(PWMA, abs(moto1)); //赋值给PWM寄存器
-	if (moto2 < 0) digitalWrite(IN3, HIGH),     digitalWrite(IN4, LOW); //TB6612的电平控制
-	else        digitalWrite(IN3, LOW),      digitalWrite(IN4, HIGH); //TB6612的电平控制
-	analogWrite(PWMB, abs(moto2));//赋值给PWM寄存器
+	if (moto1 > 0)
+		digitalWrite(PIN_IN1, HIGH), digitalWrite(PIN_IN2, LOW);	//TB6612的电平控制
+	else
+		digitalWrite(PIN_IN1, LOW), digitalWrite(PIN_IN2, HIGH);	//TB6612的电平控制
+
+	analogWrite(PIN_PWMA, abs(moto1));	//赋值给PWM寄存器
+
+	if (moto2 < 0)
+		digitalWrite(PIN_IN3, HIGH), digitalWrite(PIN_IN4, LOW);	//TB6612的电平控制
+	else
+		digitalWrite(PIN_IN3, LOW), digitalWrite(PIN_IN4, HIGH);	//TB6612的电平控制
+
+	analogWrite(PIN_PWMB, abs(moto2));	//赋值给PWM寄存器
 }
 
 /**************************************************************************
@@ -150,13 +181,19 @@ void Set_Pwm(int moto1, int moto2)
 **************************************************************************/
 void Xianfu_Pwm(void)
 {
-	int Amplitude = 250;  //===PWM满幅是255 限制在250
-	if(Flag_Qian==1)  Motor2-=DIFFERENCE;  //DIFFERENCE是一个衡量平衡小车电机和机械安装差异的一个变量。直接作用于输出，让小车具有更好的一致性。
-	if(Flag_Hou==1)   Motor2-=DIFFERENCE-2;
-	if (Motor1 < -Amplitude) Motor1 = -Amplitude;
-	if (Motor1 > Amplitude)  Motor1 = Amplitude;
-	if (Motor2 < -Amplitude) Motor2 = -Amplitude;
-	if (Motor2 > Amplitude)  Motor2 = Amplitude;
+	int Amplitude = 250;			//===PWM满幅是255 限制在250
+	if(Flag_Qian == 1)
+		Motor2 -= DIFFERENCE;		//DIFFERENCE是一个衡量平衡小车电机和机械安装差异的一个变量。直接作用于输出，让小车具有更好的一致性。
+	if(Flag_Hou==1)
+		Motor2 -= DIFFERENCE - 2;
+	if (Motor1 < -Amplitude)
+		Motor1 = -Amplitude;
+	if (Motor1 > Amplitude)
+		Motor1 = Amplitude;
+	if (Motor2 < -Amplitude)
+		Motor2 = -Amplitude;
+	if (Motor2 > Amplitude)
+		Motor2 = Amplitude;
 }
 
 /**************************************************************************
@@ -165,16 +202,16 @@ void Xianfu_Pwm(void)
 返回  值：无
 **************************************************************************/
 void READ_ENCODER_L() {
-	if (digitalRead(ENCODER_L) == LOW) {	//如果是下降沿触发的中断
-		if (digitalRead(DIRECTION_L) == LOW)
-			Velocity_L--;	//根据另外一相电平判定方向
+	if (digitalRead(PIN_ENCODER_L) == LOW) {	//如果是下降沿触发的中断
+		if (digitalRead(PIN_DIRECTION_L) == LOW)
+			Encoder_L--;	//根据另外一相电平判定方向
 		else
-			Velocity_L++;
-	} else {								//如果是上升沿触发的中断
-		if (digitalRead(DIRECTION_L) == LOW)
-			Velocity_L++;	//根据另外一相电平判定方向
+			Encoder_L++;
+	} else {									//如果是上升沿触发的中断
+		if (digitalRead(PIN_DIRECTION_L) == LOW)
+			Encoder_L++;	//根据另外一相电平判定方向
 		else
-			Velocity_L--;
+			Encoder_L--;
 	}
 }
 
@@ -185,17 +222,16 @@ void READ_ENCODER_L() {
 **************************************************************************/
 // ISR(PCINT2_vect) {
 void READ_ENCODER_R() {
-	// Serial.println("R");
-	if (digitalRead(ENCODER_R) == LOW) {	//如果是下降沿触发的中断
-		if (digitalRead(DIRECTION_R) == LOW)
-			Velocity_R--;	//根据另外一相电平判定方向
+	if (digitalRead(PIN_ENCODER_R) == LOW) {	//如果是下降沿触发的中断
+		if (digitalRead(PIN_DIRECTION_R) == LOW)
+			Encoder_R--;	//根据另外一相电平判定方向
 		else
-			Velocity_R++;
-	} else {								//如果是上升沿触发的中断
-		if (digitalRead(DIRECTION_R) == LOW)
-			Velocity_R++;	//根据另外一相电平判定方向
+			Encoder_R++;
+	} else {									//如果是上升沿触发的中断
+		if (digitalRead(PIN_DIRECTION_R) == LOW)
+			Encoder_R++;	//根据另外一相电平判定方向
 		else
-			Velocity_R--;
+			Encoder_R--;
 	}
 }
 /**************************************************************************
@@ -204,34 +240,41 @@ void READ_ENCODER_R() {
 返回  值：无
 **************************************************************************/
 void imuTask(void *pvParameters) {
-	const TickType_t xFrequency = pdMS_TO_TICKS(5); // 5 毫秒
+	const TickType_t xFrequency = pdMS_TO_TICKS(5);
 	TickType_t xLastWakeTime = xTaskGetTickCount();
 
-	static int Velocity_Count, Turn_Count, Encoder_Count;
-	static float Voltage_All,Voltage_Count;
+	static int
+		Velocity_Count	= 0,
+		Turn_Count		= 0,
+		Encoder_Count	= 0;
+	static float
+		Voltage_All		= 0,
+		Voltage_Count	= 0;
 
 	for (;;) {
 		Mpu6050.update();				//更新MPU6050数据
 		ax = Mpu6050.getAccX();			//获取MPU6050的加速度计数据
 		ay = Mpu6050.getAccY();
-		az = Mpu6050.getAccZ();			//获取MPU6050的加速度计数据
+		az = Mpu6050.getAccZ();
 		gx = Mpu6050.getGyroX();		//获取MPU6050的陀螺仪数据
 		gy = Mpu6050.getGyroY();
-		gz = Mpu6050.getGyroZ();		//获取MPU6050的陀螺仪数据
+		gz = Mpu6050.getGyroZ();
 		AngleX = Mpu6050.getAngleX();
 		AngleY = Mpu6050.getAngleY();
 		AngleZ = Mpu6050.getAngleZ();
-
 		// 在此处添加处理姿态角的代码，例如输出到串口或用于控制算法
 		// filter.updateIMU(gx, gy, gz, ax, ay, az);
 		// AngleX = filter.getRoll();
 
-		Balance_Pwm = balance(AngleX + ZHONGZHI , gx);//直立PD控制 控制周期5ms
-		if (++Velocity_Count >= 8) //速度控制，控制周期40ms
+		Balance_Pwm = balance(AngleX + ZHONGZHI , gx);			//直立PD控制 控制周期5ms
+		if (++Velocity_Count >= 8)		//速度控制，控制周期40ms
 		{
-			Velocity_Left = Velocity_L;    Velocity_L = 0;  //读取左轮编码器数据，并清零，这就是通过M法测速（单位时间内的脉冲数）得到速度。
-			Velocity_Right = Velocity_R;    Velocity_R = 0; //读取右轮编码器数据，并清零
-			Velocity_Pwm = velocity(Velocity_Left, Velocity_Right);//速度PI控制，控制周期40ms
+			Velocity_L = Encoder_L;
+			Encoder_L = 0;				//读取左轮编码器数据，并清零，这就是通过M法测速（单位时间内的脉冲数）得到速度。
+			Velocity_R = Encoder_R;
+			Encoder_R = 0;				//读取右轮编码器数据，并清零
+
+			// Velocity_Pwm = velocity(Velocity_L, Velocity_R);	//速度PI控制，控制周期40ms
 			Velocity_Count = 0;
 		}
 		// if (++Turn_Count >= 4)//转向控制，控制周期20ms
@@ -239,8 +282,8 @@ void imuTask(void *pvParameters) {
 		// 	Turn_Pwm = turn(gz);
 		// 	Turn_Count = 0;
 		// }
-		Motor1 = Balance_Pwm - Velocity_Pwm + Turn_Pwm;		//直立速度转向环的叠加
-		Motor2 = Balance_Pwm - Velocity_Pwm - Turn_Pwm;		//直立速度转向环的叠加
+		Motor1 = Balance_Pwm - Velocity_Pwm + Turn_Pwm;			//直立速度转向环的叠加
+		Motor2 = Balance_Pwm - Velocity_Pwm - Turn_Pwm;			//直立速度转向环的叠加
 		Xianfu_Pwm();//限幅
 		// if (Pick_Up(az, KalFilter.angle, Velocity_Left, Velocity_Right))
 		// 	Flag_Stop = 1;						//===如果被拿起就关闭电机//===检查是否小车被那起
@@ -253,6 +296,22 @@ void imuTask(void *pvParameters) {
 		// Voltage_Count++;       //平均值计数器
 		// Voltage_All+=Temp;     //多次采样累积
 		// if(Voltage_Count==200) Battery_Voltage=Voltage_All*0.05371/200,Voltage_All=0,Voltage_Count=0;//求平均值
+
+		if (Velocity_Count == 0)
+			Serial.printf(""
+				"AngleX: % 3.2f; "
+				"Velo_L: % 4d; Velo_R: % 4d; "
+				"Motor1: % 4d; Motor2: % 4d; "
+				"Bala_Pwm: % 4d; "
+				"Velo_Pwm: % 4d; "
+				"Turn_Pwm: % 4d\n",
+				AngleX,
+				Velocity_L, Velocity_R,
+				Motor1, Motor2,
+				Balance_Pwm,
+				Velocity_Pwm,
+				Turn_Pwm
+			);
 
 		// 延迟至下一个周期
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -270,23 +329,23 @@ void setup() {
 	Serial.begin(115200);				//开启串口，设置波特率为 9600
 
 	Serial.println("Initiating Pins ...");
-	pinMode(IN1, OUTPUT);				//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
-	pinMode(IN2, OUTPUT);				//TB6612控制引脚，
-	pinMode(IN3, OUTPUT);				//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
-	pinMode(IN4, OUTPUT);				//TB6612控制引脚，
-	pinMode(PWMA, OUTPUT);				//TB6612控制引脚，电机PWM
-	pinMode(PWMB, OUTPUT);				//TB6612控制引脚，电机PWM
-	digitalWrite(IN1, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN2, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN3, 0);				//TB6612控制引脚拉低
-	digitalWrite(IN4, 0);				//TB6612控制引脚拉低
-	analogWrite(PWMA, 0);				//TB6612控制引脚拉低
-	analogWrite(PWMB, 0);				//TB6612控制引脚拉低
-	pinMode(ENCODER_L, INPUT);			//编码器引脚
-	pinMode(ENCODER_R, INPUT);			//编码器引脚
-	pinMode(DIRECTION_L, INPUT);		//编码器引脚
-	pinMode(DIRECTION_R, INPUT);		//编码器引脚
-	pinMode(KEY, INPUT);				//按键引脚
+	pinMode(PIN_IN1, OUTPUT);			//TB6612控制引脚，控制电机1的方向，01为正转，10为反转
+	pinMode(PIN_IN2, OUTPUT);			//TB6612控制引脚，
+	pinMode(PIN_IN3, OUTPUT);			//TB6612控制引脚，控制电机2的方向，01为正转，10为反转
+	pinMode(PIN_IN4, OUTPUT);			//TB6612控制引脚，
+	pinMode(PIN_PWMA, OUTPUT);			//TB6612控制引脚，电机PWM
+	pinMode(PIN_PWMB, OUTPUT);			//TB6612控制引脚，电机PWM
+	digitalWrite(PIN_IN1, 0);			//TB6612控制引脚拉低
+	digitalWrite(PIN_IN2, 0);			//TB6612控制引脚拉低
+	digitalWrite(PIN_IN3, 0);			//TB6612控制引脚拉低
+	digitalWrite(PIN_IN4, 0);			//TB6612控制引脚拉低
+	analogWrite(PIN_PWMA, 0);			//TB6612控制引脚拉低
+	analogWrite(PIN_PWMB, 0);			//TB6612控制引脚拉低
+	pinMode(PIN_ENCODER_L, INPUT);		//编码器引脚
+	pinMode(PIN_ENCODER_R, INPUT);		//编码器引脚
+	pinMode(PIN_DIRECTION_L, INPUT);	//编码器引脚
+	pinMode(PIN_DIRECTION_R, INPUT);	//编码器引脚
+	pinMode(PIN_KEY, INPUT);			//按键引脚
 
 	Serial.println("Initiating I2C ...");
 	Wire.begin(18, 1);					//加入 IIC 总线
@@ -324,10 +383,10 @@ void setup() {
 void loop() {
 	// control();	//调用控制函数，更新MPU6050数据
 	// Serial.println("Angle: " + String(KalFilter.angle) + "  Gyro: " + String(KalFilter.Gyro_x) + "  Voltage: " + String(Battery_Voltage));
-	// Serial.println("Velocity Left: " + String(Velocity_Left) + "  Velocity Right: " + String(Velocity_Right));
-	Serial.println("AngleX: " + String(AngleX) + "; Velocity_L: " +
-		String(Velocity_L) + "; Velocity_R: " + String(Velocity_R) + ";");
+	// // Serial.println("Velocity Left: " + String(Velocity_Left) + "  Velocity Right: " + String(Velocity_Right));
+	// Serial.println("AngleX: " + String(AngleX) + "; Velocity_L: " +
+	// 	String(Velocity_L) + "; Velocity_R: " + String(Velocity_R) + ";");
 	// Serial.print("*");
 
-	delay(50);
+	delay(500);
 }
