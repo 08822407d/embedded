@@ -59,12 +59,12 @@ void setup()
 	FastLED.clear();
 	FastLED.show();
 
-	while (!moduleFan.begin(&Wire1, deviceAddr, 21, 22, 400000)) {
-		Serial.printf("Module FAN Init faile\r\n");
-	}
-	moduleFan.setStatus(MODULE_FAN_ENABLE);
-	// Set the fan to rotate at 80% duty cycle
-	moduleFan.setPWMDutyCycle(dutyCycle);
+	// while (!moduleFan.begin(&Wire1, deviceAddr, 21, 22, 400000)) {
+	// 	Serial.printf("Module FAN Init faile\r\n");
+	// }
+	// moduleFan.setStatus(MODULE_FAN_ENABLE);
+	// // Set the fan to rotate at 80% duty cycle
+	// moduleFan.setPWMDutyCycle(dutyCycle);
 
 
 	/* Init module serial port */
@@ -84,10 +84,10 @@ void setup()
 	}
 
 	/* Begin voice assistant preset */
-	M5.Display.printf(">> Begin voice assistant..\n");
+	M5.Display.printf(">> Starting voice assistant..\n");
 	while (voice_assistant.begin("HELLO") != MODULE_LLM_OK) {
 		M5.Display.setTextColor(TFT_RED);
-		M5.Display.printf(">> Begin voice assistant failed\n");
+		M5.Display.printf(">> Start voice assistant failed\n");
 		M5.Display.setTextColor(TFT_GREEN);
 	}
 
