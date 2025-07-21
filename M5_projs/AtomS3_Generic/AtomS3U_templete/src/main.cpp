@@ -1,61 +1,46 @@
-/* ---------------  src/main.cpp  --------------- */
 #include <Arduino.h>
+#include <esp_console.h>
+#include <linenoise/linenoise.h>
+#include <argtable3/argtable3.h>
 
-/* LetterShell 是 C 库，需要 extern "C" */
-extern "C" {
-#include "shell.h"
+/* ---------- 可选：自定义一个命令 ---------- */
+int cmd_hello(int, char **) {
+    printf("Hello from AtomS3U!\r\n");
+    return 0;
 }
 
-/* 若想把 shellTask 放在独立 FreeRTOS 任务中，打开下面宏 */
-#define USE_SHELL_TASK   1
+static esp_console_repl_t *repl = nullptr;
 
-/* ---------- 全局对象 / 缓冲 ---------- */
-static Shell shell;
-static char  shellBuf[512];
+void setup() {
+    Serial.begin(115200);
 
-/* ---------- read / write —— 满足 3.1 原型 ---------- */
-static short shellWrite(char *data, unsigned short len)
+    /* 1. REPL 配置 —— 保持默认 UART0，引脚不用设置 (-1 表示沿用) */
+    esp_console_repl_config_t cfg  = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
+    cfg.prompt                     = ">$ ";
+    cfg.max_cmdline_length         = 128;
+    cfg.max_history_len            = 20;      // 内存历史 (不持久化)
+
+    esp_console_dev_uart_config_t dev = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    /* dev.tx_gpio_num / rx_gpio_num 均为 -1，表示沿用当前 UART0 */
+
+    /* 2. 创建并启动 REPL (任务在后台跑) */
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&dev, &cfg, &repl));
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
+
+    /* 3. 注册 help 和自定义命令 */
+    ESP_ERROR_CHECK(esp_console_register_help_command());
+
+    const esp_console_cmd_t hello_cmd{
+        .command = "hello",
+        .help    = "print greeting",
+        .func    = &cmd_hello,
+    };
+    esp_console_cmd_register(&hello_cmd);
+
+    printf("\r\nType 'help' for list, UP/DOWN for history.\r\n");
+}
+
+void loop(void)
 {
-	return Serial.write(reinterpret_cast<uint8_t *>(data), len);
+	delay(10);
 }
-
-static short shellRead(char *data, unsigned short len)
-{
-	return Serial.readBytes(reinterpret_cast<uint8_t *>(data), len);
-}
-
-/* ---------- 初始化并可选创建任务 ---------- */
-void initLetterShell()
-{
-	Serial.begin(115200);
-
-	shell.write = shellWrite;
-	shell.read  = shellRead;
-	shellInit(&shell, shellBuf, sizeof(shellBuf));
-
-	/* shellTask() 已在库里实现；SHELL_TASK_WHILE 默认为 1 */
-	xTaskCreatePinnedToCore(
-		[](void *arg) {
-			shellTask(static_cast<Shell *>(arg));   /* 无限循环 */
-		},
-		"LetterShell",
-		2048,
-		&shell,
-		10,
-		nullptr,
-		APP_CPU_NUM              /* 固定到应用核，可改 */
-	);
-}
-
-/* ---------- Arduino 入口 ---------- */
-void setup()
-{
-	initLetterShell();
-	pinMode(LED_BUILTIN, OUTPUT);
-}
-
-void loop()
-{
-	vTaskDelay(1);               /* 让出 CPU */
-}
-/* ---------------------------------------------- */
