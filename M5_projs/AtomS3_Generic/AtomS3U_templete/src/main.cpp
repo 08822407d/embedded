@@ -1,36 +1,61 @@
-/*
- * SPDX-FileCopyrightText: 2025 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
-/*
- * @Hardwares: M5Core + Mini Unit OLED
- * @Platform Version: Arduino M5Stack Board Manager v2.1.3
- * @Dependent Library:
- * M5Stack@^0.4.6: https://github.com/m5stack/M5Stack
- * U8g2_Arduino: https://github.com/olikraus/U8g2_Arduino
- */
-
+/* ---------------  src/main.cpp  --------------- */
 #include <Arduino.h>
-#include <Wire.h>
-#include <ESP32Console.h>
 
-using namespace ESP32Console;
+/* LetterShell 是 C 库，需要 extern "C" */
+extern "C" {
+#include "shell.h"
+}
 
-Console console;
+/* 若想把 shellTask 放在独立 FreeRTOS 任务中，打开下面宏 */
+#define USE_SHELL_TASK   1
 
-void setup(void)
+/* ---------- 全局对象 / 缓冲 ---------- */
+static Shell shell;
+static char  shellBuf[512];
+
+/* ---------- read / write —— 满足 3.1 原型 ---------- */
+static short shellWrite(char *data, unsigned short len)
+{
+	return Serial.write(reinterpret_cast<uint8_t *>(data), len);
+}
+
+static short shellRead(char *data, unsigned short len)
+{
+	return Serial.readBytes(reinterpret_cast<uint8_t *>(data), len);
+}
+
+/* ---------- 初始化并可选创建任务 ---------- */
+void initLetterShell()
 {
 	Serial.begin(115200);
 
-	// console.registerCoreCommands();
-	// console.registerSystemCommands();
-	// console.registerGPIOCommands();
-	// console.registerVFSCommands();
-	// console.registerNetworkCommands();
+	shell.write = shellWrite;
+	shell.read  = shellRead;
+	shellInit(&shell, shellBuf, sizeof(shellBuf));
+
+	/* shellTask() 已在库里实现；SHELL_TASK_WHILE 默认为 1 */
+	xTaskCreatePinnedToCore(
+		[](void *arg) {
+			shellTask(static_cast<Shell *>(arg));   /* 无限循环 */
+		},
+		"LetterShell",
+		2048,
+		&shell,
+		10,
+		nullptr,
+		APP_CPU_NUM              /* 固定到应用核，可改 */
+	);
 }
 
-void loop(void)
+/* ---------- Arduino 入口 ---------- */
+void setup()
 {
-	delay(1000);
+	initLetterShell();
+	pinMode(LED_BUILTIN, OUTPUT);
 }
+
+void loop()
+{
+	vTaskDelay(1);               /* 让出 CPU */
+}
+/* ---------------------------------------------- */

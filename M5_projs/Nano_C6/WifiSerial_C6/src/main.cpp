@@ -13,36 +13,37 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <U8g2lib.h>
-// #include <ESP32Console.h>
+// #include <U8g2lib.h>
+#include <ESP32Console.h>
 
-// using namespace ESP32Console;
+using namespace ESP32Console;
 
-// Console console;
+ESP32Console console;
 
 #define SDA_PIN (2)
 #define SCL_PIN (1)
 
-U8G2_SSD1306_72X40_ER_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);  // EastRising 0.42" OLED
+// U8G2_SSD1306_72X40_ER_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);  // EastRising 0.42" OLED
+
 
 void setup(void)
 {
-	Wire.begin(SDA_PIN, SCL_PIN);
-	u8g2.begin();
+	// Wire.begin(SDA_PIN, SCL_PIN);
+	// u8g2.begin();
 
-	// console.registerCoreCommands();
-	// console.registerSystemCommands();
-	// console.registerGPIOCommands();
-	// console.registerVFSCommands();
-	// console.registerNetworkCommands();
+	console.registerCoreCommands();
+	console.registerSystemCommands();
+	console.registerGPIOCommands();
+	console.registerVFSCommands();
+	console.registerNetworkCommands();
 }
 
 void loop(void)
 {
-	u8g2.clearBuffer();                  // clear the internal memory
-	u8g2.setFont(u8g2_font_ncenB08_tr);  // choose a suitable font
-	u8g2.drawStr(10, 20, "Hello");       // write something to the internal memory
-	u8g2.drawStr(10, 30, "M5Stack!");
-	u8g2.sendBuffer();  // transfer internal memory to the display
-	delay(1000);
+	// u8g2.clearBuffer();                  // clear the internal memory
+	// u8g2.setFont(u8g2_font_ncenB08_tr);  // choose a suitable font
+	// u8g2.drawStr(10, 20, "Hello");       // write something to the internal memory
+	// u8g2.drawStr(10, 30, "M5Stack!");
+	// u8g2.sendBuffer();  // transfer internal memory to the display
+	delay(1);
 }
