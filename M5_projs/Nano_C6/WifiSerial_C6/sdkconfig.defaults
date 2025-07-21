@@ -1,0 +1,9 @@
+# ---------- 打开 TinyUSB 设备栈 ----------
+CONFIG_TINYUSB_ENABLED=y
+CONFIG_TINYUSB_CDC_ENABLED=y
+
+# ---------- 让 esp_console 走 CDC ----------
+CONFIG_ESP_CONSOLE_USB_CDC=y
+
+# ---------- 如不想再打印到 UART0，可加 ----------
+#CONFIG_ESP_CONSOLE_UART_NONE=y

@@ -12,6 +12,11 @@
  */
 
 #include <Arduino.h>
+#include <esp_console.h>
+#include <linenoise/linenoise.h>
+#include <argtable3/argtable3.h>
+#include <LittleFS.h>                      // 用于保存历史
+
 #include <Wire.h>
 // #include <U8g2lib.h>
 #include <ESP32Console.h>
