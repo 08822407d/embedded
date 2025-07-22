@@ -1,0 +1,64 @@
+mx.scratch
+
+############################################################
+#  STM32CubeMX / STM32CubeIDE 一般工程
+############################################################
+# ─── Always ignore object & dependency files ──────────────
+*.o
+*.d
+*.su                     # gcc size info
+*.lst                    # disassembly listing
+*.map
+*.elf
+*.axf
+*.bin
+*.hex
+*.out
+
+# ─── CubeIDE / Eclipse 工作区元数据 ─────────────────────
+.settings/
+.loadpath                # Eclipse include path cache
+
+# ─── CubeIDE 构建目录 (Makefile 版本) ───────────────────
+Debug/
+Release/
+
+# ─── CubeMX 6.8+ “build” 目录 (Makefile) ────────────────
+build*/
+
+# ─── CMake 构建目录 ─────────────────────────────────────
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+Testing/
+Makefile
+cmake_install.cmake
+
+# ─── Generated /Logs / Listings ──────────────────────────
+*.log
+*.srec
+*.coverage
+*.orig
+
+############################################################
+#  STM32Cube Programmer / ST-LINK utility output
+############################################################
+*.stldr
+*.stm32
+*.stcrc
+
+############################################################
+#  VSCode / CLion / JetBrains 装饰
+############################################################
+.vscode/
+.idea/
+
+############################################################
+#  OS / 编辑器杂项
+############################################################
+.DS_Store
+Thumbs.db
+*~
