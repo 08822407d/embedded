@@ -21,12 +21,17 @@
 #include "cmsis_os.h"
 #include "eth.h"
 #include "i2c.h"
+#include "rtc.h"
 #include "usart.h"
 #include "usb_otg.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+// #include "ssd1306.h"
+#include "stm32_adafruit_lcd.h"
+#include <stdint.h>
 
 /* USER CODE END Includes */
 
@@ -96,7 +101,18 @@ int main(void)
   MX_I2C1_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_I2C4_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+
+  // ssd1306_Init();
+  BSP_LCD_Init();
+  BSP_LCD_SetFont(&Font16);
+  BSP_LCD_DisplayOn();
+  BSP_LCD_Clear(LCD_COLOR_BLACK);
+  BSP_LCD_SetTextColor(LCD_COLOR_GREEN);
+  BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+  BSP_LCD_DisplayStringAtLine(1, (uint8_t *)"LCD disp test");
 
   /* USER CODE END 2 */
 
@@ -141,8 +157,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;

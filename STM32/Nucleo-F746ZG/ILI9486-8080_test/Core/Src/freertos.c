@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * File Name          : freertos.c
-  * Description        : Code for freertos applications
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+	******************************************************************************
+	* File Name          : freertos.c
+	* Description        : Code for freertos applications
+	******************************************************************************
+	* @attention
+	*
+	* Copyright (c) 2025 STMicroelectronics.
+	* All rights reserved.
+	*
+	* This software is licensed under terms that can be found in the LICENSE file
+	* in the root directory of this software component.
+	* If no LICENSE file comes with this software, it is provided AS-IS.
+	*
+	******************************************************************************
+	*/
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -25,6 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+// #include "ssd1306.h"
 
 /* USER CODE END Includes */
 
@@ -54,6 +56,13 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for myTask02 */
+osThreadId_t myTask02Handle;
+const osThreadAttr_t myTask02_attributes = {
+  .name = "myTask02",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -61,6 +70,7 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
+void ScreenUpdateTask01(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -75,63 +85,85 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+	/* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
+	/* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+	/* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
+  /* creation of myTask02 */
+  myTask02Handle = osThreadNew(ScreenUpdateTask01, NULL, &myTask02_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+	/* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
+	/* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+	* @brief  Function implementing the defaultTask thread.
+	* @param  argument: Not used
+	* @retval None
+	*/
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	/* Infinite loop */
+	for(;;)
+	{
+		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+		vTaskDelay(pdMS_TO_TICKS(500));
+		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		vTaskDelay(pdMS_TO_TICKS(500));
+		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
-    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+		// HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+		// vTaskDelay(pdMS_TO_TICKS(500));
+		// HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 
-    // osDelay(1);
-  }
+		// osDelay(1);
+	}
   /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_ScreenUpdateTask01 */
+/**
+* @brief Function implementing the myTask02 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ScreenUpdateTask01 */
+void ScreenUpdateTask01(void *argument)
+{
+  /* USER CODE BEGIN ScreenUpdateTask01 */
+	/* Infinite loop */
+	for(;;)
+	{
+		// ssd1306_UpdateScreen();
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+  /* USER CODE END ScreenUpdateTask01 */
 }
 
 /* Private application code --------------------------------------------------*/
