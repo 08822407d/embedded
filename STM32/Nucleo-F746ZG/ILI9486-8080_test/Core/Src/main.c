@@ -110,9 +110,9 @@ int main(void)
   BSP_LCD_SetFont(&Font16);
   BSP_LCD_DisplayOn();
   BSP_LCD_Clear(LCD_COLOR_BLACK);
-  BSP_LCD_SetTextColor(LCD_COLOR_GREEN);
-  BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
-  BSP_LCD_DisplayStringAtLine(1, (uint8_t *)"LCD disp test");
+  // BSP_LCD_SetTextColor(LCD_COLOR_GREEN);
+  // BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+  // BSP_LCD_DisplayStringAtLine(0, (uint8_t *)"LCD disp test");
 
   /* USER CODE END 2 */
 

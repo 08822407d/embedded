@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 
 // #include "ssd1306.h"
+#include "lcd.h"
+#include "stm32_adafruit_lcd.h"
 
 /* USER CODE END Includes */
 
@@ -161,6 +163,10 @@ void ScreenUpdateTask01(void *argument)
 	for(;;)
 	{
 		// ssd1306_UpdateScreen();
+
+		// BSP_LCD_Clear(LCD_COLOR_BLACK);
+		// BSP_LCD_Clear(LCD_COLOR_WHITE);
+
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
   /* USER CODE END ScreenUpdateTask01 */
