@@ -21,6 +21,7 @@
 #include "cmsis_os2.h"
 #include "dcache.h"
 #include "icache.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -96,6 +97,7 @@ int main(void)
   MX_GPIO_Init();
   MX_ICACHE_Init();
   MX_DCACHE1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
