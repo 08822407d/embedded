@@ -23,6 +23,7 @@
 #include "usart.h"
 #include "usb_otg.h"
 #include "gpio.h"
+#include "app_display.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -102,6 +103,9 @@ int main(void)
   MX_I2C1_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_DISPLAY_Init();
+  /* Call PreOsInit function */
+  MX_DISPLAY_PreOSInit();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

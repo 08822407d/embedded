@@ -98,17 +98,16 @@ static inline int LCD_FillWhite(uint32_t Instance, uint8_t UseDMA)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-  BSP_LCD_Init(0, 2);
 
   /* Infinite loop */
   for(;;)
   {
-    LCD_FillRed(0, 1);
-    LCD_FillGreen(0, 1);
-    LCD_FillBlue(0, 1);
-    LCD_FillWhite(0, 1);
+    LCD_FillRed(0, 0);
+    LCD_FillGreen(0, 0);
+    LCD_FillBlue(0, 0);
+    LCD_FillWhite(0, 0);
 
-    LCD_ClearBlack(0, 1);
+    LCD_ClearBlack(0, 0);
     osDelay(100);
   }
   /* USER CODE END StartDefaultTask */

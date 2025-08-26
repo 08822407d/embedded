@@ -64,9 +64,6 @@ void Error_Handler(void);
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1
 #define RMII_MDC_GPIO_Port GPIOC
-#define LCD_TE_Pin GPIO_PIN_0
-#define LCD_TE_GPIO_Port GPIOA
-#define LCD_TE_EXTI_IRQn EXTI0_IRQn
 #define EXPBoard_RESET_Pin GPIO_PIN_1
 #define EXPBoard_RESET_GPIO_Port GPIOA
 #define RMII_MDIO_Pin GPIO_PIN_2
