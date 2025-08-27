@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextDatabase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="texts.xsd" Version="4.25.0">
+  <Languages>
+    <Language Id="GB" />
+    <Language Id="FR" />
+    <Language Id="JP" />
+    <Language Id="KR" />
+  </Languages>
+  <Texts>
+    <TextGroup Id="GroupCookingOptions">
+      <Text Id="START" Alignment="Center" TypographyId="startTypography">
+        <Translation Language="GB">START</Translation>
+        <Translation Language="FR">START</Translation>
+        <Translation Language="JP">開始</Translation>
+        <Translation Language="KR">시작</Translation>
+      </Text>
+      <Text Id="WhiteRice" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">WHITE RICE - 30 MIN</Translation>
+        <Translation Language="FR">RIZ BLANC - 30 MIN</Translation>
+        <Translation Language="JP">白米 - 30 分</Translation>
+        <Translation Language="KR">백미 - 30 분</Translation>
+      </Text>
+      <Text Id="SelectedWhiteRice" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">WHITE RICE</Translation>
+        <Translation Language="FR">RIZ BLANC</Translation>
+        <Translation Language="JP">白米</Translation>
+        <Translation Language="KR">백미</Translation>
+      </Text>
+      <Text Id="Pancakes" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">PANCAKES - 12 MIN</Translation>
+        <Translation Language="FR">PANCAKES - 12 MIN</Translation>
+        <Translation Language="JP">パンケーキ - 12 分</Translation>
+        <Translation Language="KR">팬케이크 - 12 분</Translation>
+      </Text>
+      <Text Id="SelectedPancakes" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">PANCAKES</Translation>
+        <Translation Language="FR">PANCAKES</Translation>
+        <Translation Language="JP">パンケーキ</Translation>
+        <Translation Language="KR">팬케이크</Translation>
+      </Text>
+      <Text Id="Fish" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">STEAM FISH - 28 MIN</Translation>
+        <Translation Language="FR">POISSON VAPEUR - 28 MIN</Translation>
+        <Translation Language="JP">煮魚 - 28 分</Translation>
+        <Translation Language="KR">생선찜 - 28 분</Translation>
+      </Text>
+      <Text Id="SelectedFish" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">STEAM FISH</Translation>
+        <Translation Language="FR">POISSON VAPEUR</Translation>
+        <Translation Language="JP">煮魚</Translation>
+        <Translation Language="KR">생선찜</Translation>
+      </Text>
+      <Text Id="Dumplings" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">DUMPLINGS - 70 MIN</Translation>
+        <Translation Language="FR">DUMPLINGS - 70 MIN</Translation>
+        <Translation Language="JP">小籠包 - 70 分</Translation>
+        <Translation Language="KR">만두 - 70 분</Translation>
+      </Text>
+      <Text Id="SelectedDumplings" Alignment="Center" TypographyId="optionMenuTypography">
+        <Translation Language="GB">DUMPLINGS</Translation>
+        <Translation Language="FR">DUMPLINGS</Translation>
+        <Translation Language="JP">小籠包</Translation>
+        <Translation Language="KR">만두</Translation>
+      </Text>
+    </TextGroup>
+    <TextGroup Id="GroupSettings">
+      <Text Id="ClockSetting" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">Time:</Translation>
+        <Translation Language="FR">Heure:</Translation>
+        <Translation Language="JP">時間:</Translation>
+        <Translation Language="KR">시간:</Translation>
+      </Text>
+      <Text Id="minuteSettingInit" Alignment="Center" TypographyId="settingsTypograpy">
+        <Translation Language="GB">20</Translation>
+        <Translation Language="FR">20</Translation>
+        <Translation Language="JP">20</Translation>
+        <Translation Language="KR">20</Translation>
+      </Text>
+      <Text Id="minuteSetting" Alignment="Center" TypographyId="settingsTypograpy">
+        <Translation Language="GB">&lt;value&gt;</Translation>
+        <Translation Language="FR">&lt;value&gt;</Translation>
+        <Translation Language="JP">&lt;value&gt;</Translation>
+        <Translation Language="KR">&lt;value&gt;</Translation>
+      </Text>
+      <Text Id="hourSettingInit" Alignment="Center" TypographyId="settingsTypograpy">
+        <Translation Language="GB">10</Translation>
+        <Translation Language="FR">10</Translation>
+        <Translation Language="JP">10</Translation>
+        <Translation Language="KR">10</Translation>
+      </Text>
+      <Text Id="hourSetting" Alignment="Center" TypographyId="settingsTypograpy">
+        <Translation Language="GB">&lt;value&gt; :</Translation>
+        <Translation Language="FR">&lt;value&gt; :</Translation>
+        <Translation Language="JP">&lt;value&gt; :</Translation>
+        <Translation Language="KR">&lt;value&gt; :</Translation>
+      </Text>
+      <Text Id="LanguageOption" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">English</Translation>
+        <Translation Language="FR">Français</Translation>
+        <Translation Language="JP">日本語</Translation>
+        <Translation Language="KR">한국어</Translation>
+      </Text>
+      <Text Id="LanguageSettings" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">LANGUAGE</Translation>
+        <Translation Language="FR">LANGUE</Translation>
+        <Translation Language="JP">言語</Translation>
+        <Translation Language="KR">언어</Translation>
+      </Text>
+      <Text Id="DATE_TIME" Alignment="Center" TypographyId="settingsTypograpy">
+        <Translation Language="GB">TIME / DATE</Translation>
+        <Translation Language="FR">HEURE / DATE</Translation>
+        <Translation Language="JP">時間 / 日付</Translation>
+        <Translation Language="KR">시간 / 날짜</Translation>
+      </Text>
+      <Text Id="TitleSettings" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">SETTINGS</Translation>
+        <Translation Language="FR">PARAMETRES</Translation>
+        <Translation Language="JP">設定</Translation>
+        <Translation Language="KR">설정</Translation>
+      </Text>
+    </TextGroup>
+    <TextGroup Id="GroupTime">
+      <Text Id="Clock" Alignment="Center" TypographyId="clockTypography">
+        <Translation Language="GB">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="FR">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="JP">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="KR">&lt;value&gt;:&lt;value&gt;</Translation>
+      </Text>
+      <Text Id="RemainingCookingTime" Alignment="Center" TypographyId="clockTypography">
+        <Translation Language="GB">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="FR">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="JP">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="KR">&lt;value&gt;:&lt;value&gt;</Translation>
+      </Text>
+      <Text Id="minutes" Alignment="Center" TypographyId="setTimeTypography">
+        <Translation Language="GB">00</Translation>
+        <Translation Language="FR">00</Translation>
+        <Translation Language="JP">00</Translation>
+        <Translation Language="KR">00</Translation>
+      </Text>
+      <Text Id="seconds" Alignment="Center" TypographyId="setTimeTypography">
+        <Translation Language="GB">00</Translation>
+        <Translation Language="FR">00</Translation>
+        <Translation Language="JP">00</Translation>
+        <Translation Language="KR">00</Translation>
+      </Text>
+      <Text Id="Minute" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">20</Translation>
+        <Translation Language="FR">20</Translation>
+        <Translation Language="JP">20</Translation>
+        <Translation Language="KR">20</Translation>
+      </Text>
+      <Text Id="Hour" Alignment="Center" TypographyId="languageOptionTypography">
+        <Translation Language="GB">10</Translation>
+        <Translation Language="FR">10</Translation>
+        <Translation Language="JP">10</Translation>
+        <Translation Language="KR">10</Translation>
+      </Text>
+      <Text Id="remainingSeconds" Alignment="Center" TypographyId="setTimeTypography">
+        <Translation Language="GB">20</Translation>
+        <Translation Language="FR">20</Translation>
+        <Translation Language="JP">20</Translation>
+        <Translation Language="KR">20</Translation>
+      </Text>
+      <Text Id="remainingMinutes" Alignment="Center" TypographyId="setTimeTypography">
+        <Translation Language="GB">10</Translation>
+        <Translation Language="FR">10</Translation>
+        <Translation Language="JP">10</Translation>
+        <Translation Language="KR">10</Translation>
+      </Text>
+      <Text Id="cookingTime" Alignment="Center" TypographyId="setTimeTypography">
+        <Translation Language="GB">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="FR">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="JP">&lt;value&gt;:&lt;value&gt;</Translation>
+        <Translation Language="KR">&lt;value&gt;:&lt;value&gt;</Translation>
+      </Text>
+    </TextGroup>
+    <TextGroup Id="Unsorted" />
+  </Texts>
+  <Typographies>
+    <Typography Id="languageOptionTypography" Font="GommeSansW04Bold.ttf" Size="25" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="éç" WildcardCharacterRanges="0-9">
+      <LanguageSetting Language="GB" Font="GommeSansW04Bold.ttf" Size="25" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="FR" Font="GILB____.TTF" Size="24" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="éç" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="JP" Font="chinese.msyh.ttf" Size="25" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="STMicroelectronics製の炊飯器デモです" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="KR" Font="Nanum_Gothic_Bold_700.ttf" Size="25" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="설정언어시간한국어설정언어시간" WildcardCharacterRanges="0-9" />
+    </Typography>
+    <Typography Id="setTimeTypography" Font="GommeSansW04Bold.ttf" Size="20" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="éç" WildcardCharacterRanges="0-9" />
+    <Typography Id="settingsTypograpy" Font="GommeSansW04Bold.ttf" Size="25" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="éç" WildcardCharacterRanges="0-9">
+      <LanguageSetting Language="FR" Font="GommeSansW04Bold.ttf" Size="24" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="JP" Font="chinese.msyh.ttf" Size="25" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="KR" Font="Nanum_Gothic_Bold_700.ttf" Size="25" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9" />
+    </Typography>
+    <Typography Id="clockTypography" Font="GommeSansW04Bold.ttf" Size="30" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9" />
+    <Typography Id="startTypography" Font="GommeSansW04Bold.ttf" Size="28" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9">
+      <LanguageSetting Language="JP" Font="chinese.msyh.ttf" Size="28" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" />
+      <LanguageSetting Language="KR" Font="Nanum_Gothic_Bold_700.ttf" Size="28" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" />
+    </Typography>
+    <Typography Id="optionMenuTypography" Font="GommeSansW04Bold.ttf" Size="14" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacterRanges="0-9">
+      <LanguageSetting Language="JP" Font="chinese.msyh.ttf" Size="14" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="英語" WildcardCharacterRanges="0-9" />
+      <LanguageSetting Language="KR" Font="Nanum_Gothic_Bold_700.ttf" Size="14" Bpp="4" IsVector="no" IsCompressed="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters="시간" WildcardCharacterRanges="0-9" />
+    </Typography>
+  </Typographies>
+</TextDatabase>

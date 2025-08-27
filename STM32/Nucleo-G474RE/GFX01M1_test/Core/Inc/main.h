@@ -75,10 +75,14 @@ void Error_Handler(void);
 #define SPIA_MISO_GPIO_Port GPIOA
 #define SPIA_MOSI_Pin GPIO_PIN_7
 #define SPIA_MOSI_GPIO_Port GPIOA
+#define SPIA_DCX_01M2_Pin GPIO_PIN_10
+#define SPIA_DCX_01M2_GPIO_Port GPIOB
 #define JOY_CENTER_Pin GPIO_PIN_8
 #define JOY_CENTER_GPIO_Port GPIOC
 #define JOY_LEFT_Pin GPIO_PIN_9
 #define JOY_LEFT_GPIO_Port GPIOC
+#define SPIA_NCS_01M2_Pin GPIO_PIN_9
+#define SPIA_NCS_01M2_GPIO_Port GPIOA
 #define T_SWDIO_Pin GPIO_PIN_13
 #define T_SWDIO_GPIO_Port GPIOA
 #define T_SWCLK_Pin GPIO_PIN_14
@@ -89,10 +93,10 @@ void Error_Handler(void);
 #define JOY_RIGHT_GPIO_Port GPIOC
 #define JOY_UP_Pin GPIO_PIN_12
 #define JOY_UP_GPIO_Port GPIOC
-#define SPIA_DCX_Pin GPIO_PIN_3
-#define SPIA_DCX_GPIO_Port GPIOB
-#define SPIA_NCS_Pin GPIO_PIN_5
-#define SPIA_NCS_GPIO_Port GPIOB
+#define SPIA_DCX_01M1_Pin GPIO_PIN_3
+#define SPIA_DCX_01M1_GPIO_Port GPIOB
+#define SPIA_NCS_01M1_Pin GPIO_PIN_5
+#define SPIA_NCS_01M1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

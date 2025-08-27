@@ -408,7 +408,7 @@ static void SPI1_MspInit(SPI_HandleTypeDef* spiHandle)
   __HAL_LINKDMA(spiHandle,hdmarx,hdma_spi1_rx);
 
     /* Peripheral interrupt init */
-    HAL_NVIC_SetPriority(SPI1_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(SPI1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(SPI1_IRQn);
   /* USER CODE BEGIN SPI1_MspInit 1 */
 

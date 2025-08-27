@@ -18,6 +18,8 @@
 #include "lcd_os.h"
 #include "lcd_conf.h"
 
+#include <cmsis_os2.h>
+
 /** @addtogroup LCD OS Wrapper
   * @{
   */
@@ -59,7 +61,7 @@
 /** @defgroup LCD_OS_Private_Variables Private Variables
   * @{
   */
-static volatile uint8_t lcd_sem[LCD_INSTANCES_NBR];
+static osSemaphoreId_t LCD_OS_Sem[LCD_INSTANCES_NBR];
 
 /**
   * @}
@@ -70,21 +72,12 @@ static volatile uint8_t lcd_sem[LCD_INSTANCES_NBR];
   * @{
   */
 
+/**
+  * @}
+  */
+
 /* Exported variables --------------------------------------------------------*/
 /** @defgroup LCD_OS_Exported_Variables Exported Variables
-  * @{
-  */
-
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */
-
-/* Deprecated functions ------------------------------------------------------*/
-/** @defgroup LCD_OS_Deprecated_Functions Deprecated Functions
   * @{
   */
 
@@ -100,22 +93,39 @@ static volatile uint8_t lcd_sem[LCD_INSTANCES_NBR];
   * @}
   */
 
+/* Deprecated functions ------------------------------------------------------*/
+/** @defgroup LCD_OS_Deprecated_Functions Deprecated Functions
+  * @{
+  */
+
+/**
+  * @}
+  */
+
 /* Exported functions --------------------------------------------------------*/
 /** @defgroup LCD_OS_Exported_Functions Exported Functions
   * @{
   */
+
 /**
   * @brief  Initialize the LCD OS ressources.
   * @param  Instance LCD Instance
-  * @retval LCD_OS_Error_t
+  * @retval None
   */
 uint8_t LCD_OS_Initialize(uint32_t Instance)
 {
   uint8_t i;
+
   for(i = 0; i < LCD_INSTANCES_NBR; i++)
   {
-    lcd_sem[i] = 0;
+    /* Create Binary Semaphore */
+    LCD_OS_Sem[i] = osSemaphoreNew(1, 1, NULL);
+    if(LCD_OS_Sem[i] == NULL)
+    {
+      return LCD_OS_ERROR_INIT;
+    }
   }
+
   return LCD_OS_ERROR_NONE;
 }
 
@@ -126,8 +136,10 @@ uint8_t LCD_OS_Initialize(uint32_t Instance)
   */
 uint8_t LCD_OS_Lock(uint32_t Instance)
 {
-  while(lcd_sem[Instance]);
-  lcd_sem[Instance] = 1;
+  if (osSemaphoreAcquire(LCD_OS_Sem[Instance], osWaitForever) != osOK)
+  {
+    return LCD_OS_ERROR_LOCK;
+  }
   return LCD_OS_ERROR_NONE;
 }
 
@@ -138,7 +150,10 @@ uint8_t LCD_OS_Lock(uint32_t Instance)
   */
 uint8_t LCD_OS_Unlock(uint32_t Instance)
 {
-  lcd_sem[Instance] = 0;
+  if (osSemaphoreRelease(LCD_OS_Sem[Instance]) != osOK)
+  {
+    return LCD_OS_ERROR_UNLOCK;
+  }
   return LCD_OS_ERROR_NONE;
 }
 
@@ -149,7 +164,10 @@ uint8_t LCD_OS_Unlock(uint32_t Instance)
   */
 uint8_t LCD_OS_UnlockFromISR(uint32_t Instance)
 {
-  lcd_sem[Instance] = 0;
+  if (osSemaphoreRelease(LCD_OS_Sem[Instance]) != osOK)
+  {
+    return LCD_OS_ERROR_UNLOCK;
+  }
   return LCD_OS_ERROR_NONE;
 }
 
@@ -162,29 +180,11 @@ uint8_t LCD_OS_UnlockFromISR(uint32_t Instance)
   */
 uint8_t LCD_OS_TryLock(uint32_t Instance, uint32_t Timeout)
 {
-  uint32_t tickstart = HAL_GetTick();
-
-  if(lcd_sem[Instance] == 0)
-  {
-    lcd_sem[Instance] = 1;
-    return LCD_OS_ERROR_NONE;
-  }
-  else if(Timeout == 0)
+  if (osSemaphoreAcquire(LCD_OS_Sem[Instance], Timeout) != osOK)
   {
     return LCD_OS_ERROR_BUSY;
   }
-  else
-  {
-    do
-    {
-      if(lcd_sem[Instance] == 0)
-      {
-        lcd_sem[Instance] = 1;
-        return LCD_OS_ERROR_NONE;
-      }
-    } while ((HAL_GetTick() - tickstart) < Timeout);
-    return LCD_OS_ERROR_BUSY;
-  }
+  return LCD_OS_ERROR_NONE;
 }
 
 /**
@@ -194,7 +194,14 @@ uint8_t LCD_OS_TryLock(uint32_t Instance, uint32_t Timeout)
   */
 uint8_t LCD_OS_IsLocked(uint32_t Instance)
 {
-  return lcd_sem[Instance];
+  if (osSemaphoreAcquire(LCD_OS_Sem[Instance], 0) == osOK)
+  {
+    if (osSemaphoreRelease(LCD_OS_Sem[Instance]) == osOK)
+    {
+      return 0;
+    }
+  }
+  return 1;
 }
 
 /**
@@ -204,8 +211,14 @@ uint8_t LCD_OS_IsLocked(uint32_t Instance)
   */
 uint8_t LCD_OS_WaitForTransferToBeDone(uint32_t Instance)
 {
-  while(lcd_sem[Instance]);
-  return LCD_OS_ERROR_NONE;
+  if (osSemaphoreAcquire(LCD_OS_Sem[Instance], osWaitForever) == osOK)
+  {
+    if (osSemaphoreRelease(LCD_OS_Sem[Instance]) == osOK)
+    {
+      return LCD_OS_ERROR_NONE;
+    }
+  }
+  return LCD_OS_ERROR_WAIT;
 }
 
 /**

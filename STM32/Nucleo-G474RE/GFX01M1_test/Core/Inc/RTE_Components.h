@@ -28,5 +28,7 @@
 #define DISPLAY_LCD_BUS_SPI
 #define DISPLAY_LCD_COMP
 #define DISPLAY_LCD_COMP_ILI9341
+/* STMicroelectronics.X-CUBE-TOUCHGFX.4.25.0 */
+#define TOUCHGFX_APP
 
 #endif /* __RTE_COMPONENTS_H__ */
