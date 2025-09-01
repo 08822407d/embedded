@@ -96,9 +96,9 @@ static void BSP_LCD_Clear(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint3
 void MX_DISPLAY_PostInit(void)
 {
 	/* USER CODE BEGIN MX_DISPLAY_Init 1 */
-	if((BSP_LCD_GetXSize(0, &LCD_Width) != BSP_ERROR_NONE) \
-	|| (BSP_LCD_GetYSize(0, &LCD_Height) != BSP_ERROR_NONE) \
-	|| (BSP_LCD_GetOrientation(0, &LCD_Orientation) != BSP_ERROR_NONE) )
+	if((BSP_LCD_GetXSize(0, &LCD_Width) != BSP_ERROR_NONE)
+		|| (BSP_LCD_GetYSize(0, &LCD_Height) != BSP_ERROR_NONE)
+		|| (BSP_LCD_GetOrientation(0, &LCD_Orientation) != BSP_ERROR_NONE) )
 	{
 		Error_Handler();
 	}

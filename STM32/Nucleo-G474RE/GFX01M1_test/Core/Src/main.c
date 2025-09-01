@@ -22,7 +22,7 @@
 #include "crc.h"
 #include "dma.h"
 #include "gpio.h"
-#include "app_touchgfx.h"
+#include "app_display.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -93,12 +93,12 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_CRC_Init();
-  MX_TouchGFX_Init();
+  MX_DISPLAY_Init();
   /* Call PreOsInit function */
-  MX_TouchGFX_PreOSInit();
+  MX_DISPLAY_PreOSInit();
   /* USER CODE BEGIN 2 */
-  extern void MX_DISPLAY_PostInit(void);
-  MX_DISPLAY_PostInit();
+// extern void MX_DISPLAY_PostInit(void);
+//   MX_DISPLAY_PostInit();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -114,6 +114,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+// void ScreenFPS_test(void);
+// 		ScreenFPS_test();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
