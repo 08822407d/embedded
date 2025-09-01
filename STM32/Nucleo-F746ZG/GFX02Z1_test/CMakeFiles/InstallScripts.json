@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/cheyh/projs/embedded/STM32/Nucleo-F746ZG/GFX02Z1_test/cmake_install.cmake",
+		"/home/cheyh/projs/embedded/STM32/Nucleo-F746ZG/GFX02Z1_test/cmake/stm32cubemx/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

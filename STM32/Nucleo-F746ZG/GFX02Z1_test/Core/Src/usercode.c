@@ -137,7 +137,7 @@ void StartGUITask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-		ScreenFPS_test();
+	ScreenFPS_test();
     osDelay(1);
   }
   /* USER CODE END StartGUITask */
