@@ -23,6 +23,8 @@
 #include "main.h"
 #include "cmsis_os.h"
 
+#include "app_subghz_phy.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -113,6 +115,8 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartDefaultTask */
 __weak void StartDefaultTask(void *argument)
 {
+  /* init code for SubGHz_Phy */
+  MX_SubGHz_Phy_Init();
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
   for(;;)
