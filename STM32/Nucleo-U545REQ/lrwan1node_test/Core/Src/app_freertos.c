@@ -51,6 +51,28 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 512 * 4
 };
+/* Definitions for ModemSvc */
+osThreadId_t ModemSvcHandle;
+const osThreadAttr_t ModemSvc_attributes = {
+  .name = "ModemSvc",
+  .priority = (osPriority_t) osPriorityAboveNormal,
+  .stack_size = 2048 * 4
+};
+/* Definitions for ModemCmdLock */
+osMutexId_t ModemCmdLockHandle;
+const osMutexAttr_t ModemCmdLock_attributes = {
+  .name = "ModemCmdLock"
+};
+/* Definitions for ModemEvtQ */
+osMessageQueueId_t ModemEvtQHandle;
+const osMessageQueueAttr_t ModemEvtQ_attributes = {
+  .name = "ModemEvtQ"
+};
+/* Definitions for ModemCmdEvt */
+osEventFlagsId_t ModemCmdEvtHandle;
+const osEventFlagsAttr_t ModemCmdEvt_attributes = {
+  .name = "ModemCmdEvt"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -66,6 +88,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
+  /* creation of ModemCmdLock */
+  ModemCmdLockHandle = osMutexNew(&ModemCmdLock_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -78,6 +102,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
+  /* creation of ModemEvtQ */
+  ModemEvtQHandle = osMessageQueueNew (4, sizeof(256), &ModemEvtQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -85,9 +111,15 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
+  /* creation of ModemSvc */
+  ModemSvcHandle = osThreadNew(StartModemSvc, NULL, &ModemSvc_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
+
+  /* creation of ModemCmdEvt */
+  ModemCmdEvtHandle = osEventFlagsNew(&ModemCmdEvt_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -110,6 +142,24 @@ __weak void StartDefaultTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END defaultTask */
+}
+
+/* USER CODE BEGIN Header_StartModemSvc */
+/**
+* @brief Function implementing the ModemSvc thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartModemSvc */
+__weak void StartModemSvc(void *argument)
+{
+  /* USER CODE BEGIN ModemSvc */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END ModemSvc */
 }
 
 /* Private application code --------------------------------------------------*/

@@ -49,7 +49,7 @@ void MX_LPUART1_UART_Init(void)
   hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  hlpuart1.FifoMode = UART_FIFOMODE_DISABLE;
+  hlpuart1.FifoMode = UART_FIFOMODE_ENABLE;
   if (HAL_UART_Init(&hlpuart1) != HAL_OK)
   {
     Error_Handler();
@@ -62,7 +62,7 @@ void MX_LPUART1_UART_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_UARTEx_DisableFifoMode(&hlpuart1) != HAL_OK)
+  if (HAL_UARTEx_EnableFifoMode(&hlpuart1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -147,10 +147,13 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Pin = LORA_TX_Pin|LORA_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF8_LPUART1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* LPUART1 interrupt Init */
+    HAL_NVIC_SetPriority(LPUART1_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(LPUART1_IRQn);
   /* USER CODE BEGIN LPUART1_MspInit 1 */
 
   /* USER CODE END LPUART1_MspInit 1 */
@@ -181,7 +184,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Pin = DBG_TX_Pin|DBG_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
@@ -236,6 +239,8 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     */
     HAL_GPIO_DeInit(GPIOA, LORA_TX_Pin|LORA_RX_Pin);
 
+    /* LPUART1 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(LPUART1_IRQn);
   /* USER CODE BEGIN LPUART1_MspDeInit 1 */
 
   /* USER CODE END LPUART1_MspDeInit 1 */

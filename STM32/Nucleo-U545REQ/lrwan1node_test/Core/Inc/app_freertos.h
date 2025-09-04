@@ -55,6 +55,10 @@ extern "C" {
 
 /* USER CODE END EM */
 extern osThreadId_t defaultTaskHandle;
+extern osThreadId_t ModemSvcHandle;
+extern osMutexId_t ModemCmdLockHandle;
+extern osMessageQueueId_t ModemEvtQHandle;
+extern osEventFlagsId_t ModemCmdEvtHandle;
 
 /* Exported function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -62,6 +66,7 @@ extern osThreadId_t defaultTaskHandle;
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
+void StartModemSvc(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
