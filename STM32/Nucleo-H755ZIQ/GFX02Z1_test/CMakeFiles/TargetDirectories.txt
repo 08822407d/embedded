@@ -1,0 +1,4 @@
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM4.dir
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7.dir
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/edit_cache.dir
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/rebuild_cache.dir

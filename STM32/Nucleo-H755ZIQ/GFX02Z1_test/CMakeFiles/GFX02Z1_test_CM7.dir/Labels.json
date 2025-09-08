@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7-complete.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-build.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-configure.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-download.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-install.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-mkdir.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-patch.rule"
+		},
+		{
+			"file" : "/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"GFX02Z1_test_CM7"
+		],
+		"name" : "GFX02Z1_test_CM7"
+	}
+}

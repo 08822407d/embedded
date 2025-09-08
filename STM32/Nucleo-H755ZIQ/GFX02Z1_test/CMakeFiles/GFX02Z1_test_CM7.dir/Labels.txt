@@ -1,0 +1,13 @@
+# Target labels
+ GFX02Z1_test_CM7
+# Source files and their labels
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CMakeFiles/GFX02Z1_test_CM7-complete.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-build.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-configure.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-download.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-install.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-mkdir.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-patch.rule
+/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/CM7/src/GFX02Z1_test_CM7-stamp/GFX02Z1_test_CM7-update.rule

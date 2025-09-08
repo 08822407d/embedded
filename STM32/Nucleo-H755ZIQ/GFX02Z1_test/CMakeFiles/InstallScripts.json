@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/cheyh/projs/embedded/STM32/Nucleo-H755ZIQ/GFX02Z1_test/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
