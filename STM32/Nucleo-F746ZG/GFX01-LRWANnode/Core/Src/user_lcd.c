@@ -9,7 +9,7 @@
 #include <stdbool.h>
 
 
-#define USE_LCD_DMA                 0
+#define USE_LCD_DMA                 1
 
 /* RGB565：R(5) G(6) B(5) */
 #define LCD565_BLACK   0x0000U
@@ -95,6 +95,12 @@ static void BSP_LCD_Clear(uint32_t Instance, uint32_t Xpos, uint32_t Ypos, uint3
 
 void MX_DISPLAY_PostInit(void)
 {
+	BSP_LCD_DeInit(0);
+	if(BSP_LCD_Init(0, LCD_ORIENTATION_LANDSCAPE) != BSP_ERROR_NONE)
+	{
+		Error_Handler();
+	}
+
 	/* USER CODE BEGIN MX_DISPLAY_Init 1 */
 	if((BSP_LCD_GetXSize(0, &LCD_Width) != BSP_ERROR_NONE)
 		|| (BSP_LCD_GetYSize(0, &LCD_Height) != BSP_ERROR_NONE)

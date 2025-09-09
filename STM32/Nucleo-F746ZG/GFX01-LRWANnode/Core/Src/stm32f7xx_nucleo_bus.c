@@ -34,6 +34,8 @@ __weak HAL_StatusTypeDef MX_SPI1_Init(SPI_HandleTypeDef* hspi);
   * @{
   */
 
+extern void Error_Handler(void);
+
 /** @defgroup STM32F7XX_NUCLEO_BUS_Exported_Variables BUS Exported Variables
   * @{
   */
@@ -215,6 +217,40 @@ int32_t BSP_SPI1_Send_DMA(uint8_t *pData, uint16_t Length)
   return ret;
 }
 
+/**
+  * @brief  Receive Data from SPI BUS with DMA
+  * @param  pData: Pointer to data buffer to receive
+  * @param  Length: Length of data in byte
+  * @retval BSP status
+  */
+int32_t  BSP_SPI1_Recv_DMA(uint8_t *pData, uint16_t Length)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(HAL_SPI_Receive_DMA(&hspi1, pData, Length) != HAL_OK)
+  {
+      ret = BSP_ERROR_UNKNOWN_FAILURE;
+  }
+  return ret;
+}
+
+/**
+  * @brief  Send and Receive data to/from SPI BUS (Full duplex) with DMA
+  * @param  pData: Pointer to data buffer to send/receive
+  * @param  Length: Length of data in byte
+  * @retval BSP status
+  */
+int32_t BSP_SPI1_SendRecv_DMA(uint8_t *pTxData, uint8_t *pRxData, uint16_t Length)
+{
+  int32_t ret = BSP_ERROR_NONE;
+
+  if(HAL_SPI_TransmitReceive_DMA(&hspi1, pTxData, pRxData, Length) != HAL_OK)
+  {
+      ret = BSP_ERROR_UNKNOWN_FAILURE;
+  }
+  return ret;
+}
+
 #if (USE_HAL_SPI_REGISTER_CALLBACKS == 1U)
 /**
   * @brief Register Default BSP SPI1 Bus Msp Callbacks
@@ -290,7 +326,7 @@ __weak HAL_StatusTypeDef MX_SPI1_Init(SPI_HandleTypeDef* hspi)
   hspi->Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi->Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi->Init.NSS = SPI_NSS_SOFT;
-  hspi->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi->Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi->Init.TIMode = SPI_TIMODE_DISABLE;
   hspi->Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -305,6 +341,7 @@ __weak HAL_StatusTypeDef MX_SPI1_Init(SPI_HandleTypeDef* hspi)
   return ret;
 }
 DMA_HandleTypeDef hdma_spi1_tx;
+DMA_HandleTypeDef hdma_spi1_rx;
 
 static void SPI1_MspInit(SPI_HandleTypeDef* spiHandle)
 {
@@ -349,14 +386,28 @@ static void SPI1_MspInit(SPI_HandleTypeDef* spiHandle)
     hdma_spi1_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_spi1_tx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_spi1_tx.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_spi1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_spi1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_spi1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+    hdma_spi1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
     hdma_spi1_tx.Init.Mode = DMA_NORMAL;
     hdma_spi1_tx.Init.Priority = DMA_PRIORITY_HIGH;
     hdma_spi1_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     HAL_DMA_Init(&hdma_spi1_tx);
 
   __HAL_LINKDMA(spiHandle,hdmatx,hdma_spi1_tx);
+
+    hdma_spi1_rx.Instance = DMA2_Stream0;
+    hdma_spi1_rx.Init.Channel = DMA_CHANNEL_3;
+    hdma_spi1_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_spi1_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_spi1_rx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_spi1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+    hdma_spi1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+    hdma_spi1_rx.Init.Mode = DMA_NORMAL;
+    hdma_spi1_rx.Init.Priority = DMA_PRIORITY_LOW;
+    hdma_spi1_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    HAL_DMA_Init(&hdma_spi1_rx);
+
+  __HAL_LINKDMA(spiHandle,hdmarx,hdma_spi1_rx);
 
     /* Peripheral interrupt init */
     HAL_NVIC_SetPriority(SPI1_IRQn, 5, 0);
@@ -387,6 +438,7 @@ static void SPI1_MspDeInit(SPI_HandleTypeDef* spiHandle)
 
     /* Peripheral DMA DeInit*/
     HAL_DMA_DeInit(spiHandle->hdmatx);
+    HAL_DMA_DeInit(spiHandle->hdmarx);
 
     /* Peripheral interrupt Deinit*/
     HAL_NVIC_DisableIRQ(SPI1_IRQn);

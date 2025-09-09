@@ -36,6 +36,10 @@
 /* BUS IO Instance handler */
 extern  SPI_HandleTypeDef                   hspi1;
 
+/* DMA Instance handlers */
+extern  DMA_HandleTypeDef                   hdma_spi1_rx;
+extern  DMA_HandleTypeDef                   hdma_spi1_tx;
+
 /* Tearing Effect EXTI handler */
 extern EXTI_HandleTypeDef                   hexti_lcd_te;
 
@@ -53,6 +57,9 @@ extern  TIM_HandleTypeDef                   htim2;
 /* BUS IO Instance handlers */
 #define hLCDSPI                             hspi1
 
+#define hLCDDMA_rx                          hdma_spi1_rx
+#define hLCDDMA_tx                          hdma_spi1_tx
+
 /* HSync Timer Instance handler */
 #define hLCDTIM_HSync                       htim2
 #define hLCDTIM                             htim2
@@ -63,9 +70,9 @@ extern  TIM_HandleTypeDef                   htim2;
 #define LCD_SPI_Send                        BSP_SPI1_Send
 #define LCD_SPI_Recv                        BSP_SPI1_Recv
 #define LCD_SPI_SendRecv                    BSP_SPI1_SendRecv
-#define LCD_SPI_Send_DMA(td, ln)            BSP_ERROR_FEATURE_NOT_SUPPORTED
-#define LCD_SPI_Recv_DMA(rd, ln)            BSP_ERROR_FEATURE_NOT_SUPPORTED
-#define LCD_SPI_SendRecv_DMA(td, rd, ln)    BSP_ERROR_FEATURE_NOT_SUPPORTED
+#define LCD_SPI_Send_DMA                    BSP_SPI1_Send_DMA
+#define LCD_SPI_Recv_DMA                    BSP_SPI1_Recv_DMA
+#define LCD_SPI_SendRecv_DMA                BSP_SPI1_SendRecv_DMA
 
 /* CS Pin mapping */
 #define LCD_CS_GPIO_PORT                    GPIOA
@@ -89,6 +96,22 @@ extern  TIM_HandleTypeDef                   htim2;
 #define H_EXTI_0                            hexti_lcd_te
 
 /* USER CODE BEGIN EC */
+
+#ifdef LCD_SPI_Send_DMA
+# undef LCD_SPI_Send_DMA
+#endif
+
+#ifdef LCD_SPI_Recv_DMA
+# undef LCD_SPI_Recv_DMA
+#endif
+
+#ifdef LCD_SPI_SendRecv_DMA
+# undef LCD_SPI_SendRecv_DMA
+#endif
+
+#define LCD_SPI_Send_DMA                    BSP_SPI1_Send_DMA
+#define LCD_SPI_Recv_DMA                    BSP_SPI1_Recv_DMA
+#define LCD_SPI_SendRecv_DMA                BSP_SPI1_SendRecv_DMA
 
 /* USER CODE END EC */
 
