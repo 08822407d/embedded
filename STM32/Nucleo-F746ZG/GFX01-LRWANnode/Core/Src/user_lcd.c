@@ -4,6 +4,7 @@
 #include "task.h"
 #include "cmsis_os.h"
 #include "lcd_io.h"
+#include "lvgl.h"
 
 #include <string.h>
 #include <stdbool.h>
@@ -17,6 +18,8 @@
 #define LCD565_RED     0xF800U
 #define LCD565_GREEN   0x07E0U
 #define LCD565_BLUE    0x001FU
+
+extern osTimerId_t LvglTickTimerHandle;
 
 static uint32_t LCD_Width = 0;
 static uint32_t LCD_Height = 0;
@@ -127,6 +130,13 @@ void ScreenFPS_test(void)
 }
 
 
+/* LvglTick_Callback function */
+void LvglTick_Callback(void *argument)
+{
+	/* USER CODE BEGIN LvglTick_Callback */
+	lv_tick_inc(1);   // 每次回调推进 LVGL 1ms
+	/* USER CODE END LvglTick_Callback */
+}
 
 /* USER CODE BEGIN Header_StartLCDTask */
 /**
@@ -135,16 +145,21 @@ void ScreenFPS_test(void)
 	* @retval None
 	*/
 /* USER CODE END Header_StartLCDTask */
-void StartLCDTask(void *argument)
+void StartGuiTask(void *argument)
 {
 	/* USER CODE BEGIN StartGUITask */
 
 	MX_DISPLAY_PostInit();
 
+
+	/* 1 tick 周期启动：Tick rate = 1000Hz 时即 1ms */
+    osTimerStart(LvglTickTimerHandle, 1);
+
 	/* Infinite loop */
 	for(;;)
 	{
 		// ScreenFPS_test();
+		lv_timer_handler();
 		osDelay(1);
 	}
 	/* USER CODE END StartGUITask */

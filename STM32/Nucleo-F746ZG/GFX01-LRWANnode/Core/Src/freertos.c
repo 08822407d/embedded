@@ -47,12 +47,24 @@
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* Definitions for LCDTask */
-osThreadId_t LCDTaskHandle;
-const osThreadAttr_t LCDTask_attributes = {
-  .name = "LCDTask",
-  .stack_size = 2048 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+/* Definitions for GuiTask */
+osThreadId_t GuiTaskHandle;
+const osThreadAttr_t GuiTask_attributes = {
+  .name = "GuiTask",
+  .stack_size = 4096 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for UserTask */
+osThreadId_t UserTaskHandle;
+const osThreadAttr_t UserTask_attributes = {
+  .name = "UserTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for LvglTickTimer */
+osTimerId_t LvglTickTimerHandle;
+const osTimerAttr_t LvglTickTimer_attributes = {
+  .name = "LvglTickTimer"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,7 +72,9 @@ const osThreadAttr_t LCDTask_attributes = {
 
 /* USER CODE END FunctionPrototypes */
 
-void StartLCDTask(void *argument);
+void StartGuiTask(void *argument);
+void StartUserTask02(void *argument);
+void LvglTick_Callback(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -82,6 +96,10 @@ void MX_FREERTOS_Init(void) {
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
+  /* Create the timer(s) */
+  /* creation of LvglTickTimer */
+  LvglTickTimerHandle = osTimerNew(LvglTick_Callback, osTimerPeriodic, NULL, &LvglTickTimer_attributes);
+
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
@@ -91,8 +109,11 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of LCDTask */
-  LCDTaskHandle = osThreadNew(StartLCDTask, NULL, &LCDTask_attributes);
+  /* creation of GuiTask */
+  GuiTaskHandle = osThreadNew(StartGuiTask, NULL, &GuiTask_attributes);
+
+  /* creation of UserTask */
+  UserTaskHandle = osThreadNew(StartUserTask02, NULL, &UserTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -104,22 +125,48 @@ void MX_FREERTOS_Init(void) {
 
 }
 
-/* USER CODE BEGIN Header_StartLCDTask */
+/* USER CODE BEGIN Header_StartGuiTask */
 /**
-  * @brief  Function implementing the LCDTask thread.
+  * @brief  Function implementing the GuiTask thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartLCDTask */
-__weak void StartLCDTask(void *argument)
+/* USER CODE END Header_StartGuiTask */
+__weak void StartGuiTask(void *argument)
 {
-  /* USER CODE BEGIN StartLCDTask */
+  /* USER CODE BEGIN StartGuiTask */
   /* Infinite loop */
   for(;;)
   {
     osDelay(1);
   }
-  /* USER CODE END StartLCDTask */
+  /* USER CODE END StartGuiTask */
+}
+
+/* USER CODE BEGIN Header_StartUserTask02 */
+/**
+* @brief Function implementing the UserTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUserTask02 */
+__weak void StartUserTask02(void *argument)
+{
+  /* USER CODE BEGIN StartUserTask02 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUserTask02 */
+}
+
+/* LvglTick_Callback function */
+__weak void LvglTick_Callback(void *argument)
+{
+  /* USER CODE BEGIN LvglTick_Callback */
+
+  /* USER CODE END LvglTick_Callback */
 }
 
 /* Private application code --------------------------------------------------*/

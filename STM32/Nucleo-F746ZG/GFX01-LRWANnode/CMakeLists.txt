@@ -24,6 +24,7 @@ set(CMAKE_PROJECT_NAME GFX01-LRWANnode)
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+
 # Core project settings
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
@@ -36,6 +37,22 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+
+
+file(GLOB_RECURSE LVGL_SOURCES
+     ${CMAKE_SOURCE_DIR}/Drivers/lvgl/src/*.c
+)
+add_library(lvgl STATIC ${LVGL_SOURCES})
+# 使用 LV_CONF_INCLUDE_SIMPLE，在用户 include 路径里找 lv_conf.h
+set(LVGL_ROOT ${CMAKE_SOURCE_DIR}/Drivers/lvgl)
+target_include_directories(lvgl PUBLIC
+    ${LVGL_ROOT}
+    ${LVGL_ROOT}/src
+    ${CMAKE_SOURCE_DIR}/Core/Inc
+)
+target_compile_definitions(lvgl PUBLIC
+    LV_CONF_INCLUDE_SIMPLE=1
+)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -52,6 +69,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_SOURCE_DIR}/Drivers/lvgl
 )
 
 # Add project symbols (macros)
@@ -67,4 +85,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+    lvgl
 )
