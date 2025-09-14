@@ -39,20 +39,23 @@ add_executable(${CMAKE_PROJECT_NAME})
 add_subdirectory(cmake/stm32cubemx)
 
 
-file(GLOB_RECURSE LVGL_SOURCES
-     ${CMAKE_SOURCE_DIR}/Drivers/lvgl/src/*.c
-)
-add_library(lvgl STATIC ${LVGL_SOURCES})
-# 使用 LV_CONF_INCLUDE_SIMPLE，在用户 include 路径里找 lv_conf.h
-set(LVGL_ROOT ${CMAKE_SOURCE_DIR}/Drivers/lvgl)
-target_include_directories(lvgl PUBLIC
-    ${LVGL_ROOT}
-    ${LVGL_ROOT}/src
-    ${CMAKE_SOURCE_DIR}/Core/Inc
-)
-target_compile_definitions(lvgl PUBLIC
-    LV_CONF_INCLUDE_SIMPLE=1
-)
+# ── LVGL 配置：必须在 add_subdirectory(lvgl) 之前 ─────────────────────────
+# 先把潜在的旧缓存清掉（很关键）
+unset(LV_BUILD_CONF_DIR  CACHE)
+unset(LV_BUILD_CONF_PATH CACHE)
+# 指定 lv_conf.h 的确切位置（推荐用 PATH 精确到文件）
+set(LV_BUILD_CONF_PATH  "${CMAKE_SOURCE_DIR}/Core/Inc/lv_conf.h" CACHE PATH "" FORCE)
+# 若更喜欢指目录，也可用：
+# set(LV_BUILD_CONF_DIR   "${CMAKE_SOURCE_DIR}/Core/Inc"         CACHE PATH "" FORCE)
+# 关闭“自动解析 lv_conf.h 生成 CONFIG_* 变量”的 Python/pcpp 预处理（嵌入式 + Windows 更省事）
+set(LV_BUILD_SET_CONFIG_OPTS        OFF CACHE BOOL "" FORCE)
+# 先把可选目标关掉；以后要用时再打开
+set(CONFIG_LV_BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_BUILD_DEMOS           OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_USE_THORVG_INTERNAL   OFF CACHE BOOL "" FORCE)
+# 引入 lvgl 子项目（路径指向完整仓库根）
+add_subdirectory(Drivers/lvgl)
+
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -69,12 +72,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    ${CMAKE_SOURCE_DIR}/Drivers/lvgl
+    ${CMAKE_SOURCE_DIR}/Core/Inc
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+    ${CMAKE_PROJECT_NAME} PRIVATE LV_CONF_INCLUDE_SIMPLE=1
 )
 
 # Remove wrong libob.a library dependency when using cpp files
@@ -85,5 +89,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
-    lvgl
+    lvgl::lvgl
 )

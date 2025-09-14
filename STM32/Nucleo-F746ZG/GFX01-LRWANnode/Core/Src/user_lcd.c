@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 
-#define USE_LCD_DMA                 1
+#define USE_LCD_DMA    1
 
 /* RGB565：R(5) G(6) B(5) */
 #define LCD565_BLACK   0x0000U
@@ -26,6 +26,53 @@ static uint32_t LCD_Height = 0;
 static uint32_t LCD_Orientation = 0;
 
 static uint8_t CacheBuffer[(320*2*BUFFER_CACHE_LINES)];
+
+
+
+/* 双缓冲多行块，32B 对齐便于 D-Cache 清理 */
+static lv_color_t __attribute__((aligned(32))) buf1[240 * 40];
+static lv_color_t __attribute__((aligned(32))) buf2[240 * 40];
+
+/* ★ flush 回调：把 LVGL 画好的这块区域经 SPI-DMA 送给 LCD */
+static void my_flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * px_map)
+{
+    const uint32_t w = (uint32_t)(area->x2 - area->x1 + 1);
+    const uint32_t h = (uint32_t)(area->y2 - area->y1 + 1);
+    const uint32_t nbytes = w * h * 2U;               /* RGB565: 2字节/像素 */
+
+    /* F7: DMA 前清 D-Cache，避免发出旧数据 */
+    SCB_CleanDCache_by_Addr((uint32_t*)px_map, (int32_t)nbytes);
+
+    /* 用 i-cube-display 的块写 API；UseDMA=1 走 SPI-DMA */
+    /* Instance 一般为 0，与你生成的 BSP 工程保持一致 */
+    (void)BSP_LCD_FillRGBRect(/*Instance=*/0, /*UseDMA=*/1,
+                              /*pData=*/px_map,
+                              /*Xpos=*/(uint32_t)area->x1,
+                              /*Ypos=*/(uint32_t)area->y1,
+                              /*Width=*/w, /*Height=*/h);
+
+    /* 大多数版本该 API 会“等 DMA 完成”再返回 → 直接标记就绪 */
+    lv_display_flush_ready(disp);
+}
+
+/* ★ 注册显示：创建 display、设置 flush、设置 draw buffers（v9 写法） */
+void lv_port_disp_init(void)
+{
+    /* 1) 创建 display（分辨率按你的面板方向） */
+    lv_display_t * disp = lv_display_create(/*hor_res=*/240, /*ver_res=*/320);
+
+    /* 如需显式设颜色格式可加这一句；否则用 lv_conf.h 的 LV_COLOR_DEPTH=16 默认 */
+    /* lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565); */
+
+    /* 2) 绑定 flush 回调 */
+    lv_display_set_flush_cb(disp, my_flush_cb);
+
+    /* 3) 提供 draw buffers（双缓冲，按“部分刷新”模式） */
+    lv_display_set_buffers(disp,
+                           buf1, buf2,                      /* 两个缓冲 */
+                           sizeof(buf1),                    /* 单个缓冲的字节数 */
+                           LV_DISPLAY_RENDER_MODE_PARTIAL); /* 分块渲染模式 */
+}
 
 
 
@@ -151,16 +198,18 @@ void StartGuiTask(void *argument)
 
 	MX_DISPLAY_PostInit();
 
+	lv_init();                  /* 1) 初始化 LVGL 内核 */
+	lv_port_disp_init();        /* 2) 注册显示驱动（见下） */
 
 	/* 1 tick 周期启动：Tick rate = 1000Hz 时即 1ms */
-    osTimerStart(LvglTickTimerHandle, 1);
+	osTimerStart(LvglTickTimerHandle, 1);
 
 	/* Infinite loop */
 	for(;;)
 	{
 		// ScreenFPS_test();
 		lv_timer_handler();
-		osDelay(1);
+		osDelay(5);
 	}
 	/* USER CODE END StartGUITask */
 }

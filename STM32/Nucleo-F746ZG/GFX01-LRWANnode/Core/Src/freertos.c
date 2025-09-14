@@ -73,7 +73,7 @@ const osTimerAttr_t LvglTickTimer_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartGuiTask(void *argument);
-void StartUserTask02(void *argument);
+void StartUserTask(void *argument);
 void LvglTick_Callback(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -113,7 +113,7 @@ void MX_FREERTOS_Init(void) {
   GuiTaskHandle = osThreadNew(StartGuiTask, NULL, &GuiTask_attributes);
 
   /* creation of UserTask */
-  UserTaskHandle = osThreadNew(StartUserTask02, NULL, &UserTask_attributes);
+  UserTaskHandle = osThreadNew(StartUserTask, NULL, &UserTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -143,22 +143,22 @@ __weak void StartGuiTask(void *argument)
   /* USER CODE END StartGuiTask */
 }
 
-/* USER CODE BEGIN Header_StartUserTask02 */
+/* USER CODE BEGIN Header_StartUserTask */
 /**
 * @brief Function implementing the UserTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartUserTask02 */
-__weak void StartUserTask02(void *argument)
+/* USER CODE END Header_StartUserTask */
+__weak void StartUserTask(void *argument)
 {
-  /* USER CODE BEGIN StartUserTask02 */
+  /* USER CODE BEGIN StartUserTask */
   /* Infinite loop */
   for(;;)
   {
     osDelay(1);
   }
-  /* USER CODE END StartUserTask02 */
+  /* USER CODE END StartUserTask */
 }
 
 /* LvglTick_Callback function */
