@@ -72,13 +72,11 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    ${CMAKE_SOURCE_DIR}/Core/Inc
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
-    ${CMAKE_PROJECT_NAME} PRIVATE LV_CONF_INCLUDE_SIMPLE=1
 )
 
 # Remove wrong libob.a library dependency when using cpp files
