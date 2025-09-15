@@ -27,10 +27,8 @@
  *====================*/
 
 /** Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888) */
-#define LV_COLOR_DEPTH 16
-/* 分辨率（注意旋转），与你的最终方向一致 */
-#define LV_HOR_RES                     240
-#define LV_VER_RES                     320
+#define LV_COLOR_DEPTH  16
+
 
 /*=========================
    STDLIB WRAPPER SETTINGS
