@@ -110,21 +110,16 @@ void MX_DISPLAY_PostInit(void)
 {
 	BSP_LCD_DeInit(0);
 	if(BSP_LCD_Init(0, GLOB_ROTATION) != BSP_ERROR_NONE)
-	{
 		Error_Handler();
-	}
 
 	/* USER CODE BEGIN MX_DISPLAY_Init 1 */
 	if((BSP_LCD_GetXSize(0, &LCD_Width) != BSP_ERROR_NONE)
 		|| (BSP_LCD_GetYSize(0, &LCD_Height) != BSP_ERROR_NONE)
 		|| (BSP_LCD_GetOrientation(0, &LCD_Orientation) != BSP_ERROR_NONE))
-	{
 		Error_Handler();
-	}
+
 	if(BSP_LCD_DisplayOn(0) != BSP_ERROR_NONE)
-	{
 		Error_Handler();
-	}
 }
 
 
@@ -152,7 +147,6 @@ void StartGuiTask(void *argument)
 	lv_init();                  /* 1) 初始化 LVGL 内核 */
 	lv_port_disp_init();        /* 2) 注册显示驱动（见下） */
 
-	/* 1 tick 周期启动：Tick rate = 1000Hz 时即 1ms */
 	osTimerStart(LvglTickTimerHandle, 1);
 	init_lvterm();
 
@@ -171,8 +165,6 @@ void StartGuiTask(void *argument)
 }
 
 
-// static const uint32_t colors_rgb888[] = {0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF};
-// int color_idx = 0;
 /* USER CODE BEGIN Header_StartUserTask */
 /**
  * @brief Function implementing the UserTask thread.
@@ -187,11 +179,6 @@ void StartUserTask(void *argument)
 	// 等待基础设施线程初始化全部完成
 	osThreadFlagsWait(1U<<0, osFlagsWaitAny|osFlagsNoClear, osWaitForever);
 
-	// lv_obj_t *scr = lv_screen_active();          // 取当前活动屏（根对象）
-	// lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-	// lv_obj_set_style_bg_color(scr, lv_color_hex(0), 0);
-	// /* 可选：立即刷新一帧（否则等到下一次 lv_timer_handler() 节拍） */
-	// lv_refr_now(NULL);
 
 	int i = 0;
 	/* Infinite loop */
@@ -249,9 +236,7 @@ static void lvterm_drain_timer_cb(lv_timer_t *t);
 static void scroll_to_bottom(void)
 {
 	lv_textarea_set_cursor_pos(s_ta, LV_TEXTAREA_CURSOR_LAST);                     // 光标到末尾
-	// lv_obj_scroll_to_y(s_ta, LV_COORD_MAX, LV_ANIM_OFF);                           // 视口滚到底
-	int32_t lh = lv_font_get_line_height(lv_obj_get_style_text_font(s_ta, LV_PART_MAIN));
-	lv_obj_scroll_by(s_ta, 0, lh, LV_ANIM_ON);   // 下滚一个行高（平滑）
+	lv_obj_scroll_to_y(s_ta, LV_COORD_MAX, LV_ANIM_OFF);                           // 视口滚到底
 }
 
 /* 保留最近 keep_lines 条“内容行”（按 '\n' 统计） */
@@ -260,22 +245,29 @@ static void trim_keep_last_lines(uint16_t keep_lines)
 	const char *txt = lv_textarea_get_text(s_ta);
 	if(!txt) return;
 
-	/* 统计现有行数 */
+	// 统计总行数
 	size_t total_lines = 0;
-	for(const char *p = txt; *p; ++p) if(*p == '\n') ++total_lines;
-
+	for(const char *q = txt; *q; ++q) if(*q == '\n') ++total_lines;
 	if(total_lines <= keep_lines) return;
 
+	// 找到要保留的子串起点 p（第 drop 个 '\n' 之后）
 	size_t drop = total_lines - keep_lines;
-
-	/* 找到应保留文本的起始位置：跳过 drop 个 '\n' 之后 */
 	const char *p = txt;
 	while(drop && (p = strchr(p, '\n'))) { ++p; --drop; }
+	if(!p) return;
 
-	if(p && *p) {
-		lv_textarea_set_text(s_ta, p);                                             // 直接重设为子串
-		scroll_to_bottom();                                                        // 裁剪后保持在底部
-	}
+	// ★ 关键：先复制到临时缓冲，再 set_text()
+	size_t new_len = strlen(p);
+	char *tmp = (char *)lv_malloc(new_len + 1);    // 你在 GUI 线程中，lv_* 分配是安全的
+	if(!tmp) return;
+	memcpy(tmp, p, new_len + 1);
+
+	lv_textarea_set_text(s_ta, tmp);               // 现在传入的是“独立缓冲”，不再指向旧内存
+	lv_free(tmp);
+
+	// 维持视口在底部
+	lv_textarea_set_cursor_pos(s_ta, LV_TEXTAREA_CURSOR_LAST);
+	lv_obj_scroll_to_y(s_ta, LV_COORD_MAX, LV_ANIM_OFF);
 }
 
 /* 在 GUI 线程里消费一条队列消息（若存在），返回是否消费到 */
