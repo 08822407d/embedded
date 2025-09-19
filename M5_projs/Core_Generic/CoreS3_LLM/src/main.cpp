@@ -6,7 +6,13 @@
 #include <Arduino.h>
 #include <M5Unified.h>
 #include <M5ModuleLLM.h>
+#include <FastLED.h>
 #include "m5_module_fan.hpp"
+
+
+#define NUM_LEDS 10
+#define DATA_PIN 25
+CRGB leds[NUM_LEDS];
 
 
 M5ModuleLLM module_llm;
@@ -14,7 +20,8 @@ M5ModuleLLM_VoiceAssistant voice_assistant(&module_llm);
 M5ModuleFan moduleFan;
 
 uint8_t deviceAddr = MODULE_FAN_BASE_ADDR;
-uint8_t dutyCycle  = 25;
+uint8_t dutyCycle  = 50;
+
 
 /* On ASR data callback */
 void on_asr_data_input(String data, bool isFinish, int index)
@@ -48,12 +55,16 @@ void setup()
 	M5.Display.setTextSize(2);
 	M5.Display.setTextScroll(true);
 
-	while (!moduleFan.begin(&Wire1, deviceAddr, 21, 22, 400000)) {
-		Serial.printf("Module FAN Init faile\r\n");
-	}
-	moduleFan.setStatus(MODULE_FAN_ENABLE);
-	// Set the fan to rotate at 80% duty cycle
-	moduleFan.setPWMDutyCycle(dutyCycle);
+	// FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
+	// FastLED.clear();
+	// FastLED.show();
+
+	// while (!moduleFan.begin(&Wire1, deviceAddr, 21, 22, 400000)) {
+	// 	Serial.printf("Module FAN Init faile\r\n");
+	// }
+	// moduleFan.setStatus(MODULE_FAN_ENABLE);
+	// // Set the fan to rotate at 80% duty cycle
+	// moduleFan.setPWMDutyCycle(dutyCycle);
 
 
 	/* Init module serial port */
@@ -61,22 +72,22 @@ void setup()
 	// Serial2.begin(115200, SERIAL_8N1, 13, 14);  // Core2
 	Serial2.begin(115200, SERIAL_8N1, 18, 17);  // CoreS3
 
-	/* Init module */
-	module_llm.begin(&Serial2);
 
 	/* Make sure module is connected */
 	M5.Display.printf(">> Check ModuleLLM connection..\n");
 	while (1) {
+		/* Init module */
+		module_llm.begin(&Serial2);
 		if (module_llm.checkConnection()) {
 			break;
 		}
 	}
 
 	/* Begin voice assistant preset */
-	M5.Display.printf(">> Begin voice assistant..\n");
+	M5.Display.printf(">> Starting voice assistant..\n");
 	while (voice_assistant.begin("HELLO") != MODULE_LLM_OK) {
 		M5.Display.setTextColor(TFT_RED);
-		M5.Display.printf(">> Begin voice assistant failed\n");
+		M5.Display.printf(">> Start voice assistant failed\n");
 		M5.Display.setTextColor(TFT_GREEN);
 	}
 
