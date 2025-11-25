@@ -131,6 +131,13 @@ void app_main(void)
                "On Windows, try using Putty instead.\n");
     }
 
+// 头文件
+extern void lcd_st7789_init(void);
+extern void lcd_st7789_fill(uint16_t color);
+    lcd_st7789_init();              // <<< 新增：初始化屏幕
+    lcd_st7789_fill(0xFFFF);        // 全白填充一下，验证能亮
+
+
     /* Main loop */
     while(true) {
         /* Get a line using linenoise.
