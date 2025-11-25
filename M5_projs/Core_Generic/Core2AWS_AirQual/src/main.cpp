@@ -26,8 +26,8 @@ uint16_t CheckCode;
 void header(const char *string, uint16_t color) {
 	M5.Lcd.fillScreen(color);
 	M5.Lcd.setTextSize(1);
-	M5.Lcd.setTextColor(TFT_BLACK, TFT_GREY);
-	M5.Lcd.fillRect(0, 0, 320, 30, TFT_GREY);
+	M5.Lcd.setTextColor(TFT_BLACK, TFT_WHITE);
+	M5.Lcd.fillRect(0, 0, 320, 30, TFT_WHITE);
 	M5.Lcd.setTextDatum(TC_DATUM);
 	M5.Lcd.drawString(string, 160, 3, 4);
 }
@@ -44,8 +44,7 @@ void setup() {
 			delay(1);
 	}
 
-	M5.Lcd.fillScreen(TFT_WHITE);
-	header("P M 2.5", TFT_WHITE);
+	header("P M 2.5", TFT_GREY);
 }
 
 uint8_t Air_val[32] = {0};
@@ -65,50 +64,52 @@ void LCD_Display_Val(void) {
 		}
 	}
 
-	//     M5.Lcd.setTextSize(FRONT);
-	M5.Lcd.setTextColor(TFT_RED, TFT_WHITE);
+	// M5.Lcd.fillRect(0, 30, 320, 210, TFT_GREY);
+	// M5.Lcd.setTextSize(FRONT);
+
+	M5.Lcd.setTextColor(TFT_RED, TFT_GREY);
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL, FRONT);
 	M5.Lcd.print("S P M");
 
-	M5.Lcd.setTextColor(TFT_BLACK, TFT_WHITE);
+	M5.Lcd.setTextColor(TFT_BLACK, TFT_GREY);
 
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET, FRONT);
-	M5.Lcd.print("                     ");
+	M5.Lcd.print("                             ");
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET, FRONT);
 	M5.Lcd.print("PM1.0 : ");
 	M5.Lcd.print(p_val[2]);
 
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 2, FRONT);
-	M5.Lcd.print("                     ");
+	M5.Lcd.print("                             ");
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 2, FRONT);
 	M5.Lcd.print("PM2.5 : ");
 	M5.Lcd.print(p_val[3]);
 
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 3, FRONT);
-	M5.Lcd.print("                     ");
+	M5.Lcd.print("                             ");
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 3, FRONT);
 	M5.Lcd.print("PM10  : ");
 	M5.Lcd.print(p_val[4]);
 
-	M5.Lcd.setTextColor(TFT_RED, TFT_WHITE);
+	M5.Lcd.setTextColor(TFT_RED, TFT_GREY);
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL, FRONT);
 	M5.Lcd.print("A T M E");
 
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET, FRONT);
-	M5.Lcd.print("                     ");
-	M5.Lcd.setTextColor(TFT_BLACK, TFT_WHITE);
+	M5.Lcd.print("                             ");
+	M5.Lcd.setTextColor(TFT_BLACK, TFT_GREY);
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET, FRONT);
 	M5.Lcd.print("PM1.0 : ");
 	M5.Lcd.print(p_val[5]);
 
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET * 2, FRONT);
-	M5.Lcd.print("                     ");
+	M5.Lcd.print("                             ");
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET * 2, FRONT);
 	M5.Lcd.print("PM2.5 : ");
 	M5.Lcd.print(p_val[6]);
 
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET * 3, FRONT);
-	M5.Lcd.print("                     ");
+	M5.Lcd.print("                             ");
 	M5.Lcd.setCursor(X_LOCAL + X_OFFSET, Y_LOCAL + Y_OFFSET * 3, FRONT);
 	M5.Lcd.print("PM10  : ");
 	M5.Lcd.print(p_val[7]);
@@ -163,7 +164,7 @@ void TempHumRead(void) {
 		temp = 0, humd = 0;
 	}
 
-	M5.Lcd.setTextColor(TFT_GREEN, TFT_WHITE);
+	M5.Lcd.setTextColor(TFT_GREEN, TFT_GREY);
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 5, FRONT);
 	M5.Lcd.print("                     ");
 	M5.Lcd.setCursor(X_LOCAL, Y_LOCAL + Y_OFFSET * 5, FRONT);
