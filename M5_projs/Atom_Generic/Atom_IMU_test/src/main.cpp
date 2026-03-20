@@ -1,171 +1,274 @@
 #include <M5Atom.h>
 #include <math.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp32-hal-timer.h"
+#include "app_state_machine.hpp"
+#include "balance_controller.hpp"
+#include "config.hpp"
+#include "imu_estimator.hpp"
+#include "roller_i2c_driver.hpp"
+#include "safety_guard.hpp"
 
-// 可选：用于兼容判断（不同 Arduino-ESP32 core 版本 timer API 不一样）
-#if __has_include("esp_arduino_version.h")
-  #include "esp_arduino_version.h"
-#endif
-#ifndef ESP_ARDUINO_VERSION
-  #define ESP_ARDUINO_VERSION ESP_ARDUINO_VERSION_VAL(0, 0, 0)
-#endif
+/*
+Main architecture (single-thread cooperative scheduler)
+=======================================================
+This first version keeps everything in loop() with fixed-period sections:
 
-enum class LineMode : uint8_t { Columns, Rows };
+1) IMU section      @ kImuHz
+   - update attitude/rate estimator.
 
-// ====== 你要的两个静态全局变量（装板时改这里） ======
-static bool     gUseRoll  = false;                 // true: roll；false: pitch
-static LineMode gLineMode = LineMode::Columns;    // Columns: 只亮一列；Rows: 只亮一行
+2) Feedback section @ kFeedbackHz
+   - read Roller speed/current/status/error.
 
-// ====== 其它可选配置 ======
-static constexpr float kAngleSign = +1.0f;        // 左右反了就改成 -1
-static constexpr bool  kFlipX = false;            // 列镜像
-static constexpr bool  kFlipY = false;            // 行镜像
+3) Control section  @ kCtrlHz
+   - run state machine.
+   - enable/disable motor output on state transitions.
+   - compute current command when balancing.
 
-static constexpr float    kDeadbandDeg = 3.0f;
-static constexpr float    kMidDeg      = 10.0f;
-static constexpr uint32_t kColorWhite  = 0xFFFFFF;
-static constexpr uint8_t  kBrightness  = 20;
+4) UI section       @ kUiHz
+   - show concise mode/tilt visualization on Atom 5x5 LED.
 
-// IMU 采样频率（由硬件定时器“打点”）
-static constexpr uint32_t kSampleHz    = 200;     // 200Hz 足够显示姿态
-static constexpr float    kFilterAlpha = 0.25f;   // 一阶低通
+5) Log section      @ kLogHz
+   - print diagnostics for tuning and troubleshooting.
 
-// ====== 共享数据（IMU 任务 -> loop）======
-static portMUX_TYPE gAngleMux = portMUX_INITIALIZER_UNLOCKED;
-static volatile float    gAngleFiltDegShared = 0.0f;
-static volatile uint32_t gAngleSeq           = 0;
+The scheduler uses elapsed micros() checks instead of delay() so each section
+can run at independent rates with predictable cadence.
+*/
 
-// ====== 定时器与任务句柄 ======
-static hw_timer_t* gTimer = nullptr;
-static TaskHandle_t gImuTaskHandle = nullptr;
+// Global motor direction switch requested by user.
+// +1: normal, -1: reverse.
+int gMotorDirection = +1;
 
-#ifndef ARDUINO_ISR_ATTR
-  #define ARDUINO_ISR_ATTR IRAM_ATTR
-#endif
+namespace {
 
-static inline uint8_t mapX(uint8_t x) { return kFlipX ? (4 - x) : x; }
-static inline uint8_t mapY(uint8_t y) { return kFlipY ? (4 - y) : y; }
+// Core modules.
+ImuEstimator gImu;
+RollerI2CDriver gRoller;
+BalanceController gController;
+SafetyGuard gSafety;
+AppStateMachine gStateMachine;
 
-static int angleToIndex(float angleDegSigned) {
-  float absA = fabsf(angleDegSigned);
-  if (absA <= kDeadbandDeg) return 2;                           // 第3
-  if (absA <= kMidDeg)      return (angleDegSigned > 0) ? 1 : 3; // 第2/4
-  return (angleDegSigned > 0) ? 0 : 4;                          // 第1/5
+// Shared runtime state.
+MotorFeedback gMotorFeedback{};
+float gLastCurrentCmd = 0.0f;
+bool gEnableRequested = false;
+bool gMotorOutputEnabled = false;
+bool gRollerOnline = false;
+
+// Per-section scheduler timestamps in microseconds.
+uint32_t gLastImuUs = 0;
+uint32_t gLastCtrlUs = 0;
+uint32_t gLastFeedbackUs = 0;
+uint32_t gLastUiUs = 0;
+uint32_t gLastLogUs = 0;
+
+// Helper conversion for fixed-rate sections.
+float periodSec(uint32_t hz) {
+    return 1.0f / static_cast<float>(hz);
 }
 
-static void drawLine(int idx0to4) {
-  M5.dis.clear();
-  if (gLineMode == LineMode::Columns) {
-    uint8_t x = mapX((uint8_t)idx0to4);
-    for (uint8_t y = 0; y < 5; ++y) M5.dis.drawpix(x, mapY(y), kColorWhite);
-  } else {
-    uint8_t y = mapY((uint8_t)idx0to4);
-    for (uint8_t x = 0; x < 5; ++x) M5.dis.drawpix(mapX(x), y, kColorWhite);
-  }
+// Helper conversion for fixed-rate sections.
+uint32_t periodUs(uint32_t hz) {
+    return static_cast<uint32_t>(1000000UL / hz);
 }
 
-// ====== 硬件定时器 ISR：只做“唤醒 IMU 任务” ======
-void ARDUINO_ISR_ATTR onTimer() {
-  if (!gImuTaskHandle) return;
-  BaseType_t hpTaskWoken = pdFALSE;
-  vTaskNotifyGiveFromISR(gImuTaskHandle, &hpTaskWoken);
-  if (hpTaskWoken) portYIELD_FROM_ISR();
+// Convert signed angle magnitude into one of 5 LED columns.
+// This is mainly a debugging visualization of control error.
+int angleToIndex(float angleDegSigned) {
+    float absA = fabsf(angleDegSigned);
+    if (absA <= appcfg::kLedDeadbandDeg) return 2;
+    if (absA <= appcfg::kLedMidbandDeg) return (angleDegSigned > 0.0f) ? 1 : 3;
+    return (angleDegSigned > 0.0f) ? 0 : 4;
 }
 
-// ====== IMU 读取任务：被定时器稳定唤醒后读姿态（不在 ISR 里跑 I2C） ======
-static void imuTask(void* arg) {
-  (void)arg;
-  float angleFilt = 0.0f;
-
-  for (;;) {
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    double pitch = 0.0, roll = 0.0;
-    M5.IMU.getAttitude(&pitch, &roll);
-
-    float angle = (float)(gUseRoll ? roll : pitch);
-    angle *= kAngleSign;
-
-    angleFilt += kFilterAlpha * (angle - angleFilt);
-
-    portENTER_CRITICAL(&gAngleMux);
-    gAngleFiltDegShared = angleFilt;
-    gAngleSeq++;
-    portEXIT_CRITICAL(&gAngleMux);
-  }
+// Utility to paint all 25 LEDs.
+void fillAll(uint32_t color) {
+    for (uint8_t y = 0; y < 5; ++y) {
+        for (uint8_t x = 0; x < 5; ++x) {
+            M5.dis.drawpix(x, y, color);
+        }
+    }
 }
 
-static void startImuTimerAndTask() {
-  // 1) 创建 IMU 任务（优先级稍高即可）
-  xTaskCreatePinnedToCore(
-    imuTask, "imuTask",
-    4096, nullptr,
-    4, &gImuTaskHandle,
-    1  // pin 到 core1（一般 Arduino loop 也在 core1）
-  );
-
-  // 2) 配置硬件定时器
-#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-  // Arduino-ESP32 3.x：timerBegin(frequency) + timerAlarm()
-  // 官方文档示例就是 1MHz tick，然后 alarm_value 用“微秒数”来写。:contentReference[oaicite:0]{index=0}
-  gTimer = timerBegin(1000000);               // 1MHz
-  if (gTimer) {
-    timerAttachInterrupt(gTimer, &onTimer);   // 3.x 只有两个参数 :contentReference[oaicite:1]{index=1}
-    uint64_t alarmValue = 1000000ULL / kSampleHz; // us
-    timerAlarm(gTimer, alarmValue, true, 0);  // autoreload 无限次 :contentReference[oaicite:2]{index=2}
-  }
-#else
-  // Arduino-ESP32 2.x：老 API（timer num / divider / countUp）
-  // divider=80 => 80MHz/80 = 1MHz tick
-  gTimer = timerBegin(0, 80, true);
-  if (gTimer) {
-    timerAttachInterrupt(gTimer, &onTimer, true);
-    uint64_t alarmValue = 1000000ULL / kSampleHz; // us
-    timerAlarmWrite(gTimer, alarmValue, true);
-    timerAlarmEnable(gTimer);
-  }
-#endif
+// DISARMED indication: blue center dot.
+void drawDisarmed() {
+    M5.dis.clear();
+    M5.dis.drawpix(2, 2, 0x000030);
 }
+
+// REF_CAPTURE indication: blinking amber bar.
+void drawRefCapture(bool blinkOn) {
+    M5.dis.clear();
+    if (blinkOn) {
+        M5.dis.drawpix(1, 2, 0x302000);
+        M5.dis.drawpix(2, 2, 0x302000);
+        M5.dis.drawpix(3, 2, 0x302000);
+    }
+}
+
+// BALANCING indication: green column shifts with signed angle error.
+void drawBalancing(float thetaErrDeg) {
+    M5.dis.clear();
+    const int idx = angleToIndex(thetaErrDeg);
+    const uint8_t x = static_cast<uint8_t>(idx);
+    for (uint8_t y = 0; y < 5; ++y) {
+        M5.dis.drawpix(x, y, 0x003000);
+    }
+}
+
+// FAULT indication: solid red.
+void drawFault() {
+    fillAll(0x200000);
+}
+
+// String name used by serial log stream.
+const char* modeName(AppMode mode) {
+    switch (mode) {
+        case AppMode::Disarmed:
+            return "DISARMED";
+        case AppMode::RefCapture:
+            return "REF_CAPTURE";
+        case AppMode::Balancing:
+            return "BALANCING";
+        case AppMode::Fault:
+            return "FAULT";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+}  // namespace
 
 void setup() {
-  M5.begin(true, true, true);
-  delay(50);
+    // Serial diagnostics are essential for first tuning sessions.
+    Serial.begin(115200);
 
-  M5.dis.setBrightness(kBrightness);
-  M5.dis.clear();
+    // Atom board + display init.
+    M5.begin(true, true, true);
+    delay(80);
+    M5.dis.setBrightness(appcfg::kLedBrightness);
+    M5.dis.clear();
 
-  M5.IMU.Init();
-  delay(50);
+    // IMU init must happen before estimator begins.
+    M5.IMU.Init();
+    delay(60);
+    gImu.begin();
 
-  startImuTimerAndTask();
+    // Bring up motor interface (I2C + current mode).
+    gRollerOnline = gRoller.begin();
+
+    // Start state machine in disarmed mode.
+    gStateMachine.begin();
+    gStateMachine.requestEnabled(false);
+
+    // Align all scheduler phases to "now".
+    const uint32_t nowUs = micros();
+    gLastImuUs = nowUs;
+    gLastCtrlUs = nowUs;
+    gLastFeedbackUs = nowUs;
+    gLastUiUs = nowUs;
+    gLastLogUs = nowUs;
+
+    drawDisarmed();
 }
 
 void loop() {
-  M5.update();
+    M5.update();
 
-  static uint32_t lastSeq = 0;
-  static int lastIdx = -1;
-
-  float angleCopy = 0.0f;
-  uint32_t seqCopy = 0;
-
-  portENTER_CRITICAL(&gAngleMux);
-  angleCopy = gAngleFiltDegShared;
-  seqCopy   = gAngleSeq;
-  portEXIT_CRITICAL(&gAngleMux);
-
-  if (seqCopy != lastSeq) {
-    int idx = angleToIndex(angleCopy);
-    if (idx != lastIdx) {
-      drawLine(idx);
-      lastIdx = idx;
+    // Short press toggles arm request.
+    // Arm only allowed when Roller is online.
+    if (M5.Btn.wasPressed()) {
+        if (gRollerOnline) {
+            gEnableRequested = !gEnableRequested;
+            gStateMachine.requestEnabled(gEnableRequested);
+        }
     }
-    lastSeq = seqCopy;
-  }
 
-  // loop 不必固定周期，IMU 已被定时器稳定驱动
-  delay(5);
+    const uint32_t nowUs = micros();
+    const uint32_t nowMs = millis();
+
+    // 1) IMU loop.
+    if (static_cast<uint32_t>(nowUs - gLastImuUs) >= periodUs(appcfg::kImuHz)) {
+        gLastImuUs += periodUs(appcfg::kImuHz);
+        gImu.update(periodSec(appcfg::kImuHz));
+    }
+
+    // 2) Motor feedback loop.
+    if (static_cast<uint32_t>(nowUs - gLastFeedbackUs) >= periodUs(appcfg::kFeedbackHz)) {
+        gLastFeedbackUs += periodUs(appcfg::kFeedbackHz);
+        gMotorFeedback = gRoller.readFeedback();
+    }
+
+    // 3) State + control loop (core logic).
+    if (static_cast<uint32_t>(nowUs - gLastCtrlUs) >= periodUs(appcfg::kCtrlHz)) {
+        gLastCtrlUs += periodUs(appcfg::kCtrlHz);
+
+        const ImuSample imu = gImu.sample();
+
+        // State machine decides mode transitions and safety latch behavior.
+        gStateMachine.update(nowMs, imu, gMotorFeedback, gSafety);
+
+        // Output-stage control is tied to mode transitions, not raw button state.
+        const bool shouldEnableMotor = gStateMachine.motorShouldEnable();
+        if (shouldEnableMotor != gMotorOutputEnabled) {
+            if (shouldEnableMotor) {
+                // Fresh controller state prevents stale integral/output memory.
+                gController.reset();
+                gRoller.setOutput(true);
+                gMotorOutputEnabled = true;
+            } else {
+                // On any non-balancing mode, force safe stop.
+                gController.reset();
+                gLastCurrentCmd = 0.0f;
+                gRoller.stop();
+                gMotorOutputEnabled = false;
+            }
+        }
+
+        // Compute and send command only in Balancing mode.
+        if (gStateMachine.controlActive()) {
+            const float thetaErr = gStateMachine.thetaErrorDeg(imu);
+            gLastCurrentCmd =
+                gController.step(thetaErr, imu.roll_rate_dps, gMotorFeedback.speed_raw, periodSec(appcfg::kCtrlHz));
+            gRoller.writeCurrentCommand(gLastCurrentCmd);
+        }
+    }
+
+    // 4) UI loop.
+    if (static_cast<uint32_t>(nowUs - gLastUiUs) >= periodUs(appcfg::kUiHz)) {
+        gLastUiUs += periodUs(appcfg::kUiHz);
+
+        const AppMode mode = gStateMachine.mode();
+        const ImuSample imu = gImu.sample();
+        const float thetaErr = gStateMachine.thetaErrorDeg(imu);
+
+        // Offline Roller is treated visually as fault.
+        if (!gRollerOnline) {
+            drawFault();
+        } else if (mode == AppMode::Disarmed) {
+            drawDisarmed();
+        } else if (mode == AppMode::RefCapture) {
+            // Blink helps user hold system still while ref is captured.
+            const bool blinkOn = ((nowMs / 250) % 2) == 0;
+            drawRefCapture(blinkOn);
+        } else if (mode == AppMode::Balancing) {
+            drawBalancing(thetaErr);
+        } else {
+            drawFault();
+        }
+    }
+
+    // 5) Log loop.
+    // This is the main tuning stream: mode, reference angle, current angle/rate,
+    // command output, and motor readback.
+    if (static_cast<uint32_t>(nowUs - gLastLogUs) >= periodUs(appcfg::kLogHz)) {
+        gLastLogUs += periodUs(appcfg::kLogHz);
+        const ImuSample imu = gImu.sample();
+        const float thetaErr = gStateMachine.thetaErrorDeg(imu);
+        Serial.printf(
+            "mode=%s req=%d ref=%.2f roll=%.2f err=%.2f rate=%.2f cmd=%.1f speed=%ld cur=%ld ferr=%u dir=%d online=%d\n",
+            modeName(gStateMachine.mode()), gEnableRequested ? 1 : 0, gStateMachine.thetaRefDeg(), imu.roll_deg,
+            thetaErr, imu.roll_rate_dps, gLastCurrentCmd, static_cast<long>(gMotorFeedback.speed_raw),
+            static_cast<long>(gMotorFeedback.current_raw), gStateMachine.fault() == FaultCode::None ? 0 : 1,
+            gMotorDirection, gRollerOnline ? 1 : 0);
+    }
 }
