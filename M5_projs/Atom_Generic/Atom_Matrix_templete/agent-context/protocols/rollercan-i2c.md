@@ -5,7 +5,8 @@
 
 ## 硬件 / 接线
 - 模块：**M5Stack Unit RollerCAN**（无刷直流电机 + 编码器 + FOC），支持 **CAN / I²C** 两种总线，**本项目用 I²C**。
-- 接 ATOM **Grove 口**：**SDA = G26，SCL = G32**，400kHz（**勿用 100kHz**，见 [esp32-i2c-frequency-caveat.md](esp32-i2c-frequency-caveat.md)）。
+- 接 ATOM **Grove 口**：**SDA = G26，SCL = G32**。I²C 频率 **TBD（暂定 ~200kHz）**：
+  **100kHz 和 400kHz 均为危险频率、勿用**，见 [esp32-i2c-frequency-caveat.md](esp32-i2c-frequency-caveat.md)。
 - **默认 I²C 从机地址 = `0x64`**（`#define I2C_ADDR (0x64)`），本项目用默认地址。
 - 与 ATOM 内部 IMU(MPU6886) 的 I²C 是不同组，互不冲突。
 
@@ -16,7 +17,7 @@
 - 库已封装帧/CRC，**直接调方法即可，无需手写协议**。
 
 ## 库 API（I²C，UnitRollerI2C）
-- 初始化：`begin(&Wire, 0x64, 26, 32, 400000)`
+- 初始化：`begin(&Wire, 0x64, 26, 32, <freq>)` —— **freq 勿用 400000/100000**（危险频率），暂定 ~200000，待实测
 - 模式枚举：`ROLLER_MODE_SPEED=1 / _POSITION=2 / _CURRENT=3 / _ENCODER=4`
 - 控制：`setMode(mode)`、`setOutput(en)`(1开/0关)、`setCurrent(i)`、`setSpeed(s)`+`setSpeedMaxCurrent()`、`setPos(p)`+`setPosMaxCurrent()`、`setSpeedPID()`、`setPosPID()`
 - 读回：`getCurrentReadback()`、`getSpeedReadback()`、`getPosReadback()`（均 ÷100）、`getCurrent()/getSpeed()/getPos()`（读设定值）

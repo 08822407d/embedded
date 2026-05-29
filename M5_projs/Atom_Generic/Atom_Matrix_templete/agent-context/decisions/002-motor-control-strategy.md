@@ -25,7 +25,7 @@
 - 健康：`getVin()÷100`、`getTemp()`
 
 ## 初始化顺序（电流模式）
-1. `begin(&Wire, 0x64, 26, 32, 400000)`
+1. `begin(&Wire, 0x64, 26, 32, <freq>)`（**freq 勿用 400000/100000**，危险频率，暂定 ~200000 待实测，见 [protocols/esp32-i2c-frequency-caveat.md](../protocols/esp32-i2c-frequency-caveat.md)）
 2. `setOutput(0)`（改模式前先关输出）
 3. `setMode(ROLLER_MODE_CURRENT)`
 4. `setCurrent(0)`（初始零力矩，防使能跳变）
