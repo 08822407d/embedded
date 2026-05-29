@@ -20,3 +20,4 @@
 ## sessions/
 - [2026-05-29 第1步 IMU 读取与标定](sessions/2026-05-29-step1-imu.md) — 环境/串口桥/存储系统/IMU标定
 - [2026-05-29 电机模块文档调研](sessions/2026-05-29-motor-module-research.md) — RollerCAN I²C/库API/控制方案确认(未编码)
+- [2026-05-29 电机方向辨识进度(WIP)](sessions/2026-05-29-motor-dir-test.md) — 编码+实测；发现加速度动态不可信/需陀螺、需挣脱力矩；防翻保底(面内+侧向)
