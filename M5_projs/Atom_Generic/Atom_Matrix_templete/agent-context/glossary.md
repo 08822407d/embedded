@@ -10,3 +10,7 @@
 - **静止态 A / B** — 倒向两侧、某个侧面贴桌的稳定静止状态。
 - **可动轴** — 系统唯一旋转自由度对应的 IMU 姿态角 = **pitch**（roll 正交无关）。详见 [system-model.md](system-model.md)。
 - **串口桥** — `tools/serial_bridge.py`，单进程独占串口、并发收发的监控/发令工具。
+- **RollerCAN** — M5 反作用轮电机（无刷+编码器+FOC），本项目经 I²C(地址0x64) 控制。见 [protocols/rollercan-i2c.md](protocols/rollercan-i2c.md)。
+- **反作用轮 / 飞轮** — 电机带动的惯性轮；靠其角加速度产生反作用力矩驱动机体平衡。
+- **去饱和 (desaturation)** — 飞轮转速持续累积会饱和而失去控制力矩，需外环把转速拉回。
+- **电流(力矩)模式** — 电机控制方式，T=Kt·I，下发电流即下发力矩；本项目主控量。见 [decisions/002](decisions/002-motor-control-strategy.md)。

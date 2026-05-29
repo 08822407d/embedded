@@ -1,28 +1,26 @@
 /*
- * 屏动平衡系统 —— 第 1 步：IMU 姿态角读取
- * 硬件: M5Stack ATOM Matrix (MPU6886 IMU)
+ * 屏动平衡系统 —— 主程序（装配各功能模块）
+ * 硬件: M5Stack ATOM Matrix (MPU6886 IMU + 5x5 RGB 点阵)
  *
- * 目标:
- *   读取 IMU，换算成两个姿态角（不输出原始加速度）:
- *     pitch 俯仰角 —— 绕 Y 轴前后俯仰
- *     roll  横滚/倾角 —— 绕 X 轴左右倾斜
- *   采样间隔 50ms (20Hz)，与原工程一致，保证实时性。
+ * 代码组织约定：按功能分模块，main 只做初始化与主循环装配，不堆业务代码。
+ *   - imu.*   IMU 姿态读取
+ *   - led.*   LED 点阵控制（临时，暂未接入）
+ *   - (后续) 电机控制等各自独立成文件
  *
- * 用途:
- *   通过物理倾斜设备，观察哪个角随系统“可活动方向”变化，
- *   以确定可动轴对应的是 pitch 还是 roll。
+ * 当前阶段（第 1 步）：读 IMU 输出 pitch/roll，50ms/20Hz。
  */
 #include <M5Atom.h>
+
+#include "imu.h"
+#include "led.h"  // 临时功能，暂未在 loop 中调用
 
 // 采样间隔：沿用原工程的 50ms (20Hz)
 static const uint32_t SAMPLE_INTERVAL_MS = 50;
 
-static const double RAD2DEG = 180.0 / PI;
-
 void setup() {
     // 初始化 ATOM-Matrix：串口 + I2C(IMU)，暂不使用 LED 点阵
     M5.begin(true, true, false);
-    M5.IMU.Init();  // 初始化 MPU6886
+    imuInit();
     delay(100);
     Serial.println();
     Serial.println("# step1: IMU attitude (pitch/roll), 20Hz");
@@ -30,12 +28,8 @@ void setup() {
 }
 
 void loop() {
-    float accX = 0, accY = 0, accZ = 0;
-    M5.IMU.getAccelData(&accX, &accY, &accZ);  // 单位: g
-
-    // 由重力方向换算静态姿态角（atan2 给出完整量程）
-    double pitch = atan2(-accX, sqrt(accY * accY + accZ * accZ)) * RAD2DEG;
-    double roll  = atan2(accY, accZ) * RAD2DEG;
+    double pitch = 0, roll = 0;
+    imuReadAttitude(&pitch, &roll);
 
     Serial.printf("pitch=%7.2f  roll=%7.2f\n", pitch, roll);
 

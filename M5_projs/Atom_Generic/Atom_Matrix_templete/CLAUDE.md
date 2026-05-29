@@ -18,9 +18,17 @@
 
 ## 项目速览
 
-- 硬件：M5Stack ATOM Matrix（ESP32 + MPU6886 IMU + 5×5 RGB 点阵）。
+- 硬件：M5Stack ATOM Matrix（ESP32 + MPU6886 IMU + 5×5 RGB 点阵）+ RollerCAN 反作用轮电机。
 - 构建：PlatformIO，env `m5stack-atom`，framework arduino。
 - 串口：开发板为 `/dev/ttyUSB0`（FTDI, "M5stack"），监控 115200。
   监控用 `tools/serial_bridge.py`（单进程独占串口，并发收发；`pio device monitor`
   在无 TTY 环境不可用）。
-- 目标系统：反作用轮 / 动量平衡（"屏动平衡"）。详见 `agent-context/`。
+- 电机：RollerCAN 经 I²C(地址 0x64，Grove SDA=26/SCL=32) 控制，用官方库 `M5Unit-Roller`
+  的 `UnitRollerI2C`，**电流(力矩)模式**。详见 `agent-context/protocols/rollercan-i2c.md`、`decisions/002`。
+- 目标系统：反作用轮倒立摆（"屏动平衡"，单轴，被控量 pitch，平衡点 0°）。详见 `agent-context/`。
+
+## 代码组织约定（务必遵守）
+
+- 按功能分模块，**不要把代码都堆进 `main.cpp`**；main 只做初始化与主循环装配。
+- 现有模块：`src/imu.*`（IMU 姿态）、`src/led.*`（LED 点阵，临时）；后续电机 → `src/motor.*`。
+- 模块间通过头文件接口交互。

@@ -11,9 +11,11 @@
 
 ## decisions/
 - [001 IMU 姿态角读取方式与采样](decisions/001-imu-readout.md) — getAccelData+atan2、50ms、调试等级降为1
+- [002 电机控制方式：电流(力矩)模式](decisions/002-motor-control-strategy.md) — 反作用轮用电流模式，状态读取项与初始化顺序
 
 ## protocols/
-<!-- 例: - [串口命令协议](protocols/serial-command-protocol.md) — 反作用轮电机命令格式（待补） -->
+- [RollerCAN I²C 控制](protocols/rollercan-i2c.md) — 接线/地址0x64/官方库 UnitRollerI2C API/定标/帧协议
 
 ## sessions/
 - [2026-05-29 第1步 IMU 读取与标定](sessions/2026-05-29-step1-imu.md) — 环境/串口桥/存储系统/IMU标定
+- [2026-05-29 电机模块文档调研](sessions/2026-05-29-motor-module-research.md) — RollerCAN I²C/库API/控制方案确认(未编码)
