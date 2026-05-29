@@ -15,6 +15,7 @@
 
 ## protocols/
 - [RollerCAN I²C 控制](protocols/rollercan-i2c.md) — 接线/地址0x64/官方库 UnitRollerI2C API/定标/帧协议
+- [ESP32 I²C 频率坑](protocols/esp32-i2c-frequency-caveat.md) — 避开100kHz(~10ms延迟)、>143kHz崩溃已在3.2.0修复，留源备查
 
 ## sessions/
 - [2026-05-29 第1步 IMU 读取与标定](sessions/2026-05-29-step1-imu.md) — 环境/串口桥/存储系统/IMU标定

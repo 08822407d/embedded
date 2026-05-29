@@ -5,7 +5,7 @@
 
 ## 硬件 / 接线
 - 模块：**M5Stack Unit RollerCAN**（无刷直流电机 + 编码器 + FOC），支持 **CAN / I²C** 两种总线，**本项目用 I²C**。
-- 接 ATOM **Grove 口**：**SDA = G26，SCL = G32**，400kHz。
+- 接 ATOM **Grove 口**：**SDA = G26，SCL = G32**，400kHz（**勿用 100kHz**，见 [esp32-i2c-frequency-caveat.md](esp32-i2c-frequency-caveat.md)）。
 - **默认 I²C 从机地址 = `0x64`**（`#define I2C_ADDR (0x64)`），本项目用默认地址。
 - 与 ATOM 内部 IMU(MPU6886) 的 I²C 是不同组，互不冲突。
 
