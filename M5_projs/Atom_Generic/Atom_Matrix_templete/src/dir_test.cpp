@@ -50,6 +50,7 @@ static float    g_fusedPitch  = 0;   // 互补滤波后的 pitch（看门狗/判
 static float    g_gyBias      = 0;   // pitch 轴(gy)陀螺零偏（°/s），运行前现标
 static float    g_gxBias      = 0;   // lateral 轴(gx)陀螺零偏（°/s），运行前现标
 static float    g_lastCur     = 0;   // 最近一次读到的实际电流（mA），避免重复 I²C 读
+static float    g_lastGyRate  = 0;   // 最近一次 pitch 轴角速度(gy 扣零偏, °/s)——起摆刹车判停用
 static uint8_t  g_lastErr     = 0;   // 最近一次电机错误码（1过压/2堵转/4越界）
 static uint32_t g_lastSampleMs = 0;  // 上一帧时间戳，用于求真实 dt（积分用）
 
@@ -69,7 +70,8 @@ static float sampleAndLog(const char *phase) {
     g_lastLateral = (float)imuFusionStepLateral(lat, gx - g_gxBias, dt);
     // 互补滤波：pitch 轴陀螺(gy 扣零偏)主导动态、加速度慢校正。
     //   动态下信陀螺（飞轮线加速度污染加速度角；陀螺仅高频振动且零均值，积分≈0）。
-    g_fusedPitch = (float)imuFusionStepPitch(pitch, gy - g_gyBias, dt);
+    g_lastGyRate = gy - g_gyBias;  // pitch 轴角速度(°/s)，刹车判停用
+    g_fusedPitch = (float)imuFusionStepPitch(pitch, g_lastGyRate, dt);
 
     float   cmd = motorCommandedmA();
     float   cur = motorCurrentmA();
@@ -292,17 +294,17 @@ int dirTestRestoreCurrentSign() {
     return g_restoreSign;
 }
 
-// 共用开局：打表头 → 标定陀螺零偏(点阵橙) → 播种互补滤波 → 静置 3s → 校验在 B。
-//   返回 true=校准成功且在静止态 B；false=已 ABORT/断电（调用方应直接 return）。
-static bool prepAtRestB() {
+// 共用开局：打表头 → 标定陀螺零偏(点阵橙) → 播种互补滤波 → 静置 3s → 识别静止态。
+//   返回 +1=在静止态 B(+30°)，-1=在静止态 A(-31°)，0=校准失败/不在 A/B（已 ABORT/断电，调用方直接 return）。
+static int prepAtRest() {
     Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
-    Serial.println("# 请确认系统处于静止态 B，3 秒后开始...");
+    Serial.println("# 请确认系统处于静止态 A 或 B，3 秒后开始...");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));  // 橙：正在校准
     if (!imuCalibrateGyro(200)) {
         M5.dis.fillpix(CRGB(0x40, 0x00, 0x00));  // 红：校准失败
         Serial.println("# ABORT：陀螺标定多次检测到运动，未取得静止窗 → 不驱动电机。");
         motorPowerOff();
-        return false;
+        return 0;
     }
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿：校准完成
     {
@@ -325,17 +327,25 @@ static bool prepAtRestB() {
     for (int i = 0; i < 3000 / (int)TICK_MS; i++) { delay(TICK_MS); sampleAndLog("WAIT"); }
 
     float p0 = sampleAndLog("CHECK");
-    Serial.printf("# 起始 pitch=%.2f（预期 ~%.1f）\n", p0, REST_B_DEG);
-    if (fabsf(p0 - REST_B_DEG) > REST_BAND_DEG) {
-        Serial.println("# ABORT：不在静止态 B。");
-        motorPowerOff();
-        return false;
+    if (fabsf(p0 - REST_B_DEG) < REST_BAND_DEG) {
+        Serial.printf("# 起始 pitch=%.2f → 静止态 B(+%.0f°)\n", p0, REST_B_DEG);
+        return +1;
     }
-    return true;
+    if (fabsf(p0 - REST_A_DEG) < REST_BAND_DEG) {
+        Serial.printf("# 起始 pitch=%.2f → 静止态 A(%.0f°)\n", p0, REST_A_DEG);
+        return -1;
+    }
+    Serial.printf("# ABORT：不在静止态 A/B（pitch=%.2f）。\n", p0);
+    motorPowerOff();
+    return 0;
 }
 
 void dirTestRun() {
-    if (!prepAtRestB()) return;
+    if (prepAtRest() != +1) {  // 方向辨识固定从 B 起
+        Serial.println("# （方向辨识需从静止态 B 开始）");
+        motorPowerOff();
+        return;
+    }
 
     // 正向、反向渐增探测
     float dPos = 0, dNeg = 0;
@@ -376,7 +386,7 @@ void dirTestRun() {
 //   toward=-1：负转速=朝平衡（与电流模式 restoreSign=-1 同向，已 3 次实测确认）。
 //   安全：横滚/侧向沿用保守阈值(≤34/15，均在用户 42° 上限内)；遇险 setSpeed0+断电。
 void speedModeTest() {
-    if (!prepAtRestB()) return;
+    if (prepAtRest() != +1) { motorPowerOff(); return; }  // 速度模式测试固定从 B 起
     const int      toward      = -1;
     const float    targets[]   = {500, 1000, 1500, 2000, 3000};
     const uint32_t SPD_PULSE_MS = 400;  // 速度模式给更长加速时间观察顶速
@@ -433,13 +443,23 @@ void speedModeTest() {
     Serial.println("# 全部测试完成，电机已断电。");
 }
 
+// 危险消抖：角度类危险需**连续 DANGER_NEED 次**越界才确认，滤掉飞轮振动造成的单帧假尖峰；
+//   过压立即确认（硬故障）。配合片上 DLPF 双保险。
+static int       g_dangerStreak = 0;
+static const int DANGER_NEED    = 3;  // 连续 3 帧(=60ms)越界才算真危险
+
 // 上电(XT30 高压)专用危险处理：真力矩下**只断电、不主动反向恢复**（避免无人值守时反向甩动失控）。
-//   过压(err=1)同样立即断电。返回 true=已断电应中止。
+//   含消抖；过压(err=1)立即断电。返回 true=已断电应中止。
 static bool poweredDangerStop(float pitch) {
+    if (g_lastErr == 1) {  // 过压：硬故障，立即
+        Serial.println("# !! 过压(E:1) → 立即断电");
+        motorStop(); motorPowerOff(); g_faulted = true; return true;
+    }
     DangerKind dk = checkDanger(pitch);
-    if (dk == DK_NONE && g_lastErr != 1) return false;
-    Serial.printf("# !! 危险(kind=%d err=%u pitch=%.1f lat=%.1f spd=%.0f) → 立即断电\n",
-                  (int)dk, g_lastErr, pitch, g_lastLateral, g_lastSpeed);
+    if (dk == DK_NONE) { g_dangerStreak = 0; return false; }
+    if (++g_dangerStreak < DANGER_NEED) return false;  // 还没连够 → 疑似振动尖峰，先不动
+    Serial.printf("# !! 危险确认(kind=%d 连%d帧 pitch=%.1f lat=%.1f spd=%.0f) → 断电\n",
+                  (int)dk, g_dangerStreak, pitch, g_lastLateral, g_lastSpeed);
     motorStop();
     motorPowerOff();
     g_faulted = true;
@@ -447,23 +467,27 @@ static bool poweredDangerStop(float pitch) {
 }
 
 // 上电谨慎起跳表征（电流模式，XT30 接 12-15V 后用）：
-//   仅朝平衡方向(已知 -1)，从极小电流 50mA 起步、步进 50、短脉冲、脱阱即停、自复位；
-//   遇险/过压只断电；含上电 Vin/错误自检。真力矩下尽量小冲量找阈值，降低过冲翻越风险。
+//   **自动识别在 A 还是 B**，朝平衡方向施力（B→负电流、A→正电流）；从极小 50mA 起步、步进 50、
+//   短脉冲、脱阱即停、自复位；遇险/过压只断电；含上电 Vin/错误自检。真力矩下小冲量找阈值，降低过冲翻越风险。
+//   advance(朝平衡前进) = st·(restAngle − pitch)，st=+1@B / −1@A；脱阱后机体落到另一态，可连续测。
 void poweredBreakawayTest() {
-    if (!prepAtRestB()) return;
+    int st = prepAtRest();
+    if (st == 0) return;                                  // 校准失败/不在 A/B（已断电）
+    const float restAngle = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const int   toward    = -st;                          // B(+1)→-1电流; A(-1)→+1电流，均朝平衡
 
     float   vin  = motorVoltage();
     uint8_t err0 = motorErrorCode();
-    Serial.printf("# 上电自检: Vin=%.2fV err=%u\n", vin, err0);
+    Serial.printf("# 上电自检: Vin=%.2fV err=%u（起始态=%s, 朝平衡电流符号=%+d）\n",
+                  vin, err0, (st == +1) ? "B" : "A", toward);
     if (err0 == 1) { Serial.println("# ABORT: 电机过压(E:1) → 断电"); motorPowerOff(); return; }
     if (vin < 6.0f) Serial.println("# 注意: Vin<6V，XT30 高压似乎未接入；仍按低功率谨慎进行。");
 
-    const int      toward    = -1;            // 负电流朝平衡（3 次实测确认）
     const float    PB_START  = 50.0f;         // 真力矩下从极小起步
     const float    PB_STEP   = 50.0f;
     const uint32_t PB_PULSE  = 150;           // 更短脉冲，限单次冲量
     const uint32_t PB_SETTLE = 1200;
-    const float    PB_BRK    = 8.0f;          // 朝平衡前进超此=脱阱（比 12 更早切，限过冲）
+    const float    PB_BRK    = 8.0f;          // 朝平衡前进超此=脱阱（早切，限过冲）
 
     Serial.println("# === 上电起跳表征(谨慎)：朝平衡 50→1200mA，脱阱即停，遇险断电 ===");
     M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝
@@ -471,7 +495,7 @@ void poweredBreakawayTest() {
 
     for (float mA = PB_START; mA <= MOTOR_MAX_MA + 0.1f; mA += PB_STEP) {
         float pPre = sampleAndLog("PB_PRE");
-        if (fabsf(pPre - REST_B_DEG) > REST_BAND_DEG * 2) {  // 没回到 B 先等自复位
+        if (fabsf(pPre - restAngle) > REST_BAND_DEG * 2) {  // 没回到起始态先等自复位
             uint32_t t = millis();
             while (millis() - t < PB_SETTLE) {
                 delay(TICK_MS);
@@ -481,35 +505,36 @@ void poweredBreakawayTest() {
             pPre = sampleAndLog("PB_PRE");
         }
 
-        float minPitch = pPre, maxSpd = 0, maxCur = 0;
-        bool  broke    = false;
+        float maxAdv = 0, maxSpd = 0, maxCur = 0;
+        bool  broke  = false;
         motorSetCurrentmA((float)toward * mA);
         uint32_t t0 = millis();
         while (millis() - t0 < PB_PULSE) {
             delay(TICK_MS);
-            float p = sampleAndLog("PB");
-            if (p < minPitch) minPitch = p;
+            float p   = sampleAndLog("PB");
+            float adv = (float)st * (restAngle - p);  // 朝平衡前进（>0）
+            if (adv > maxAdv) maxAdv = adv;
             if (fabsf(g_lastSpeed) > maxSpd) maxSpd = fabsf(g_lastSpeed);
             if (fabsf(g_lastCur)   > maxCur) maxCur = fabsf(g_lastCur);
             if (poweredDangerStop(p)) return;
-            if (pPre - p > PB_BRK) { broke = true; break; }  // 脱阱→立即停推
+            if (maxAdv > PB_BRK) { broke = true; break; }  // 脱阱→立即停推
         }
         motorStop();
 
         uint32_t t1 = millis();
         while (millis() - t1 < PB_SETTLE) {
             delay(TICK_MS);
-            float p = sampleAndLog("PB_SET");
-            if (p < minPitch) minPitch = p;
+            float p   = sampleAndLog("PB_SET");
+            float adv = (float)st * (restAngle - p);
+            if (adv > maxAdv) maxAdv = adv;
             if (poweredDangerStop(p)) return;
         }
 
-        float adv = pPre - minPitch;
         Serial.printf("# 起跳 %+.0fmA: 朝平衡前进=%.2f° 峰值转速=%.0frpm 峰值电流=%.0fmA Vin=%.2f\n",
-                      (float)toward * mA, adv, maxSpd, maxCur, motorVoltage());
-        if (broke || adv > PB_BRK) {
+                      (float)toward * mA, maxAdv, maxSpd, maxCur, motorVoltage());
+        if (broke || maxAdv > PB_BRK) {
             thr = mA;
-            Serial.printf("# => 脱阱！起跳阈值 ≈ %.0fmA（前进 %.1f°）。停止。\n", mA, adv);
+            Serial.printf("# => 脱阱！起跳阈值 ≈ %.0fmA（前进 %.1f°）。停止。\n", mA, maxAdv);
             break;
         }
     }
@@ -519,6 +544,471 @@ void poweredBreakawayTest() {
     if (thr == 0) Serial.printf("# 升至 %.0fmA 仍未脱阱。\n", MOTOR_MAX_MA);
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿
     Serial.println("# 全部测试完成，电机已断电。");
+}
+
+// ===== 起跳策略（可更换）=====
+SwingUpStrategy g_swingUpStrategy = SWINGUP_CUBLI;  // 默认 Cubli
+void swingUpSetStrategy(SwingUpStrategy s) { g_swingUpStrategy = s; }
+static const char *swingUpName(SwingUpStrategy s) {
+    switch (s) { case SWINGUP_IMPULSE: return "突然启动单次冲量";
+                 case SWINGUP_PUMP:    return "震荡式蓄能(秋千)";
+                 default:              return "Cubli蓄能急刹"; }
+}
+
+// ---- 策略1：Cubli 蓄能急刹（默认）----
+// 教训(run_cubli2)：满蓄能1600rpm+全力起跳 → 机体以1261°/s越平衡、冲过对面+38.5°**翻倒**。
+//   ⇒ 起跳能量必须**远小**：蓄能转速**逐级加大**找最温和越平衡，越平衡即停加能并**立即反向急刹防翻**。
+//   方向：driveSign=-st(起跳)、spinSign=+st(反向蓄能/越平衡后急刹)。落点精准本质需平衡控制器接住。
+static void swingUpCubli(int st) {
+    const float startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const int   driveSign = -st;
+    const int   spinSign  = +st;
+
+    const float    SPIN_MA   = 140.0f;        // 蓄能电流（<挣脱200，机体留在起始态）
+    const float    HOLD_TOL  = 4.0f;
+    const float    KICK_MA   = MOTOR_MAX_MA;  // 起跳全力（越平衡瞬间即停，速度由蓄能量决定）
+    const uint32_t SPIN_TO   = 6000;
+    const uint32_t KICK_TO   = 1000;
+    const uint32_t MANAGE_TO = 2500;
+    const float    GY_STOP   = 12.0f;
+    // 蓄能转速从低到高（无蓄能的单次自旋只到平衡前 9°，故只需补一点点）：找最温和的越平衡
+    const float    spinTargets[] = {200, 300, 400, 550, 700, 900};
+
+    bool crossedOnce = false;
+    for (unsigned i = 0; i < sizeof(spinTargets) / sizeof(spinTargets[0]) && !crossedOnce; i++) {
+        float spinTgt = spinTargets[i];
+
+        // 回到起始态（自复位）
+        float pPre = sampleAndLog("CU_PRE");
+        if (fabsf(pPre - startRest) > REST_BAND_DEG * 2) {
+            uint32_t t = millis();
+            while (millis() - t < 1500) { delay(TICK_MS); float p = sampleAndLog("CU_PRE"); if (poweredDangerStop(p)) return; }
+            pPre = sampleAndLog("CU_PRE");
+            if (fabsf(pPre - startRest) > REST_BAND_DEG * 2) { Serial.printf("# 未回到起始态(%.1f) 跳过档%u\n", pPre, i); continue; }
+        }
+
+        // 蓄能（反向，小电流，机体留在起始态）
+        Serial.printf("# [档%u] 蓄能 %+.0fmA → %.0frpm\n", i, spinSign * SPIN_MA, spinTgt);
+        M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));  // 橙
+        motorSetCurrentmA((float)spinSign * SPIN_MA);
+        uint32_t t0 = millis();
+        while (millis() - t0 < SPIN_TO) {
+            delay(TICK_MS);
+            float p = sampleAndLog("CU_SPIN");
+            if (poweredDangerStop(p)) return;
+            if (fabsf(p - startRest) > HOLD_TOL) { motorStop(); motorPowerOff(); Serial.printf("# 蓄能机体离位(%.1f)中止\n", p); return; }
+            if (fabsf(g_lastSpeed) >= spinTgt) break;
+        }
+
+        // 起跳：全力正向，越平衡即停加能
+        Serial.printf("# [档%u] 起跳 %+.0fmA（飞轮%.0frpm）\n", i, driveSign * KICK_MA, g_lastSpeed);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
+        motorSetCurrentmA((float)driveSign * KICK_MA);
+        bool  crossed = false;
+        float closest = startRest;
+        uint32_t t1 = millis();
+        while (millis() - t1 < KICK_TO) {
+            delay(TICK_MS);
+            float p = sampleAndLog("CU_KICK");
+            if ((float)st * (startRest - p) > (float)st * (startRest - closest)) closest = p;
+            if (poweredDangerStop(p)) return;
+            if ((float)st * p < 0) { crossed = true; break; }        // 越过平衡
+            if ((float)driveSign * g_lastGyRate <= 0) break;         // 顶点（未越过）
+        }
+        motorStop();  // 立即停加能
+
+        if (!crossed) {
+            // 未越过 → 回落侧减速防过冲 + 自复位，再加大蓄能
+            Serial.printf("# [档%u] 未越平衡（最高 %.1f）。回落侧减速后加大蓄能。\n", i, closest);
+            M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));
+            motorSetCurrentmA((float)driveSign * 600.0f);  // 中等减速回落，防冲过起始态外棱
+            uint32_t t2 = millis();
+            while (millis() - t2 < MANAGE_TO) {
+                delay(TICK_MS); float p = sampleAndLog("CU_CATCH");
+                if (poweredDangerStop(p)) return;
+                if (fabsf(p - startRest) < REST_BAND_DEG && fabsf(g_lastGyRate) < GY_STOP) break;
+            }
+            motorStop();
+            continue;  // 加大蓄能
+        }
+
+        // 越过平衡 → **立即全力反向急刹**（防翻优先；上次实测立即急刹能拦住、coast 则翻倒）
+        crossedOnce = true;
+        Serial.printf("# ★[档%u] 越过平衡(closest=%.1f, 蓄能%.0frpm)！立即反向急刹防冲过对面/翻倒。\n", i, closest, spinTgt);
+        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝
+        motorSetCurrentmA((float)spinSign * KICK_MA);
+        float farPeak = 0;
+        uint32_t t2 = millis();
+        while (millis() - t2 < MANAGE_TO) {
+            delay(TICK_MS);
+            float p = sampleAndLog("CU_FAR");
+            if ((float)st * p < (float)st * farPeak) farPeak = p;
+            if (poweredDangerStop(p)) return;
+            if ((float)driveSign * g_lastGyRate <= GY_STOP) break;  // 摆停
+        }
+        motorStop();
+        Serial.printf("# 冲对面峰值 pitch=%.1f\n", farPeak);
+    }
+
+    // 落定观察
+    uint32_t ts = millis();
+    float pe = 0;
+    while (millis() - ts < 1500) { delay(TICK_MS); float p = sampleAndLog("CU_SETTLE"); pe = p; if (poweredDangerStop(p)) return; }
+    motorStop();
+    Serial.printf("# Cubli起跳结束：%s，最终落于 %.1f。\n", crossedOnce ? "已安全越过平衡" : "未越过平衡", pe);
+}
+
+// ---- 策略2：突然启动电机单次冲量（早期方案）----
+// 直接全幅施加驱动电流（无蓄能），逐级加大单次冲量找最小越平衡值；越平衡立即反向急刹、未越则回落侧减速。
+//   受单次飞轮动量限制（实测单次只到平衡前 ~9°），多半越不过——保留作对比/弱机动用。
+static void swingUpImpulse(int st) {
+    const float startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const int   driveSign = -st;
+    const int   spinSign  = +st;
+    const float    SU_START = 300.0f, SU_STEP = 100.0f, SU_MAX = 900.0f;
+    const uint32_t SU_DRIVE_TO = 700, MANAGE_TO = 2000;
+    const float    GY_STOP = 12.0f;
+
+    Serial.println("# 策略[突然启动单次冲量]：逐级加大单次驱动电流，找最小越平衡冲量。");
+    bool crossedOnce = false;
+    for (float mA = SU_START; mA <= SU_MAX + 0.1f && !crossedOnce; mA += SU_STEP) {
+        float pPre = sampleAndLog("IM_PRE");
+        if (fabsf(pPre - startRest) > REST_BAND_DEG * 2) {
+            uint32_t t = millis();
+            while (millis() - t < 1500) { delay(TICK_MS); float p = sampleAndLog("IM_PRE"); if (poweredDangerStop(p)) return; }
+            pPre = sampleAndLog("IM_PRE");
+            if (fabsf(pPre - startRest) > REST_BAND_DEG * 2) continue;
+        }
+        Serial.printf("# 单次冲量 %+.0fmA …\n", driveSign * mA);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+        motorSetCurrentmA((float)driveSign * mA);
+        bool  crossed = false;
+        float closest = startRest;
+        uint32_t t0 = millis();
+        while (millis() - t0 < SU_DRIVE_TO) {
+            delay(TICK_MS);
+            float p = sampleAndLog("IM_DRIVE");
+            if ((float)st * (startRest - p) > (float)st * (startRest - closest)) closest = p;
+            if (poweredDangerStop(p)) return;
+            if ((float)st * p < 0) { crossed = true; break; }
+            if ((float)driveSign * g_lastGyRate <= 0) break;
+        }
+        motorStop();
+        if (!crossed) {
+            Serial.printf("# %+.0fmA 未越平衡(最高 %.1f)，回落侧减速后加大。\n", driveSign * mA, closest);
+            motorSetCurrentmA((float)driveSign * 600.0f);
+            uint32_t t2 = millis();
+            while (millis() - t2 < MANAGE_TO) { delay(TICK_MS); float p = sampleAndLog("IM_CATCH"); if (poweredDangerStop(p)) return; if (fabsf(p - startRest) < REST_BAND_DEG && fabsf(g_lastGyRate) < GY_STOP) break; }
+            motorStop();
+            continue;
+        }
+        crossedOnce = true;
+        Serial.printf("# ★越平衡(closest=%.1f)！立即反向急刹防翻。\n", closest);
+        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));
+        motorSetCurrentmA((float)spinSign * MOTOR_MAX_MA);
+        float farPeak = 0;
+        uint32_t t2 = millis();
+        while (millis() - t2 < MANAGE_TO) { delay(TICK_MS); float p = sampleAndLog("IM_FAR"); if ((float)st * p < (float)st * farPeak) farPeak = p; if (poweredDangerStop(p)) return; if ((float)driveSign * g_lastGyRate <= GY_STOP) break; }
+        motorStop();
+        Serial.printf("# 冲对面峰值 %.1f\n", farPeak);
+    }
+    uint32_t ts = millis(); float pe = 0;
+    while (millis() - ts < 1500) { delay(TICK_MS); float p = sampleAndLog("IM_SET"); pe = p; if (poweredDangerStop(p)) return; }
+    motorStop();
+    Serial.printf("# 单次冲量起跳结束：%s，最终落于 %.1f。\n", crossedOnce ? "已越平衡" : "未越平衡(单次动量受限)", pe);
+}
+
+// ---- 策略3：莱洛三角震荡式蓄能（秋千）—— 当前硬件不适用，留空 ----
+// 思路（仅备注，未实现）：与机体自然摆动**同相位逐周泵能**，幅度逐渐增长直到越平衡（像荡秋千）。
+//   本套件**不适用**：几何强不对称（外棱距静止态仅 3-4°、平衡 30°+），振荡会先撞外棱再到平衡 → 不安全。
+//   若将来换更对称/飞轮惯量更大的机构，再在此实现。
+static void swingUpPump(int st) {
+    (void)st;
+    Serial.println("# 策略[震荡式蓄能/秋千]：当前硬件不适用（几何强不对称、外棱过近），未实现、留空。");
+}
+
+// ===== 起跳分派器：识别 A/B + Vin 自检 → 按 g_swingUpStrategy 调对应策略 =====
+void swingUpTest() {
+    int st = prepAtRest();
+    if (st == 0) return;
+    float   vin  = motorVoltage();
+    uint8_t err0 = motorErrorCode();
+    Serial.printf("# 起跳自检: Vin=%.2fV err=%u 起始=%s 策略=[%s]\n",
+                  vin, err0, (st == +1) ? "B" : "A", swingUpName(g_swingUpStrategy));
+    if (err0 == 1) { Serial.println("# ABORT: 过压 → 断电"); motorPowerOff(); return; }
+    if (vin < 6.0f) { Serial.println("# ABORT: Vin<6V，未接 12V，不试。"); motorPowerOff(); return; }
+
+    switch (g_swingUpStrategy) {
+        case SWINGUP_IMPULSE: swingUpImpulse(st); break;
+        case SWINGUP_PUMP:    swingUpPump(st);    break;
+        case SWINGUP_CUBLI:
+        default:              swingUpCubli(st);   break;
+    }
+    motorStop();
+    motorPowerOff();
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿
+}
+
+// ===== 启动自动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界 =====
+// [1] 两个 I²C 总线自检：IMU(MPU6886 在 Wire1 0x68)、电机(RollerCAN 在 Wire 0x64)。
+static bool i2cSelfCheck() {
+    Wire1.beginTransmission(0x68);              int imu = Wire1.endTransmission();
+    Wire.beginTransmission(MOTOR_I2C_ADDR);     int mot = Wire.endTransmission();
+    bool ok = (imu == 0) && (mot == 0);
+    Serial.printf("# [1] I²C 自检: IMU(Wire1,0x68)=%s  电机(Wire,0x%02X)=%s → %s\n",
+                  imu == 0 ? "OK" : "NG", MOTOR_I2C_ADDR, mot == 0 ? "OK" : "NG", ok ? "通过" : "失败");
+    return ok;
+}
+
+// [4] 危险边界渐进探测：当前静止态 st，**朝已知外棱方向(电流符号=+st)**逐级加流，
+//   渐进逼近"机体被推向外棱(不可恢复侧)"的临界。**速度钳 + 小偏移即停**(外棱仅 3-4°，绝不真翻)。
+//   返回逼近到的边界电流(mA，带符号)；0=升到上限仍很稳。
+float dangerBoundaryProbe(int st) {
+    const float restAngle    = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float outerSign    = (float)st;     // +st = 朝外棱
+    const float V_SAFE       = 60.0f;         // 朝外角速度钳(°/s)：超此=将失控→停
+    const float SAFE_DEFLECT = 2.5f;          // 朝外偏移超此(°)=已逼近外棱→停
+    const float    PB_START = 40.0f, PB_STEP = 25.0f;
+    const uint32_t PB_PULSE = 120, PB_SETTLE = 1200;
+
+    Serial.printf("# [4] %s侧危险边界探测：朝外棱(电流符号%+d)渐进加流，逼近即停。\n", (st == +1) ? "B" : "A", st);
+    float boundary = 0;
+    for (float mA = PB_START; mA <= MOTOR_MAX_MA + 0.1f; mA += PB_STEP) {
+        float pPre = sampleAndLog("DB_PRE");
+        if (fabsf(pPre - restAngle) > REST_BAND_DEG * 2) {  // 自复位
+            uint32_t t = millis();
+            while (millis() - t < PB_SETTLE) { delay(TICK_MS); float p = sampleAndLog("DB_PRE"); if (poweredDangerStop(p)) return boundary; }
+            pPre = sampleAndLog("DB_PRE");
+        }
+        float maxOut = 0, maxVout = 0;
+        bool  hit = false;
+        motorSetCurrentmA(outerSign * mA);
+        uint32_t t0 = millis();
+        while (millis() - t0 < PB_PULSE) {
+            delay(TICK_MS);
+            float p    = sampleAndLog("DB");
+            float outEx = outerSign * (p - restAngle);   // 朝外偏移(>0)
+            float vout  = (float)st * g_lastGyRate;      // 朝外角速度
+            if (outEx > maxOut)  maxOut = outEx;
+            if (vout  > maxVout) maxVout = vout;
+            if (poweredDangerStop(p)) return boundary;   // 硬保底(真到±34)
+            if (vout > V_SAFE || outEx > SAFE_DEFLECT) { hit = true; break; }  // 逼近→停
+        }
+        motorStop();
+        Serial.printf("# 朝外 %+.0fmA: 偏移峰值=%.2f° 朝外角速度峰值=%.0f°/s%s\n",
+                      outerSign * mA, maxOut, maxVout, hit ? " ←逼近外棱" : "");
+        uint32_t t1 = millis();
+        while (millis() - t1 < PB_SETTLE) { delay(TICK_MS); float p = sampleAndLog("DB_SET"); if (poweredDangerStop(p)) return boundary; }
+        if (hit) { boundary = outerSign * mA;
+                   Serial.printf("# => %s侧危险边界 ≈ %+.0fmA（朝外棱，超此将失控翻倒）\n", (st == +1) ? "B" : "A", boundary);
+                   break; }
+    }
+    if (boundary == 0) Serial.printf("# 升到 %.0fmA 仍未逼近外棱（边界更高/机体很稳）。\n", MOTOR_MAX_MA);
+    return boundary;
+}
+
+// [4] 击杀式方向探测：用一个**小冲量**安全试出"电机往哪转才朝平衡"。
+//   在预期朝平衡方向(-st)给小冲量；若机体反而朝**外棱(危险)**运动 → 转向相反(返 +st)。
+//   小冲量(实测 ~250mA 朝外棱仅偏 ~0.6°，安全)，速度钳+逼近外棱即停。返回朝平衡电流符号(±1)，0=不明确/异常。
+static int directionProbeKick(int st) {
+    const float restAngle = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float V_SAFE  = 60.0f;     // 朝外角速度钳
+    const float KICK_MA = 250.0f;    // 小冲量(朝外棱仅偏~0.6°，安全)
+    const float DETECT  = 0.8f;      // 可辨偏移
+    const uint32_t KICK_MS = 160, SETTLE = 1200;
+
+    Serial.printf("# [4] 击杀式方向探测：先试 %+.0fmA(预期朝平衡)，看机体朝平衡还是朝外棱…\n", (float)(-st) * KICK_MA);
+    float innerMax = 0, outerMax = 0;
+    motorSetCurrentmA((float)(-st) * KICK_MA);
+    uint32_t t0 = millis();
+    while (millis() - t0 < KICK_MS) {
+        delay(TICK_MS);
+        float p = sampleAndLog("DIR");
+        float inner = (float)st * (restAngle - p);   // 朝平衡(>0)
+        float outer = (float)st * (p - restAngle);   // 朝外棱(>0)
+        if (inner > innerMax) innerMax = inner;
+        if (outer > outerMax) outerMax = outer;
+        if (poweredDangerStop(p)) return 0;
+        if (millis() - t0 > 40 && (float)st * g_lastGyRate > V_SAFE) {  // 跳过起振瞬态
+            Serial.println("# 朝外棱速度超钳 → 安全停（最终判向以净偏移为准）。"); break;
+        }
+    }
+    motorStop();
+    uint32_t ts = millis();
+    while (millis() - ts < SETTLE) { delay(TICK_MS); float p = sampleAndLog("DIR_SET"); if (poweredDangerStop(p)) return 0; }
+
+    int tb;
+    if (innerMax > outerMax + DETECT) { tb = -st; Serial.printf("# → 机体朝平衡(峰值%.1f°)，朝平衡电流符号=%+d ✓\n", innerMax, tb); }
+    else if (outerMax > innerMax + DETECT) { tb = +st; Serial.printf("# → 机体朝外棱(峰值%.1f°)，转向相反！朝平衡电流符号=%+d\n", outerMax, tb); }
+    else { tb = 0; Serial.printf("# → 不明确(inner=%.1f° outer=%.1f°)。\n", innerMax, outerMax); }
+    return tb;
+}
+
+// 固定启动表征序列。需在 M5.begin/imuInit/motorInit 之后调用。
+void startupSequence() {
+    Serial.println("# ===== 启动自动表征序列 =====");
+    if (!i2cSelfCheck()) { Serial.println("# [1] I²C 自检失败 → 停止。"); motorPowerOff(); return; }
+
+    Serial.println("# [2] 供电探测（加大转速测顶速判 12V）…");
+    if (!powerDetectTest()) { Serial.println("# 供电不足（仅5V）→ 不起跳/不探边界，停止。"); return; }
+
+    Serial.println("# [3] 识别当前静止态 A/B …");
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在 A/B（或翻倒）→ 需人工复位，停止。"); motorPowerOff(); return; }
+
+    if (!motorInit()) { Serial.println("# 电机重新使能失败 → 停。"); motorPowerOff(); return; }  // 供电探测后重新使能输出
+
+    int tb = directionProbeKick(st);                         // [4] 击杀式安全方向探测
+    if (tb != -st) {
+        Serial.printf("# 方向探测结果(%+d)与预期(%+d)不符或不明确 → 安全起见停止（勿在方向未确认下探边界/起跳）。\n", tb, -st);
+        motorStop(); motorPowerOff(); return;
+    }
+
+    dangerBoundaryProbe(st);                                 // [5] 当前侧危险边界（朝已确认的外棱方向）
+
+    Serial.println("# [6] 下一步（待『安全越平衡落地』ready 后启用）：起跳到对面静止态 → 落稳 → 探对面危险边界。");
+    Serial.println("# 本轮先到此（前半段安全可测；起跳越平衡仍在解决受控落地，未自动执行以免翻倒）。");
+    motorStop(); motorPowerOff();
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
+// ===== 翻倒兜底恢复（条件化）=====
+// 触发：机体横滚(out-of-plane, lat) > 30° = 进入不可恢复倾倒态。读垂直于它的俯仰角(pitch)：
+//   · 俯仰 < 10°  → 还有救：用大动量击杀两个方向各搏一次，尝试磕回 A/B(±34° 且横滚收回)。
+//   · 俯仰 ≥ 10°  → 太深，断电、不再补救。
+//   横滚 ≤ 30°(非倾倒态) → 本兜底不适用。放宽保底(只防过压/超速)。
+static bool recoverGuard() {  // 自救用宽松保底
+    if (g_lastErr == 1) { Serial.println("# 过压(E:1) → 停。"); motorStop(); motorPowerOff(); return true; }
+    if (fabsf(g_lastSpeed) > SPEED_LIMIT_RPM) { Serial.println("# 飞轮超速 → 停。"); motorStop(); motorPowerOff(); return true; }
+    return false;
+}
+
+void recoverFlipTest() {
+    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# 翻倒兜底恢复：横滚>30°(倾倒)且俯仰<10° 才击杀尝试；俯仰≥10° 断电不救。");
+    M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));
+    if (!imuCalibrateGyro(200)) { Serial.println("# 标定失败"); motorPowerOff(); return; }
+    float lat0 = 0;
+    {
+        float bx = 0, by = 0, bz = 0; imuGyroBias(&bx, &by, &bz); g_gyBias = by; g_gxBias = bx;
+        float ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0; imuReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+        double p = 0, r = 0; imuComputeAttitude(ax, ay, az, &p, &r);
+        lat0 = atan2f(ay, sqrtf(ax * ax + az * az)) * 57.29578f;
+        imuFusionInit(p, FUSION_ALPHA); imuFusionInitLateral(lat0, FUSION_ALPHA);
+        g_fusedPitch = (float)p; g_lastLateral = lat0;
+    }
+    double p0 = 0, r0 = 0; imuReadAttitude(&p0, &r0);
+
+    const float LAT_TIP_DEG      = 30.0f;  // 横滚>此 = 不可恢复倾倒态
+    const float PITCH_GIVEUP_DEG = 10.0f;  // 倾倒态下俯仰≥此 = 放弃、断电
+    Serial.printf("# 兜底检查: 俯仰pitch=%.1f° 横滚lat=%.1f°（横滚阈%.0f° 俯仰救助阈%.0f°）\n",
+                  p0, lat0, LAT_TIP_DEG, PITCH_GIVEUP_DEG);
+
+    if (fabsf(lat0) <= LAT_TIP_DEG) {
+        Serial.printf("# 横滚 %.0f°≤%.0f° → 非横滚倾倒态，本兜底不适用。\n", fabsf(lat0), LAT_TIP_DEG);
+        motorPowerOff(); return;
+    }
+    if (fabsf(p0) >= PITCH_GIVEUP_DEG) {
+        Serial.printf("# 横滚%.0f°(倾倒) 且 俯仰%.0f°≥%.0f° → 断电，不再补救。\n", fabsf(lat0), fabsf(p0), PITCH_GIVEUP_DEG);
+        motorPowerOff(); return;
+    }
+    Serial.printf("# 横滚%.0f°(倾倒) 但 俯仰%.0f°<%.0f° → 尝试击杀恢复到 A/B。\n", fabsf(lat0), fabsf(p0), PITCH_GIVEUP_DEG);
+
+    const float    SPIN_MA  = 140.0f;
+    const float    KICK_MA  = MOTOR_MAX_MA;
+    const uint32_t SPIN_TO  = 2500;
+    const uint32_t KICK_TO  = 1500;
+    const uint32_t SETTLE   = 1800;
+    const int      dirs[2]  = {-1, +1};  // 先反向(-)再正向(+)
+
+    bool recovered = false;
+    for (int d = 0; d < 2 && !recovered; d++) {
+        int kickSign = dirs[d];
+        int spinSign = -kickSign;
+        Serial.printf("# 自救尝试%d：蓄能 %+.0fmA → 全力起跳 %+.0fmA\n", d + 1, spinSign * SPIN_MA, kickSign * KICK_MA);
+
+        M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));  // 蓄能
+        motorSetCurrentmA((float)spinSign * SPIN_MA);
+        uint32_t t0 = millis();
+        while (millis() - t0 < SPIN_TO) { delay(TICK_MS); sampleAndLog("RC_SPIN"); if (recoverGuard()) return; if (fabsf(g_lastSpeed) >= 1400) break; }
+
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 起跳
+        motorSetCurrentmA((float)kickSign * KICK_MA);
+        uint32_t t1 = millis();
+        while (millis() - t1 < KICK_TO) { delay(TICK_MS); sampleAndLog("RC_KICK"); if (recoverGuard()) return; }
+        motorStop();
+
+        uint32_t ts = millis();
+        while (millis() - ts < SETTLE) { delay(TICK_MS); sampleAndLog("RC_SET"); if (recoverGuard()) return; }
+
+        double pe = 0, re = 0; imuReadAttitude(&pe, &re);   // 静态原始 pitch 判落点
+        Serial.printf("# 尝试%d 落点: pitch=%.1f lat=%.1f\n", d + 1, pe, g_lastLateral);
+        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < LAT_TIP_DEG) recovered = true;  // 回到 A/B = 俯仰进范围且横滚收回
+    }
+
+    motorStop();
+    motorPowerOff();
+    double pf = 0, rf = 0; imuReadAttitude(&pf, &rf);
+    if (recovered) { Serial.printf("# ★翻倒自救成功！机体回到范围内 pitch=%.1f\n", pf); M5.dis.fillpix(CRGB(0x00, 0x28, 0x00)); }
+    else           { Serial.printf("# 自救未成功，仍在范围外 pitch=%.1f，需人工复位。\n", pf); M5.dis.fillpix(CRGB(0x28, 0x00, 0x00)); }
+}
+
+// ===== 供电充足性探测（缓升小电流测飞轮顶速，区分 5V/12V，机体姿态无关）=====
+bool powerDetectTest() {
+    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# 供电探测：缓升电流(<挣脱150mA)平稳转飞轮测顶速。5V≈600rpm vs 12V>1000rpm。");
+    M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));  // 橙：标定
+    if (!imuCalibrateGyro(200)) {
+        M5.dis.fillpix(CRGB(0x40, 0x00, 0x00));
+        Serial.println("# ABORT：陀螺标定检测到运动 → 断电。");
+        motorPowerOff();
+        return false;
+    }
+    {  // 播种融合（任意姿态，仅用于机体异动监测）
+        float bx = 0, by = 0, bz = 0;
+        imuGyroBias(&bx, &by, &bz); g_gyBias = by; g_gxBias = bx;
+        float ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
+        imuReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+        double p = 0, r = 0; imuComputeAttitude(ax, ay, az, &p, &r);
+        float lat0 = atan2f(ay, sqrtf(ax * ax + az * az)) * 57.29578f;
+        imuFusionInit(p, FUSION_ALPHA); imuFusionInitLateral(lat0, FUSION_ALPHA);
+        g_fusedPitch = (float)p; g_lastLateral = lat0;
+    }
+    M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝：探测中
+    float startP = sampleAndLog("PWR_PRE");
+
+    const float    RAMP_MAX = 150.0f;   // 缓升上限（<12V 挣脱 200mA，机体不动）
+    const uint32_t RAMP_MS  = 2000;     // 2s 缓升
+    const uint32_t HOLD_MS  = 4000;     // 4s 持稳让飞轮到顶速
+    const float    MOVE_TOL = 6.0f;     // 机体偏离起始>此=异常(挣脱)，停
+    const float    REF_5V   = 600.0f;   // 5V 实测顶速基准
+    const float    THRESH   = 800.0f;   // 判据阈值（5V~600 与 12V>1000 之间）
+
+    float    maxSpd = 0;
+    bool     moved  = false;
+    uint32_t t0 = millis();
+    while (millis() - t0 < RAMP_MS + HOLD_MS) {
+        uint32_t el = millis() - t0;
+        float mA = (el < RAMP_MS) ? RAMP_MAX * (float)el / (float)RAMP_MS : RAMP_MAX;  // 缓升后保持
+        motorSetCurrentmA(mA);
+        delay(TICK_MS);
+        float p = sampleAndLog("PWR");
+        if (fabsf(g_lastSpeed) > maxSpd) maxSpd = fabsf(g_lastSpeed);
+        if (g_lastErr == 1) { Serial.println("# 过压(E:1) → 停。"); break; }
+        if (fabsf(p - startP) > MOVE_TOL) { moved = true; Serial.printf("# 机体异动(%.1f→%.1f) → 停。\n", startP, p); break; }
+    }
+    motorStop();
+    motorPowerOff();
+
+    float vin = motorVoltage();
+    bool sufficient = (maxSpd > THRESH);
+    Serial.printf("# === 供电探测结果: 飞轮顶速 %.0frpm, Vin=%.2fV（5V基准≈%.0f, 阈值%.0f）===\n",
+                  maxSpd, vin, REF_5V, THRESH);
+    if (sufficient) Serial.println("# => ✓ 供电充足：外部 12V 已生效（顶速远超 5V 水平）。");
+    else            Serial.println("# => ✗ 供电不足：仅 5V 水平（外部 12V 未接/未生效）。");
+    if (moved) Serial.println("# 注：机体中途移动，顶速可能偏低，结果仅供参考。");
+    M5.dis.fillpix(sufficient ? CRGB(0x00, 0x28, 0x00) : CRGB(0x28, 0x10, 0x00));
+    return sufficient;
 }
 
 // ===== 电机台架能力测试（测最大电流/最大转速，不做起跳）=====

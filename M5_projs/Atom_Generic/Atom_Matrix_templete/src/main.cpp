@@ -15,29 +15,24 @@
 #include "imu.h"
 #include "motor.h"
 #include "dir_test.h"
+#include "reboot_test.h"
 
+// === 启动表征序列：I²C自检 → 供电探测 → 识别A/B → 击杀式方向探测 → 当前侧危险边界 ===
 void setup() {
-    M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵(校准/状态提示)
-    M5.dis.setBrightness(20);      // 点阵调暗，避免刺眼
-    M5.dis.clear();
+    M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵
+    M5.dis.setBrightness(20);
     imuInit();
-
     Serial.println();
-    Serial.println("# 电机台架能力测试 @12V（测最大电流/转速，不做起跳；硬线约束机体）");
-
-    if (!motorInit()) {  // 电流模式
-        Serial.println("ERR: 电机 I2C 初始化失败，停止。");
-        motorPowerOff();
-        return;
-    }
-
-    motorBenchTest();  // 测 12V 最大电流/转速，交替方向短脉冲，含 Vin/过压/超速看门狗
+    Serial.println("# 启动表征序列：I²C自检 → 供电探测 → 识别A/B → 击杀式方向探测 → 当前侧危险边界");
+    if (!motorInit()) { Serial.println("ERR: 电机 I2C 初始化失败，停止。"); motorPowerOff(); return; }
+    startupSequence();
 }
 
 void loop() {
-    // 测试结束后空闲：电机已停/断电；周期打印 pitch 供观察
     double pitch = 0, roll = 0;
     imuReadAttitude(&pitch, &roll);
     Serial.printf("# idle pitch=%.2f  motorErr=%u\n", pitch, motorErrorCode());
     delay(500);
 }
+
+// 双路供电重启诊断暂停用：需要时把 setup 换成 rebootTestSetup()/loop 换成 rebootTestLoop()。

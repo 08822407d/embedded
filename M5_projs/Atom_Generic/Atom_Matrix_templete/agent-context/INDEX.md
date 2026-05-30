@@ -8,6 +8,7 @@
 
 ## references/（外部成熟经验）
 - [反作用轮倒立摆 Playbook + 问题排查路径](references/reaction-wheel-pendulum-playbook.md) — 理论/流程/数据处理/控制/★常见问题优先排查表；遇到问题先查这里
+- [渐进逼近极限的安全探测规范](references/safe-limit-probing.md) — 起摆翻倒事故复盘+对策：相对authority表参、从低ramp、变更重归零、速度天花板、逼近即停留裕度
 
 ## requirements/
 - [001 屏动平衡系统](requirements/001-screen-balance-system.md) — 反作用轮倒立摆项目诉求与分步目标
@@ -17,6 +18,7 @@
 - [002 电机控制方式：电流(力矩)模式](decisions/002-motor-control-strategy.md) — 反作用轮用电流模式，状态读取项与初始化顺序
 - [003 IMU 姿态滤波：单轴 pitch 互补滤波](decisions/003-imu-filtering.md) — 飞轮转动时加速度角失真(实测+14°伪象)，改陀螺主导互补滤波(gy)，含零偏标定与延迟分析
 - [004 电机供电与控制方式](decisions/004-motor-power-and-mode.md) — Grove 5V 供电不足致推不动；速度模式无改善(同~600rpm)；查证 XT30 接 12-16V 可得 3× 力矩
+- [005 启动自动表征序列](decisions/005-startup-characterization-sequence.md) — 开机固定流程：供电探测→识别A/B→逐侧两方向渐进探临界(朝平衡/朝外棱)，就近探测、禁跨边、不对称
 
 ## protocols/
 - [RollerCAN I²C 控制](protocols/rollercan-i2c.md) — 接线/地址0x64/官方库 UnitRollerI2C API/定标/帧协议

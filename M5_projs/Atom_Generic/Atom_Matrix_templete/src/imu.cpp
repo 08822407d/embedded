@@ -4,8 +4,22 @@
 
 static const double RAD2DEG = 180.0 / PI;
 
+// 直接写 MPU6886 寄存器（在 Wire1，地址 0x68）
+static void mpu6886Write(uint8_t reg, uint8_t val) {
+    Wire1.beginTransmission(0x68);
+    Wire1.write(reg);
+    Wire1.write(val);
+    Wire1.endTransmission();
+}
+
 void imuInit() {
     M5.IMU.Init();  // 初始化 MPU6886
+    // 收窄片上 DLPF 抗混叠：M5 默认陀螺~176Hz/加速度~218Hz，远超 50Hz 采样的 Nyquist(25Hz)，
+    //   飞轮高转速振动会混叠进 gy → 融合角假尖峰（实测 12V/1330rpm 下假冲到 -35° 触发误保底）。
+    //   陀螺 DLPF→20Hz(CFG=4)、加速度→21Hz(CFG=4)：远低于 Nyquist，仍保留摆体真实动态(<5Hz)。
+    mpu6886Write(0x1A, 0x04);  // CONFIG: gyro DLPF_CFG=4 → 20Hz
+    mpu6886Write(0x1D, 0x04);  // ACCEL_CONFIG2: accel DLPF_CFG=4 → 21Hz
+    delay(2);
 }
 
 void imuReadRaw(float *ax, float *ay, float *az, float *gx, float *gy, float *gz) {

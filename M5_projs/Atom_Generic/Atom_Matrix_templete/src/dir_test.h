@@ -23,5 +23,34 @@ void poweredBreakawayTest();
 //   交替方向短脉冲，仅看电机读数；含 Vin/过压/超速/侧向看门狗。需在 motorInit(电流模式) 后调用。
 void motorBenchTest();
 
+// ===== 起跳策略（可更换）=====
+enum SwingUpStrategy {
+    SWINGUP_CUBLI = 0,   // 蓄能急刹（反向蓄能→全力急刹反转飞轮）—— 默认
+    SWINGUP_IMPULSE,     // 突然启动电机单次冲量（早期方案，逐级加大单次驱动）
+    SWINGUP_PUMP,        // 莱洛三角震荡式蓄能（秋千式逐周泵能）—— 当前硬件不适用，留空
+};
+extern SwingUpStrategy g_swingUpStrategy;          // 当前起跳策略（默认 SWINGUP_CUBLI）
+void swingUpSetStrategy(SwingUpStrategy s);         // 切换策略
+
+// 起摆 (swing-up)：自动识别 A/B → Vin 自检 → 按 g_swingUpStrategy 分派到对应策略实现。
+//   全程安全保底。需在 imuInit/motorInit(电流模式) 后调用。
+void swingUpTest();
+
+// 供电充足性探测：缓升电流(<挣脱)平稳转飞轮、测顶速，对比 5V 基准(~600rpm)判 12V 是否生效。
+//   机体姿态无关(翻倒也能测)；机体异动/过压即停。返回 true=供电充足(12V)。需在 motorInit(电流模式) 后调用。
+bool powerDetectTest();
+
+// 翻倒自救：机体已翻到正常范围外时，用大动量 Cubli 冲量两个方向各试一次，尝试磕回 ±34° 内。
+//   放宽保底(仅过压/超速)。需在 imuInit/motorInit(电流模式) 后调用。
+void recoverFlipTest();
+
+// 危险边界渐进探测：当前静止态 st(+1=B/-1=A)，朝外棱方向渐进加流找逼近翻倒的临界电流(带符号)。
+//   速度钳+小偏移即停，绝不真翻。需在 imuInit/motorInit(电流模式) 后调用。
+float dangerBoundaryProbe(int st);
+
+// 固定启动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界。
+//   需在 M5.begin/imuInit/motorInit 之后调用。
+void startupSequence();
+
 // 辨识结果：使 pitch 减小(朝平衡)的电流符号，+1/-1；0=未知/未测出。
 int dirTestRestoreCurrentSign();
