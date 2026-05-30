@@ -4,11 +4,19 @@
 > 来源：M5 官方库 `m5stack/M5Unit-Roller`（源码）+ Unit-RollerCAN I2C Protocol PDF。整理日期 2026-05-29。
 
 ## 硬件 / 接线
-- 模块：**M5Stack Unit RollerCAN**（无刷直流电机 + 编码器 + FOC），支持 **CAN / I²C** 两种总线，**本项目用 I²C**。
+- 模块：**M5Stack Unit RollerCAN**（**D3504 200KV** 无刷电机 + 编码器 + FOC），支持 **CAN / I²C** 两种总线，**本项目用 I²C**。
 - 接 ATOM **Grove 口**：**SDA = G26，SCL = G32**。I²C 频率 **TBD（暂定 ~200kHz）**：
   **100kHz 和 400kHz 均为危险频率、勿用**，见 [esp32-i2c-frequency-caveat.md](esp32-i2c-frequency-caveat.md)。
 - **默认 I²C 从机地址 = `0x64`**（`#define I2C_ADDR (0x64)`），本项目用默认地址。
 - 与 ATOM 内部 IMU(MPU6886) 的 I²C 是不同组，互不冲突。
+
+## ⚡ 供电（关键！决定电机力矩/转速）—— 来源：m5-docs 规格表，2026-05-30 实测印证
+- **两路供电**：**CAN(XT30) 口 6–16V DC**（电机动力）／**Grove 口 5V**（逻辑，自动调功率系数）。
+- **力矩随电压差 3 倍**：**5V Grove → 0.021 N·m @350mA**；**16V CAN → 0.065 N·m @927mA**。
+- 16V 负载表：无载 78mA；50g→2100rpm/225mA；200g→1400rpm/601mA；500g(满)→560rpm/918mA。
+- **过压保护**：> **18V** 报 E:1「Over Voltage」、电机停、LED 蓝。上限 16V，**勿超**。
+- **本项目现状坑**：只接 Grove，实测 Vin≈4.5V → 电机仅 ~0.021N·m、飞轮顶 ~600rpm、机体推不动(不脱阱)。
+  **解决：给 XT30 接 12–16V DC（建议 12–15V），Grove 仍接做 I²C 通信。** 详见 [decisions/004](../decisions/004-motor-power-and-mode.md)。
 
 ## 官方库
 - 仓库：`https://github.com/m5stack/M5Unit-Roller.git`（PlatformIO 注册表查不到，**用 git URL** 引用；已加入 `platformio.ini` lib_deps）。

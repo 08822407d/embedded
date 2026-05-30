@@ -16,7 +16,24 @@ bool motorInit() {
     roller.setMode(ROLLER_MODE_CURRENT);  // 电流模式，运行中不再改
     roller.setCurrent(0);                 // 初始零力矩，防使能跳变
     roller.setOutput(1);                  // 使能
+    Serial.printf("# 电机供电 Vin=%.2fV（诊断：电机若只靠 Grove 5V 会供电不足）\n", motorVoltage());
     return ok;
+}
+
+bool motorInitSpeed(float maxCurrentmA) {
+    bool ok = roller.begin(&Wire, MOTOR_I2C_ADDR, MOTOR_I2C_SDA, MOTOR_I2C_SCL, MOTOR_I2C_FREQ);
+    roller.setOutput(0);                                              // 先关输出
+    roller.setMode(ROLLER_MODE_SPEED);                               // 速度模式
+    roller.setSpeedMaxCurrent((int32_t)lroundf(maxCurrentmA * 100));  // 速度环允许的最大电流
+    roller.setSpeed(0);                                              // 初始 0 转速
+    roller.setOutput(1);                                            // 使能
+    Serial.printf("# 电机[速度模式] Vin=%.2fV  速度环maxCur=%.0fmA\n", motorVoltage(), maxCurrentmA);
+    return ok;
+}
+
+void motorSetSpeedRPM(float rpm) {
+    g_lastCmdMA = 0;  // 速度模式不用电流命令；遥测 cmd_mA 置 0
+    roller.setSpeed((int32_t)lroundf(rpm * 100.0f));  // raw = rpm × 100
 }
 
 void motorSetCurrentmA(float mA) {
@@ -43,6 +60,10 @@ float motorSpeedRPM() {
 
 float motorCurrentmA() {
     return roller.getCurrentReadback() / 100.0f;
+}
+
+float motorVoltage() {
+    return roller.getVin() / 100.0f;
 }
 
 uint8_t motorErrorCode() {

@@ -17,19 +17,21 @@
 #include "dir_test.h"
 
 void setup() {
-    M5.begin(true, true, false);  // 串口 + 内部 I2C(IMU 在 Wire1)，LED 不用
+    M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵(校准/状态提示)
+    M5.dis.setBrightness(20);      // 点阵调暗，避免刺眼
+    M5.dis.clear();
     imuInit();
 
     Serial.println();
-    Serial.println("# motor direction test (with anti-flip failsafe)");
+    Serial.println("# 电机台架能力测试 @12V（测最大电流/转速，不做起跳；硬线约束机体）");
 
-    if (!motorInit()) {
+    if (!motorInit()) {  // 电流模式
         Serial.println("ERR: 电机 I2C 初始化失败，停止。");
         motorPowerOff();
         return;
     }
 
-    dirTestRun();  // 阻塞执行一次，内嵌看门狗与断电保底
+    motorBenchTest();  // 测 12V 最大电流/转速，交替方向短脉冲，含 Vin/过压/超速看门狗
 }
 
 void loop() {
