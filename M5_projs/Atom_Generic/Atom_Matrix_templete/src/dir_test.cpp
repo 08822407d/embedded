@@ -275,11 +275,14 @@ static void breakawayTest(int toward) {
 //   **面内(pitch)越外棱不在此硬断电**：交给"消能/动量接住"预防、万一翻越交面内击杀自救。
 //   返回 true=已断电(应中止)。
 static bool speedDanger(float pitch) {
-    bool lateral = fabsf(g_lastLateral) > LATERAL_DANGER_DEG;   // 出平面倾倒(不可控)
-    bool overspd = fabsf(g_lastSpeed)   > SPEED_LIMIT_RPM;      // 飞轮 runaway
-    if (!lateral && !overspd) return false;
-    Serial.printf("# !! 硬危险(%s pitch=%.1f lat=%.1f spd=%.0f) → setSpeed0 + 断电\n",
-                  lateral ? "横向倾倒(出平面/不可控)" : "飞轮超速", pitch, g_lastLateral, g_lastSpeed);
+    // decision 006(用户简化)：**超出平衡 40° 即视为翻越/不可恢复 → 立即断电，只读监视、不再自救**。
+    //   外加横向倾倒、飞轮超速两道硬保底。任一触发 → setSpeed0 + 断输出。
+    bool overPit = fabsf(pitch)         > 40.0f;               // 超平衡 40° → 翻越外棱、不可恢复
+    bool lateral = fabsf(g_lastLateral) > LATERAL_DANGER_DEG;  // 出平面倾倒(飞轮不可控)
+    bool overspd = fabsf(g_lastSpeed)   > SPEED_LIMIT_RPM;     // 飞轮 runaway
+    if (!overPit && !lateral && !overspd) return false;
+    Serial.printf("# !! 硬危险(%s pitch=%.1f lat=%.1f spd=%.0f) → 断电、仅监视(不自救)\n",
+                  overPit ? "超平衡40°" : (lateral ? "横向倾倒" : "飞轮超速"), pitch, g_lastLateral, g_lastSpeed);
     motorSetSpeedRPM(0);
     motorPowerOff();
     g_faulted = true;
@@ -556,6 +559,10 @@ void poweredBreakawayTest() {
 // ===== 起跳策略（可更换）=====
 SwingUpStrategy g_swingUpStrategy = SWINGUP_CUBLI;  // 默认 Cubli
 void swingUpSetStrategy(SwingUpStrategy s) { g_swingUpStrategy = s; }
+
+// 表征结果：使机体朝平衡起跳所需的**飞轮"速度变化方向"**（+1/-1），0=未测出。
+int g_swingUpDir = 0;
+int swingUpDirection() { return g_swingUpDir; }
 static const char *swingUpName(SwingUpStrategy s) {
     switch (s) { case SWINGUP_IMPULSE: return "突然启动单次冲量";
                  case SWINGUP_PUMP:    return "震荡式蓄能(秋千)";
@@ -1022,6 +1029,61 @@ void swingUpTest() {
     motorStop();
     motorPowerOff();
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿
+}
+
+// ===== 开机方向表征（decision 006 简化目标）：只判定+记录起跳转向，然后终止 =====
+// 目标(用户)：开机后只探测"飞轮**速度该往哪个方向变化(加速)**才能把机体推向平衡"，记录该方向 → **终止**
+//   (断电 + 仅持续监视)。不再做完整起跳/落地/自救。
+// 物理(用户校正)：机体运动方向由**反作用力矩**决定；力矩由**飞轮角加速度 = 速度变化 dω/dt 的方向**决定，
+//   **不是飞轮当前转速方向**。故控制量 = "速度变化方向"。从静止给飞轮一个目标转速 = 一记"速度变化"冲量，
+//   其符号即速度变化方向(加速到目标期间产生反作用力矩；到达目标后 dω/dt→0、力矩消失)。看机体朝平衡
+//   (|pitch|↓)还是朝外棱动，定出正确的速度变化方向并记录。
+// 安全：全程 speedDanger（超平衡 40°/横向/超速 → 立即断电、仅监视、不自救）。需 motorInitSpeed 后调用。
+void probeSwingUpDirection() {
+    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视（不驱动）。"); motorPowerOff(); return; }
+    float vin = motorVoltage();
+    if (motorErrorCode() == 1 || vin < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", vin); motorPowerOff(); return; }
+
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const int      guess     = -st;       // 约定速度变化方向(负=朝平衡，B侧实测、A侧对称)，先试它
+    const float    PROBE_RPM = 350.0f;    // 小幅"速度变化"冲量(静止→±PROBE_RPM)，足以看出方向、不致翻
+    const uint32_t PROBE_TO  = 900;
+
+    Serial.printf("# [方向表征] 起始=%s。给一记小速度变化冲量(目标 %+.0frpm = 速度变化方向 %+d)看机体朝哪动…\n",
+                  (st == +1) ? "B" : "A", guess * PROBE_RPM, guess);
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
+    motorSetSpeedRPM((float)guess * PROBE_RPM);
+    float closest = startRest, farthest = startRest;
+    uint32_t t0 = millis();
+    while (millis() - t0 < PROBE_TO) {
+        delay(TICK_MS);
+        float p = sampleAndLog("DIRPROBE");
+        if (speedDanger(p)) return;   // 超平衡40°/横向/超速 → 断电+监视
+        if ((float)st * (startRest - p) > (float)st * (startRest - closest))  closest  = p;  // 最朝平衡
+        if ((float)st * (p - startRest) > (float)st * (farthest - startRest)) farthest = p;  // 最朝外棱
+    }
+    motorStop();
+    float advBal  = (float)st * (startRest - closest);    // 朝平衡前进(>0 好)
+    float advEdge = (float)st * (farthest - startRest);   // 朝外棱(>0 表示这个变化方向推反了)
+
+    if      (advBal  > advEdge && advBal  > 1.5f) g_swingUpDir = guess;    // 约定方向正确
+    else if (advEdge > advBal  && advEdge > 1.5f) g_swingUpDir = -guess;   // 推反了 → 取反
+    else                                          g_swingUpDir = 0;        // 不明确
+
+    settleSpeedSafe(1500, "DIR_SET");   // 小幅静置自复位（gravity 拉回；危险即断电）
+    motorStop(); motorPowerOff();
+
+    if (g_swingUpDir != 0) {
+        Serial.printf("# ★方向表征完成并记录：朝平衡起跳的**飞轮速度变化方向 = %+d**（朝平衡%.1f° / 朝外%.1f°）。\n",
+                      g_swingUpDir, advBal, advEdge);
+        Serial.println("# 已终止：电机断电，仅持续监视读数。");
+        M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿
+    } else {
+        Serial.printf("# 方向不明确(朝平衡%.1f° 朝外%.1f°)，冲量偏小，需加大重试。终止、仅监视。\n", advBal, advEdge);
+        M5.dis.fillpix(CRGB(0x28, 0x18, 0x00));  // 橙
+    }
 }
 
 // ===== 启动自动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界 =====

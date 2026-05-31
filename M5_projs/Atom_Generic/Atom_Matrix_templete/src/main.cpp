@@ -17,17 +17,16 @@
 #include "dir_test.h"
 #include "reboot_test.h"
 
-// === 固定流程（decisions/006）：全速度模式 初始化→自检→分轮探测→一次性起跳→统一消能落地→兜底 ===
-//   终点态 = 电机断电 + 阶段二持续监视（loop 里 attitudeReportTick）。运行中绝不切控制模式。
+// === 简化流程（decisions/006）：开机只表征"起跳所需飞轮速度变化方向"→记录→终止(断电+持续监视) ===
+//   危险(超平衡40°/横向/超速)即断电、仅监视、不自救。运行中绝不切控制模式。
 void setup() {
     M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [decisions/006] 全速度模式：自检→识别A/B→分轮探测(模型自适应)→越平衡起跳→统一消能落地→兜底");
+    Serial.println("# [decisions/006] 开机方向表征：识别A/B→小速度变化冲量→记录起跳飞轮速度变化方向→终止(仅监视)");
     if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    swingUpSetStrategy(SWINGUP_SPEED);
-    swingUpTest();    // 阶段一~四（自带断电收尾）
+    probeSwingUpDirection();   // 判定+记录方向后终止
 }
 
 void loop() {

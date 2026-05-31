@@ -59,3 +59,8 @@ int dirTestRestoreCurrentSign();
 // 姿态状态监视（流程终点态）：电机断电，每 1s 采样窗逐帧打印全部传感器，窗末用均值/抖动判定机体静止态。
 //   只读 IMU/电机状态、绝不驱动。在 loop() 中反复调用即可持续监视。
 void attitudeReportTick();
+
+// 开机方向表征（decision 006 简化）：只判定+记录"使机体朝平衡起跳的飞轮**速度变化方向**"，然后终止
+//   (断电+仅监视)。安全：超平衡40°/横向/超速即断电、不自救。需 motorInitSpeed 后调用。
+void probeSwingUpDirection();
+int  swingUpDirection();   // 表征结果：+1/-1（飞轮速度变化方向），0=未测出
