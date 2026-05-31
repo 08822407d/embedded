@@ -65,6 +65,11 @@ void attitudeReportTick();
 void probeSwingUpDirection();
 int  swingUpDirection();   // 表征结果：+1/-1（飞轮速度变化方向），0=未测出
 
+// 探测"能起跳的扭矩"（system-model §6：作用量是扭矩）：逐增速度环力矩上限(maxCurrent≈扭矩)施加朝平衡，
+//   找机体挣脱静止态阱起跳的最小扭矩 τ_break(并确认方向)。结果存 g_breakawayTorque/g_swingUpDir。需 motorInitSpeed 后调用。
+void  probeBreakawayTorque();
+float swingUpBreakawayTorque();   // 探测结果：能起跳的扭矩(mA当量)，0=未测出
+
 // 正式起跳测试（decision 006）：一记起跳冲量 → 单次消能(回落同向/越过反向) → 断电滑行、观察落点。
 //   只施加一次消能、不连续阻尼。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInitSpeed 后调用。
 void swingUpOneShotTest();

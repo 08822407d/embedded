@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [decisions/006] 起跳→平衡：识别A/B→实测起跳方向→起跳冲量送到平衡附近→接管PID平衡控制器钳θ≈0");
+    Serial.println("# [system-model §6] 探能起跳的扭矩：识别A/B→逐增力矩上限施加朝平衡→找挣脱起跳的 τ_break→记录、终止监视");
     if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    swingUpToBalance();   // 起跳直接到平衡 + PID 保持（LQR 备用，balanceSetMethod 可切）
+    probeBreakawayTorque();   // 探"能起跳的扭矩"(扭矩框架，替代旧的探转向)
 }
 
 void loop() {

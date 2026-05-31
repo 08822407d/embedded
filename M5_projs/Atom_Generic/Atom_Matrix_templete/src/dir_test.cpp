@@ -1284,6 +1284,72 @@ void swingUpToBalance() {
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 
+// 探测结果：能让机体朝平衡挣脱起跳的扭矩(mA 当量，力矩∝电流)，0=未测出。
+float g_breakawayTorque = 0;
+float swingUpBreakawayTorque() { return g_breakawayTorque; }
+
+// ===== 探测"能起跳的扭矩 τ_break"（system-model §6：作用量是扭矩，非转速方向）=====
+// 逐步增大**速度环力矩上限(maxCurrent≈扭矩)**、施加朝平衡方向，找机体**挣脱静止态阱起跳**的最小扭矩。
+//   速度模式实现：setSpeedMaxCurrent(τ) + 命令大目标转速 → 速度环以 τ 全力加速 = 施加扭矩 τ。
+//   方向是该扭矩的属性：先按物理约定 dir=−st；若机体**朝外棱挣脱**(符号反)→取反同档重试。
+//   外棱仅 3-4°：朝外判据用更小阈值(防翻)。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInitSpeed 后调用。
+void probeBreakawayTorque() {
+    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    TAU_START = 100.0f, TAU_STEP = 80.0f, TAU_MAX = MOTOR_MAX_MA;  // 扭矩(mA)逐增
+    const float    SPIN_RPM  = 2500.0f;   // 大目标转速：让速度环以 τ 全力加速 = 施加扭矩 τ
+    const float    BREAK_BAL = 6.0f;      // 朝平衡前进超此 = 挣脱起跳
+    const float    BREAK_EDGE = 3.0f;     // 朝外棱前进超此 = 朝外挣脱(外棱仅3-4°，小阈值防翻)
+    const uint32_t PUSH_TO   = 900;
+    int   dir = -st;                      // 朝平衡方向初猜(物理约定)
+    bool  dirFlipped = false;
+
+    Serial.printf("# [探扭矩] 起始=%s。逐增力矩上限(扭矩,起%.0f步%.0f顶%.0fmA)施加朝平衡，找挣脱起跳的 τ_break。\n",
+                  (st == +1) ? "B" : "A", TAU_START, TAU_STEP, TAU_MAX);
+    float tau = TAU_START, tauBreak = 0;
+    while (tau <= TAU_MAX + 0.1f) {
+        if (!confirmSettledAtRest(startRest, 500, 4000, "TQ_SETL")) { Serial.println("# 未能稳回起始态 → 终止。"); break; }
+        motorReenable();
+        motorSetSpeedMaxCurrent(tau);                 // 力矩上限 = 扭矩 τ
+        Serial.printf("# [扭矩档 %.0fmA] 施加朝平衡(飞轮速度变化方向%+d)…\n", tau, dir);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+        motorSetSpeedRPM((float)dir * SPIN_RPM);      // 命令大速度 → 速度环以 τ 全力加速
+        float advBal = 0, advEdge = 0; int outcome = 0;  // 0=没挣脱 1=朝平衡挣脱 2=朝外挣脱
+        uint32_t t0 = millis();
+        while (millis() - t0 < PUSH_TO) {
+            delay(TICK_MS); float p = sampleAndLog("TQ");
+            if (speedDanger(p)) { motorSetSpeedMaxCurrent(MOTOR_MAX_MA); return; }
+            float aB = (float)st * (startRest - p); if (aB > advBal)  advBal  = aB;
+            float aE = (float)st * (p - startRest); if (aE > advEdge) advEdge = aE;
+            if (advBal  > BREAK_BAL)  { outcome = 1; break; }
+            if (advEdge > BREAK_EDGE) { outcome = 2; break; }
+        }
+        motorSetSpeedRPM(0);
+
+        if (outcome == 1) { tauBreak = tau; Serial.printf("# ★挣脱起跳！能起跳的扭矩 τ_break≈%.0fmA（朝平衡%.1f°，飞轮速度变化方向%+d）。\n", tau, advBal, dir); break; }
+        if (outcome == 2) {
+            if (!dirFlipped) { dir = -dir; dirFlipped = true; Serial.printf("# 机体朝外棱挣脱(%.1f°)→此方向把机体推离平衡、方向反，取反为%+d 同档重试。\n", advEdge, dir); continue; }
+            Serial.println("# 两个方向都朝外挣脱？异常 → 终止。"); break;
+        }
+        settleSpeedSafe(1200, "TQ_RST");
+        tau += TAU_STEP;
+    }
+    motorSetSpeedMaxCurrent(MOTOR_MAX_MA);   // 恢复力矩上限
+    motorStop(); motorPowerOff();
+    if (tauBreak > 0) {
+        g_breakawayTorque = tauBreak; g_swingUpDir = dir;
+        Serial.printf("# ★记录：能起跳扭矩 τ_break=%.0fmA，朝平衡飞轮速度变化方向=%+d。终止、仅监视。\n", tauBreak, dir);
+        M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+    } else {
+        Serial.printf("# 升至力矩上限 %.0fmA 仍未挣脱起跳(供电/机械?)。终止、仅监视。\n", TAU_MAX);
+        M5.dis.fillpix(CRGB(0x28, 0x18, 0x00));
+    }
+}
+
 // ===== 启动自动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界 =====
 // [1] 两个 I²C 总线自检：IMU(MPU6886 在 Wire1 0x68)、电机(RollerCAN 在 Wire 0x64)。
 static bool i2cSelfCheck() {
