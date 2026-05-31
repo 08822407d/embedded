@@ -873,10 +873,11 @@ void startupSequence() {
 }
 
 // ===== 翻倒兜底恢复（条件化）=====
-// 触发：机体横滚(out-of-plane, lat) > 30° = 进入不可恢复倾倒态。读垂直于它的俯仰角(pitch)：
-//   · 俯仰 < 10°  → 还有救：用大动量击杀两个方向各搏一次，尝试磕回 A/B(±34° 且横滚收回)。
-//   · 俯仰 ≥ 10°  → 太深，断电、不再补救。
-//   横滚 ≤ 30°(非倾倒态) → 本兜底不适用。放宽保底(只防过压/超速)。
+// 轴：面内角 pitch(可控轴，会滚过外棱翻越正常范围)；垂直角 lat(出平面，电机无 authority)。
+// 触发：机体**面内角 |pitch| > 40°** = 已滚过外棱、翻越正常范围。读**垂直角 lat**判可救性：
+//   · |lat| < 10°  → 机体仍在运动平面内、飞轮还能使劲 → 大动量击杀两方向各搏一次，尝试磕回 A/B。
+//   · |lat| ≥ 10°  → 已三维翻滚、飞轮无 authority → 断电、不再补救。
+//   |pitch| ≤ 40°(未翻越) → 本兜底不适用。放宽保底(只防过压/超速)。
 static bool recoverGuard() {  // 自救用宽松保底
     if (g_lastErr == 1) { Serial.println("# 过压(E:1) → 停。"); motorStop(); motorPowerOff(); return true; }
     if (fabsf(g_lastSpeed) > SPEED_LIMIT_RPM) { Serial.println("# 飞轮超速 → 停。"); motorStop(); motorPowerOff(); return true; }
@@ -885,7 +886,7 @@ static bool recoverGuard() {  // 自救用宽松保底
 
 void recoverFlipTest() {
     Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
-    Serial.println("# 翻倒兜底恢复：横滚>30°(倾倒)且俯仰<10° 才击杀尝试；俯仰≥10° 断电不救。");
+    Serial.println("# 翻倒兜底恢复：面内角(pitch)>40°(翻越)且垂直角(lat)<10°(仍在平面)→击杀试救；垂直角≥10°→断电不救。");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));
     if (!imuCalibrateGyro(200)) { Serial.println("# 标定失败"); motorPowerOff(); return; }
     float lat0 = 0;
@@ -899,20 +900,21 @@ void recoverFlipTest() {
     }
     double p0 = 0, r0 = 0; imuReadAttitude(&p0, &r0);
 
-    const float LAT_TIP_DEG      = 30.0f;  // 横滚>此 = 不可恢复倾倒态
-    const float PITCH_GIVEUP_DEG = 10.0f;  // 倾倒态下俯仰≥此 = 放弃、断电
-    Serial.printf("# 兜底检查: 俯仰pitch=%.1f° 横滚lat=%.1f°（横滚阈%.0f° 俯仰救助阈%.0f°）\n",
-                  p0, lat0, LAT_TIP_DEG, PITCH_GIVEUP_DEG);
+    // 轴对应：p0=面内角(pitch，可控轴，会滚过外棱翻越正常范围)；lat0=垂直角(出平面，电机无 authority)。
+    const float ROLLED_DEG  = 40.0f;  // |面内角|>此 = 已翻越正常范围(滚过外棱)
+    const float PERP_GIVEUP = 10.0f;  // |垂直角|≥此 = 三维翻滚→放弃断电；<此 = 仍在平面内→可击杀试救
+    Serial.printf("# 兜底检查: 面内角pitch=%.1f° 垂直角lat=%.1f°（翻越阈%.0f° 垂直救助阈%.0f°）\n",
+                  p0, lat0, ROLLED_DEG, PERP_GIVEUP);
 
-    if (fabsf(lat0) <= LAT_TIP_DEG) {
-        Serial.printf("# 横滚 %.0f°≤%.0f° → 非横滚倾倒态，本兜底不适用。\n", fabsf(lat0), LAT_TIP_DEG);
+    if (fabsf(p0) <= ROLLED_DEG) {
+        Serial.printf("# 面内角 %.0f°≤%.0f° → 未翻越正常范围，本兜底不适用。\n", fabsf(p0), ROLLED_DEG);
         motorPowerOff(); return;
     }
-    if (fabsf(p0) >= PITCH_GIVEUP_DEG) {
-        Serial.printf("# 横滚%.0f°(倾倒) 且 俯仰%.0f°≥%.0f° → 断电，不再补救。\n", fabsf(lat0), fabsf(p0), PITCH_GIVEUP_DEG);
+    if (fabsf(lat0) >= PERP_GIVEUP) {
+        Serial.printf("# 已翻越 且 垂直角%.0f°≥%.0f°(三维翻滚) → 断电，不再补救。\n", fabsf(lat0), PERP_GIVEUP);
         motorPowerOff(); return;
     }
-    Serial.printf("# 横滚%.0f°(倾倒) 但 俯仰%.0f°<%.0f° → 尝试击杀恢复到 A/B。\n", fabsf(lat0), fabsf(p0), PITCH_GIVEUP_DEG);
+    Serial.printf("# 已翻越(面内%.0f°) 但 垂直角%.0f°<%.0f°(仍在平面内) → 击杀尝试磕回 A/B。\n", fabsf(p0), fabsf(lat0), PERP_GIVEUP);
 
     const float    SPIN_MA  = 140.0f;
     const float    KICK_MA  = MOTOR_MAX_MA;
@@ -943,7 +945,7 @@ void recoverFlipTest() {
 
         double pe = 0, re = 0; imuReadAttitude(&pe, &re);   // 静态原始 pitch 判落点
         Serial.printf("# 尝试%d 落点: pitch=%.1f lat=%.1f\n", d + 1, pe, g_lastLateral);
-        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < LAT_TIP_DEG) recovered = true;  // 回到 A/B = 俯仰进范围且横滚收回
+        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) recovered = true;  // 回到 A/B = 面内角进范围且垂直角小
     }
 
     motorStop();
