@@ -831,9 +831,16 @@ static void finalizeOrRescueSpeed() {
     Serial.printf("# 翻越到第三/四面(pitch=%.1f) 但已落回平面(lat=%.1f<%.0f) → **单次**击杀 %+.0frpm 磕回 %s。\n",
                   p0, fabsf(lat0), PERP_GIVEUP, kickSign * 2600.0f, (p0 > 0) ? "B" : "A");
     motorReenable();   // 自救前重新使能输出（**不重 begin**，避免双 I²C 挂死）
-    const float    KICK_RPM = 2600.0f;
-    const uint32_t KICK_TO  = 700;
-    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+    // 单次但**蓄能式**击杀(实测单一速度冲量太弱、磕不动第三面)：先反向把飞轮转起来(机体顶在第三面不动)，
+    //   再**急反转**给大冲量——这才是之前验证有效(84°→B)的力度。
+    const float    SPIN_RPM = 1600.0f;   // 反向蓄能目标转速
+    const float    KICK_RPM = 2800.0f;   // 急反转大冲量
+    const uint32_t SPIN_TO  = 1500, KICK_TO = 800;
+    M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));  // 橙：蓄能
+    motorSetSpeedRPM((float)(-kickSign) * SPIN_RPM);   // 反向蓄能(机体顶第三面不动)
+    uint32_t ts = millis();
+    while (millis() - ts < SPIN_TO) { delay(TICK_MS); sampleAndLog("FIN_SPIN"); if (recoverGuard()) return; if (fabsf(g_lastSpeed) >= SPIN_RPM) break; }
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红：急反转起跳
     motorSetSpeedRPM((float)kickSign * KICK_RPM);
     uint32_t tk = millis();
     while (millis() - tk < KICK_TO) { delay(TICK_MS); sampleAndLog("FIN_KICK"); if (recoverGuard()) return; }

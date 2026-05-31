@@ -8,8 +8,10 @@ BAUD = 115200
 out  = sys.argv[1] if len(sys.argv) > 1 else "tools/run.log"
 tmo  = float(sys.argv[2]) if len(sys.argv) > 2 else 35.0
 
-# 结束标志（任一出现即提前停止）
-DONE = ("全部测试完成", "断电（保底）", "断电（不可恢复）", "结果不明确", "ABORT", "I2C 初始化失败")
+# 结束标志（任一出现即提前停止）。
+# 注意：006 固定流程**结尾永远落到持续监视(attitudeReportTick)**、且 ABORT 后还会自救续跑，
+#   故这些都不再是"终态"。默认置空＝抓满整个时长；如需早停可临时填标志。
+DONE = ()
 
 ser = serial.Serial(PORT, BAUD, timeout=0.2)
 # 经典复位进 run 模式：EN 拉低再释放，GPIO0 保持高
