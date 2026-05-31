@@ -15,6 +15,13 @@ static const uint8_t  MOTOR_I2C_SCL  = 32;       // ATOM Grove SCL
 static const uint32_t MOTOR_I2C_FREQ = 200000;   // 占位 200kHz，勿用 100k/400k
 static const float    MOTOR_MAX_MA   = 1200.0f;  // 硬件电流上限 ±1200mA
 
+// 控制模式（一次性在 init 选定，运行中不切——切模式要先撒手且慢，见 decisions/002）。
+//   CURRENT=力矩(平衡主回路，τ=Kt·I 直观)；SPEED=飞轮转速(外环动量管理/去饱和/缓落软逼近)。
+enum MotorMode { MOTOR_MODE_CUR = 0, MOTOR_MODE_SPD = 1 };
+
+// 当前活动模式（由 motorInit/motorInitSpeed 设定）。上层据此选 setCurrent/setSpeed。
+MotorMode motorMode();
+
 // 初始化：I²C → 关输出 → 电流模式 → 电流0 → 使能。返回 I²C 是否握手成功。
 bool    motorInit();
 // 初始化为**速度模式**：I²C → 关输出 → 速度模式 → 设速度环最大电流 → 速度0 → 使能。

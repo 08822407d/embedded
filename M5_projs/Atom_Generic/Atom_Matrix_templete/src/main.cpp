@@ -17,22 +17,21 @@
 #include "dir_test.h"
 #include "reboot_test.h"
 
-// === 启动表征序列：I²C自检 → 供电探测 → 识别A/B → 击杀式方向探测 → 当前侧危险边界 ===
+// === 固定流程（decisions/006）：全速度模式 初始化→自检→分轮探测→一次性起跳→统一消能落地→兜底 ===
+//   终点态 = 电机断电 + 阶段二持续监视（loop 里 attitudeReportTick）。运行中绝不切控制模式。
 void setup() {
     M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# 启动表征序列：I²C自检 → 供电探测 → 识别A/B → 击杀式方向探测 → 当前侧危险边界");
-    if (!motorInit()) { Serial.println("ERR: 电机 I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    startupSequence();
+    Serial.println("# [decisions/006] 全速度模式：自检→识别A/B→分轮探测(一次性递增)→越平衡起跳→统一消能落地→兜底");
+    if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
+    swingUpSetStrategy(SWINGUP_SPEED);
+    swingUpTest();    // 阶段一~四（自带断电收尾）
 }
 
 void loop() {
-    double pitch = 0, roll = 0;
-    imuReadAttitude(&pitch, &roll);
-    Serial.printf("# idle pitch=%.2f  motorErr=%u\n", pitch, motorErrorCode());
-    delay(500);
+    attitudeReportTick();   // 终点态：每窗聚合判定机体静止态 + 全速率打印（电机已断电）
 }
 
 // 双路供电重启诊断暂停用：需要时把 setup 换成 rebootTestSetup()/loop 换成 rebootTestLoop()。

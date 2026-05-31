@@ -5,7 +5,10 @@
 #include "motor.h"
 
 static UnitRollerI2C roller;
-static float g_lastCmdMA = 0;  // 最近下发的目标电流（遥测用）
+static float     g_lastCmdMA = 0;                 // 最近下发的目标电流（遥测用）
+static MotorMode g_mode      = MOTOR_MODE_CUR;    // 当前活动模式（init 设定）
+
+MotorMode motorMode() { return g_mode; }
 
 bool motorInit() {
     // 已知风险：IMU(Wire1) 与电机(Wire) 双 I²C 控制器共存时，可能其中一路失效。
@@ -16,6 +19,7 @@ bool motorInit() {
     roller.setMode(ROLLER_MODE_CURRENT);  // 电流模式，运行中不再改
     roller.setCurrent(0);                 // 初始零力矩，防使能跳变
     roller.setOutput(1);                  // 使能
+    g_mode = MOTOR_MODE_CUR;
     Serial.printf("# 电机供电 Vin=%.2fV（诊断：电机若只靠 Grove 5V 会供电不足）\n", motorVoltage());
     return ok;
 }
@@ -27,6 +31,7 @@ bool motorInitSpeed(float maxCurrentmA) {
     roller.setSpeedMaxCurrent((int32_t)lroundf(maxCurrentmA * 100));  // 速度环允许的最大电流
     roller.setSpeed(0);                                              // 初始 0 转速
     roller.setOutput(1);                                            // 使能
+    g_mode = MOTOR_MODE_SPD;
     Serial.printf("# 电机[速度模式] Vin=%.2fV  速度环maxCur=%.0fmA\n", motorVoltage(), maxCurrentmA);
     return ok;
 }
@@ -45,13 +50,15 @@ void motorSetCurrentmA(float mA) {
 
 void motorStop() {
     g_lastCmdMA = 0;
-    roller.setCurrent(0);
+    if (g_mode == MOTOR_MODE_SPD) roller.setSpeed(0);  // 速度模式：命令 0 转速（飞轮主动减速到停）
+    else                          roller.setCurrent(0);  // 电流模式：零力矩（飞轮滑行）
 }
 
 void motorPowerOff() {
     g_lastCmdMA = 0;
-    roller.setCurrent(0);
-    roller.setOutput(0);
+    if (g_mode == MOTOR_MODE_SPD) roller.setSpeed(0);
+    else                          roller.setCurrent(0);
+    roller.setOutput(0);  // 撒手：两模式均切断输出
 }
 
 float motorSpeedRPM() {

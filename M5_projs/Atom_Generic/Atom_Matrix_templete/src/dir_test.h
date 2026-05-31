@@ -25,9 +25,10 @@ void motorBenchTest();
 
 // ===== 起跳策略（可更换）=====
 enum SwingUpStrategy {
-    SWINGUP_CUBLI = 0,   // 蓄能急刹（反向蓄能→全力急刹反转飞轮）—— 默认
-    SWINGUP_IMPULSE,     // 突然启动电机单次冲量（早期方案，逐级加大单次驱动）
+    SWINGUP_CUBLI = 0,   // 蓄能急刹（反向蓄能→全力急刹反转飞轮）—— 默认（电流/力矩模式）
+    SWINGUP_IMPULSE,     // 突然启动电机单次冲量（早期方案，逐级加大单次驱动）（电流模式）
     SWINGUP_PUMP,        // 莱洛三角震荡式蓄能（秋千式逐周泵能）—— 当前硬件不适用，留空
+    SWINGUP_SPEED,       // 速度模式起跳 + 速度环"动量接住"缓落（研究用，整段跑速度模式）
 };
 extern SwingUpStrategy g_swingUpStrategy;          // 当前起跳策略（默认 SWINGUP_CUBLI）
 void swingUpSetStrategy(SwingUpStrategy s);         // 切换策略
@@ -54,3 +55,7 @@ void startupSequence();
 
 // 辨识结果：使 pitch 减小(朝平衡)的电流符号，+1/-1；0=未知/未测出。
 int dirTestRestoreCurrentSign();
+
+// 姿态状态监视（流程终点态）：电机断电，每 1s 采样窗逐帧打印全部传感器，窗末用均值/抖动判定机体静止态。
+//   只读 IMU/电机状态、绝不驱动。在 loop() 中反复调用即可持续监视。
+void attitudeReportTick();
