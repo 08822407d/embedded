@@ -1169,7 +1169,8 @@ void swingUpStepwiseTest() {
     for (float SU = SU_START; SU <= SU_MAX; SU += SU_STEP) {
         if (!confirmSettledAtRest(startRest, 500, 4000, "STEP_SETL")) { Serial.println("# 未能稳定回到起始态 → 终止。"); break; }
 
-        // 起跳冲量
+        // 起跳冲量（**先重新使能输出**——上一轮断电滑行后 output 是关的，否则本轮命令不驱动！）
+        motorReenable();
         Serial.printf("# [档 SU=%.0frpm] 起跳冲量 → %+.0frpm\n", SU, dir * SU);
         M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
         motorSetSpeedRPM((float)dir * SU);
