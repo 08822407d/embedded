@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [decisions/006] 开机方向表征：识别A/B→小速度变化冲量→记录起跳飞轮速度变化方向→终止(仅监视)");
+    Serial.println("# [decisions/006] 正式起跳测试：识别A/B→一记起跳冲量→单次消能(回落同向/越过反向)→断电滑行、观察落点");
     if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    probeSwingUpDirection();   // 判定+记录方向后终止
+    swingUpOneShotTest();   // 单冲量起跳 + 单次消能 + 滑行落定
 }
 
 void loop() {

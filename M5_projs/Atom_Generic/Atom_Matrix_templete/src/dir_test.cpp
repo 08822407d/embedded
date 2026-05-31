@@ -1086,6 +1086,63 @@ void probeSwingUpDirection() {
     }
 }
 
+// ===== 正式起跳测试（单冲量起跳 + 单次消能 + 断电滑行）decision 006 =====
+// 用户方案：方向已表征(=-st，飞轮速度变化方向)。一记起跳冲量后看机体：
+//   · 回落(未越平衡) → 施加**一次**与起跳**同向**的扭矩(速度变化)消能；
+//   · 越过平衡向对面落 → 施加**一次**与起跳**反向**的扭矩消能。
+//   **只施加一次**，施加完即 motorPowerOff(断电滑行、不再施加任何变化)，让机体自然落定。
+//   目的：看"单冲量起跳 + 单次消能 + 滑行"的综合能量能否达成落地——避开之前**连续**消能泵能加剧震荡的坑。
+// 安全：全程 speedDanger(超平衡40°/横向/超速 → 断电、仅监视)。需 motorInitSpeed 后调用。
+void swingUpOneShotTest() {
+    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    const float    startRest  = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    oppRest    = (st == +1) ? REST_A_DEG : REST_B_DEG;
+    const int      dir        = -st;       // 起跳(飞轮速度变化)方向，已表征确认
+    const float    SU_RPM     = 700.0f;    // 起跳冲量目标转速(可调)
+    const float    CANCEL_RPM = 1000.0f;   // 单次消能脉冲目标转速(可调)
+    const uint32_t SU_TO = 1200, CANCEL_TO = 500, OBSERVE_TO = 3000;
+    const int      CROSS_NEED = 3;
+
+    // 1) 起跳：一记速度变化冲量
+    Serial.printf("# [正式起跳] 起始=%s dir=%+d。一记起跳冲量 → %+.0frpm\n", (st == +1) ? "B" : "A", dir, dir * SU_RPM);
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
+    motorSetSpeedRPM((float)dir * SU_RPM);
+    bool crossed = false; int crossStreak = 0; float closest = startRest; bool peaked = false;
+    uint32_t t0 = millis();
+    while (millis() - t0 < SU_TO) {
+        delay(TICK_MS); float p = sampleAndLog("SU_KICK");
+        if (speedDanger(p)) return;
+        if ((float)st * (startRest - p) > (float)st * (startRest - closest)) closest = p;
+        if ((float)st * p < 0) { if (++crossStreak >= CROSS_NEED) { crossed = true; break; } } else crossStreak = 0;
+        if ((float)dir * g_lastGyRate <= 0 && fabsf(p - startRest) > 3.0f) { peaked = true; break; }
+    }
+    float adv = (float)st * (startRest - closest);
+    Serial.printf("# 起跳结果：%s（朝平衡峰值 %.1f°/%.0f°）\n",
+                  crossed ? "★越过平衡" : (peaked ? "未越、顶点回落" : "未越、超时"), adv, fabsf(startRest));
+
+    // 2) 单次消能脉冲：回落=同向(dir)、越过=反向(-dir)
+    int cancelDir = crossed ? -dir : dir;
+    Serial.printf("# 单次消能：%s → 施加**一次**速度变化方向 %+d 的扭矩(%+.0frpm)\n",
+                  crossed ? "越过平衡(反向消能)" : "回落(同向消能)", cancelDir, cancelDir * CANCEL_RPM);
+    M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝
+    motorSetSpeedRPM((float)cancelDir * CANCEL_RPM);
+    uint32_t t1 = millis();
+    while (millis() - t1 < CANCEL_TO) { delay(TICK_MS); float p = sampleAndLog("SU_CANCEL"); if (speedDanger(p)) return; }
+
+    // 3) 施加完成 → 断电滑行，不再施加任何变化（让机体自然落定）
+    motorPowerOff();
+    Serial.println("# 单次消能施加完毕 → 断电滑行、不再施加，让机体自然落定。观察落点…");
+    M5.dis.fillpix(CRGB(0x00, 0x20, 0x10));  // 青
+    uint32_t t2 = millis();
+    while (millis() - t2 < OBSERVE_TO) { delay(TICK_MS); sampleAndLog("SU_COAST"); }
+    Serial.printf("# 落点 pitch=%.1f lat=%.1f（目标对面静止态 %.0f° / 起始 %.0f°）→ 终止、仅监视。\n",
+                  g_accelPitch, g_lastLateral, oppRest, startRest);
+}
+
 // ===== 启动自动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界 =====
 // [1] 两个 I²C 总线自检：IMU(MPU6886 在 Wire1 0x68)、电机(RollerCAN 在 Wire 0x64)。
 static bool i2cSelfCheck() {
