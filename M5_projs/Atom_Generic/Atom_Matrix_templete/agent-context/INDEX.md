@@ -10,6 +10,7 @@
 - [反作用轮倒立摆 Playbook + 问题排查路径](references/reaction-wheel-pendulum-playbook.md) — 理论/流程/数据处理/控制/★常见问题优先排查表；遇到问题先查这里
 - [渐进逼近极限的安全探测规范](references/safe-limit-probing.md) — 起摆翻倒事故复盘+对策：相对authority表参、从低ramp、变更重归零、速度天花板、逼近即停留裕度
 - [缓落控制：速度模式 vs 电流模式](references/speed-vs-current-descent.md) — 缓落是速度问题：速度模式动量守恒前馈接住更简单(平衡仍用电流)；已落地可换策略 SWINGUP_SPEED + motor mode-aware
+- [紧凑机器日志格式](references/log-format.md) — sampleAndLog 输出约定(10列定点整数,phase=代码位置/iter=循环计数,≈83Hz)，供离线精密分析/诊断
 
 ## requirements/
 - [001 屏动平衡系统](requirements/001-screen-balance-system.md) — 反作用轮倒立摆项目诉求与分步目标

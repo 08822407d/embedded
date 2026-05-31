@@ -41,7 +41,7 @@ static const uint32_t SETTLE_MS     = 400;     // 脉冲间稳定（同样采样
 static const float    RECOVER_MA         = MOTOR_MAX_MA;  // 全力反向
 static const uint32_t RECOVER_TIMEOUT_MS = 1500;
 
-static const uint32_t TICK_MS = 20;  // 采样/看门狗/遥测周期（50Hz；时间戳为准）
+static const uint32_t TICK_MS = 8;   // 采样/看门狗/遥测周期（≈80-90Hz；dt 以时间戳为准，可放心提采样率）
 
 static int   g_restoreSign = 0;   // 使 pitch 减小的电流符号（+1/-1），0=未知
 static bool  g_faulted     = false;
@@ -56,6 +56,8 @@ static float    g_accelPitch   = 0;   // 最近一帧**加速度计原始** pitc
 static float    g_accelLat     = 0;   // 最近一帧**加速度计原始**侧向角（°，无积分漂移）
 static uint8_t  g_lastErr     = 0;   // 最近一次电机错误码（1过压/2堵转/4越界）
 static uint32_t g_lastSampleMs = 0;  // 上一帧时间戳，用于求真实 dt（积分用）
+static const char *g_logLastPhase = nullptr;  // 紧凑日志：上一帧 phase 指针（变化即重置 iter）
+static uint16_t    g_logIter      = 0;        // 紧凑日志：当前 phase 内的循环帧计数
 
 // 采一帧：读原始6轴 + 换算姿态 + 互补滤波 + 电机命令/实际电流/转速/错误，打时间戳 CSV 输出。
 // 返回融合后的 pitch（°）。同时更新 g_lastSpeed / g_lastLateral。
@@ -81,18 +83,21 @@ static float sampleAndLog(const char *phase) {
     float   cmd = motorCommandedmA();
     float   cur = motorCurrentmA();
     float   spd = motorSpeedRPM();
-    float   vin = motorVoltage();
-    uint8_t err = motorErrorCode();
+    uint8_t err = motorErrorCode();   // (去掉每帧读 vin，省一次 I²C → 提采样率)
     g_lastSpeed = spd;
     g_lastCur   = cur;
     g_lastErr   = err;
+    (void)gz; (void)roll;             // 仅算姿态用，紧凑日志不输出
 
-    // CSV: t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin
-    //   pitch=加速度原始角(动态有伪象)  pf=陀螺融合pitch  lat=陀螺融合侧向角(安全判据)
-    //   vin=供电电压(诊断电机供电/掉压：满载若明显掉压=供电电流不足)
-    Serial.printf("%lu,%s,%.4f,%.4f,%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%u,%.2f\n",
-                  (unsigned long)now, phase, ax, ay, az, gx, gy, gz,
-                  pitch, g_fusedPitch, roll, g_lastLateral, cmd, cur, spd, err, vin);
+    // ── 紧凑机器日志(定点整数，供离线精密分析；不为人读) ──
+    //   列: phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err
+    //   phase=代码位置标识  iter=该 phase 内循环帧号  t_ms=时间戳
+    //   pf_cdeg=融合θ×100(厘度)  gy_cdps=机体角速度θ̇×100(已扣零偏)  cmd/cur=电流(mA)  spd=飞轮(rpm)  lat_cdeg=侧向×100
+    if (phase != g_logLastPhase) { g_logLastPhase = phase; g_logIter = 0; } else { g_logIter++; }
+    Serial.printf("%s,%u,%lu,%ld,%ld,%ld,%ld,%ld,%ld,%u\n",
+                  phase, g_logIter, (unsigned long)now,
+                  lroundf(g_fusedPitch * 100.0f), lroundf(g_lastGyRate * 100.0f),
+                  lroundf(cmd), lroundf(cur), lroundf(spd), lroundf(g_lastLateral * 100.0f), err);
     return g_fusedPitch;
 }
 
@@ -304,7 +309,7 @@ int dirTestRestoreCurrentSign() {
 // 共用开局：打表头 → 标定陀螺零偏(点阵橙) → 播种互补滤波 → 静置 3s → 识别静止态。
 //   返回 +1=在静止态 B(+30°)，-1=在静止态 A(-31°)，0=校准失败/不在 A/B（已 ABORT/断电，调用方直接 return）。
 static int prepAtRest() {
-    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err");
     Serial.println("# 请确认系统处于静止态 A 或 B，3 秒后开始...");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));  // 橙：正在校准
     if (!imuCalibrateGyro(200)) {
@@ -1566,7 +1571,7 @@ static bool recoverGuard() {  // 自救用宽松保底
 }
 
 void recoverFlipTest() {
-    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err");
     Serial.println("# 翻倒兜底恢复：面内角(pitch)>40°(翻越)且垂直角(lat)<10°(仍在平面)→击杀试救；垂直角≥10°→断电不救。");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));
     if (!imuCalibrateGyro(200)) { Serial.println("# 标定失败"); motorPowerOff(); return; }
@@ -1638,7 +1643,7 @@ void recoverFlipTest() {
 
 // ===== 供电充足性探测（缓升小电流测飞轮顶速，区分 5V/12V，机体姿态无关）=====
 bool powerDetectTest() {
-    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err");
     Serial.println("# 供电探测：缓升电流(<挣脱150mA)平稳转飞轮测顶速。5V≈600rpm vs 12V>1000rpm。");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));  // 橙：标定
     if (!imuCalibrateGyro(200)) {
@@ -1741,7 +1746,7 @@ static bool benchSettle(uint32_t ms, const char *phase) {
 
 void motorBenchTest() {
     // 轻量开局：标定陀螺(点阵橙)+播种融合+Vin 自检（**不要求机体在 B**，只测电机能力）
-    Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+    Serial.println("# phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err");
     Serial.println("# 电机台架能力测试(12V)：测最大电流/最大转速，不做起跳；机体受硬线约束，仅看电机读数。");
     M5.dis.fillpix(CRGB(0x30, 0x18, 0x00));  // 橙：校准
     if (!imuCalibrateGyro(200)) {
@@ -1809,7 +1814,7 @@ void motorBenchTest() {
 void attitudeReportTick() {
     static bool headerDone = false;
     if (!headerDone) {  // CSV 表头只打一次（与 sampleAndLog 同 schema，便于离线解析）
-        Serial.println("# t_ms,phase,ax,ay,az,gx,gy,gz,pitch,pf,roll,lat,cmd_mA,cur_mA,spd_rpm,err,vin");
+        Serial.println("# phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err");
         headerDone = true;
     }
     const int N = 1000 / (int)TICK_MS;        // 1s 窗样本数（仅用于判定聚合）
