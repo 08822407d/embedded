@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [system-model §6] 探能起跳的扭矩：识别A/B→逐增力矩上限施加朝平衡→找挣脱起跳的 τ_break→记录、终止监视");
-    if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    probeBreakawayTorque();   // 探"能起跳的扭矩"(扭矩框架，替代旧的探转向)
+    Serial.println("# [电流模式·system-model §6] 探能起跳的扭矩：识别A/B→逐增电流施加朝平衡→找挣脱起跳的 τ_break→记录、终止监视");
+    if (!motorInit()) { Serial.println("ERR: 电机[电流模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
+    probeBreakawayTorque();   // 探"能起跳的扭矩"(电流模式，扭矩=电流直接施加)
 }
 
 void loop() {

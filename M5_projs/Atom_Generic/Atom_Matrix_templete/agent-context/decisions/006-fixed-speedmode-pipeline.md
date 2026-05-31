@@ -24,6 +24,17 @@
     A/B 两侧都现测、不靠约定；stepwise 起跳改用此**实测方向**。
 - 下方"阶段三/四 起跳+落地+自救"为**完整方案存档**，待机械单轴约束就绪后再启用；当前先把方向测准记下。
 
+## ★控制模式回归电流（2026-05-31，调研后用户定）—— 覆盖本文档前面的"全程速度模式"
+> 调研主流高质量项目(SimpleFOC 反作用轮倒立摆、Cubli/ETH 及现代 BLDC 复刻)：**起跳与平衡全程用力矩/电压(=力矩)模式、不切换；
+> 无人用速度控制做起跳/平衡**（速度只用于外环去饱和，正是 decision 002 早写的）。执行权威是**扭矩**。
+- ⇒ **方案切回电流(力矩)模式为主**（回到 decision 002 最初选择）。**作用量=扭矩=电流，直接施加**，
+  不再用"速度模式 + setSpeedMaxCurrent + 积分速度命令"绕力矩。起跳(今后 Cubli)与平衡都用电流，自然衔接、不切模式。
+- **已转电流模式的活跃流程**：`main`(motorInit)、`probeBreakawayTorque`(逐增电流找 τ_break)、
+  `balanceStep`(直接输出力矩 mA)、`swingUpToBalance`(电流起跳脉冲+平衡力矩)、硬危险 `motorStop`(mode-aware)。
+- **速度模式旧测试函数**(swingUpStepwiseTest/OneShotTest/measureSwingUpDir/probeSwingUpDirection/cancelEnergyToRest/
+  finalizeOrRescueSpeed/swingUpSpeed)= 速度方案遗留、不在主流程，**待清理删除**（其目的本是速度模式模拟力矩，电流模式不需要）。
+- 依据见 references（调研：SimpleFOC voltage/torque 全程不切、Cubli torque）。
+
 ## 今后阶段方针（2026-05-31，用户定）：起跳改用 Cubli 蓄能急刹
 > 这是**今后大方向**，不必立即完整实现；当前起跳代码先保持，逐步过渡。
 - **方案**：飞轮**小扭矩反向蓄能**到 ω_max(机体留静止态不动) → **大扭矩急刹到 0**；飞轮从 ±ω_max 急减速到 0 的

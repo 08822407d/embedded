@@ -271,20 +271,16 @@ static void breakawayTest(int toward) {
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));  // 绿：表征结束
 }
 
-// 速度模式硬危险（decision 006·A）：**硬断电只看飞轮"管不了"的两件事**——
-//   ① 出平面/横向倾倒(|lat|>阈，飞轮无 authority、不可控)  ② 飞轮超速(runaway)。
-//   **面内(pitch)越外棱不在此硬断电**：交给"消能/动量接住"预防、万一翻越交面内击杀自救。
-//   返回 true=已断电(应中止)。
+// 硬危险（模式通用，电流/速度模式皆可）：超平衡40°/横向倾倒/飞轮超速 任一 → 立即断电、仅监视、不自救。
+//   （motorStop 已 mode-aware：电流模式置 0 电流、速度模式置 0 转速。）返回 true=已断电(应中止)。
 static bool speedDanger(float pitch) {
-    // decision 006(用户简化)：**超出平衡 40° 即视为翻越/不可恢复 → 立即断电，只读监视、不再自救**。
-    //   外加横向倾倒、飞轮超速两道硬保底。任一触发 → setSpeed0 + 断输出。
     bool overPit = fabsf(pitch)         > 40.0f;               // 超平衡 40° → 翻越外棱、不可恢复
     bool lateral = fabsf(g_lastLateral) > LATERAL_DANGER_DEG;  // 出平面倾倒(飞轮不可控)
     bool overspd = fabsf(g_lastSpeed)   > SPEED_LIMIT_RPM;     // 飞轮 runaway
     if (!overPit && !lateral && !overspd) return false;
     Serial.printf("# !! 硬危险(%s pitch=%.1f lat=%.1f spd=%.0f) → 断电、仅监视(不自救)\n",
                   overPit ? "超平衡40°" : (lateral ? "横向倾倒" : "飞轮超速"), pitch, g_lastLateral, g_lastSpeed);
-    motorSetSpeedRPM(0);
+    motorStop();
     motorPowerOff();
     g_faulted = true;
     return true;
@@ -561,9 +557,12 @@ void poweredBreakawayTest() {
 SwingUpStrategy g_swingUpStrategy = SWINGUP_CUBLI;  // 默认 Cubli
 void swingUpSetStrategy(SwingUpStrategy s) { g_swingUpStrategy = s; }
 
-// 表征结果：使机体朝平衡起跳所需的**飞轮"速度变化方向"**（+1/-1），0=未测出。
+// 表征结果：使机体朝平衡起跳所需的**电流符号/速度变化方向**（+1/-1），0=未测出。
 int g_swingUpDir = 0;
 int swingUpDirection() { return g_swingUpDir; }
+// 探测结果：能让机体朝平衡挣脱起跳的扭矩(mA，力矩∝电流)，0=未测出。
+float g_breakawayTorque = 0;
+float swingUpBreakawayTorque() { return g_breakawayTorque; }
 static const char *swingUpName(SwingUpStrategy s) {
     switch (s) { case SWINGUP_IMPULSE: return "突然启动单次冲量";
                  case SWINGUP_PUMP:    return "震荡式蓄能(秋千)";
@@ -1231,30 +1230,26 @@ void swingUpStepwiseTest() {
 // 平衡控制器(balance.*)输出飞轮目标转速命令；危险(超平衡40°/横向/超速)→ 断电、仅监视。
 // 注意：增益/起跳量为占位初值，需机械单轴约束就绪后实测整定；当前侧向不约束下机体会出平面、跑不稳。
 void swingUpToBalance() {
-    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
     int st = prepAtRest();
     if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
     if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
 
-    // 1) 实测起跳方向（不靠对称约定）
-    int dir = measureSwingUpDir(st, 350.0f);
-    if (dir == 0) { Serial.println("# 方向实测不明确 → 终止。"); motorPowerOff(); return; }
-    g_swingUpDir = dir;
-    int thetaDown = dir * st;   // 使 θ 减小的飞轮速度变化方向
+    // 1) 起跳方向(电流符号)：用已探的 g_swingUpDir，没探过则用物理约定 −st
+    int dir = (g_swingUpDir != 0) ? g_swingUpDir : -st;
+    int thetaDown = dir * st;   // 使 θ 减小的电流符号
     balanceInit(thetaDown);
     balanceSetMethod(BALANCE_PID);
     Serial.printf("# [起跳→平衡] 起始=%s 起跳方向=%+d θ减小方向=%+d 平衡法=PID。\n", (st == +1) ? "B" : "A", dir, thetaDown);
 
-    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
-    const float    SU_RPM    = 1000.0f;   // 起跳冲量(送机体到平衡附近)，占位待调
+    const float    SU_MA     = (g_breakawayTorque > 0) ? (g_breakawayTorque + 100.0f) : 400.0f;  // 起跳电流(≥τ_break)
     const float    CATCH_DEG = 15.0f;     // |θ|<此 → 接管平衡控制器
     const uint32_t SU_TO = 1500, BAL_TO = 8000;
 
-    // 2) 起跳冲量：把机体推向平衡，进 CATCH 窗就接管
-    Serial.printf("# 起跳冲量 → %+.0frpm，待 |θ|<%.0f° 接管平衡…\n", dir * SU_RPM, CATCH_DEG);
+    // 2) 起跳：施加朝平衡电流(扭矩)把机体推向平衡，进 CATCH 窗就接管
+    Serial.printf("# 起跳电流 → %+.0fmA，待 |θ|<%.0f° 接管平衡…\n", dir * SU_MA, CATCH_DEG);
     M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
-    motorReenable();
-    motorSetSpeedRPM((float)dir * SU_RPM);
+    motorSetCurrentmA((float)dir * SU_MA);
     bool caught = false;
     uint32_t t0 = millis();
     while (millis() - t0 < SU_TO) {
@@ -1263,89 +1258,78 @@ void swingUpToBalance() {
         if (speedDanger(p)) return;
         if (fabsf(g_fusedPitch) < CATCH_DEG) { caught = true; break; }   // 进平衡窗
     }
-    if (!caught) { Serial.println("# 起跳未把机体送进平衡窗(冲量/方向/机械) → 断电、仅监视。"); motorPowerOff(); return; }
+    if (!caught) { Serial.println("# 起跳未把机体送进平衡窗(扭矩/方向/机械) → 断电、仅监视。"); motorPowerOff(); return; }
 
-    // 3) 接管平衡控制器：钳在 θ≈0
+    // 3) 接管平衡控制器(电流模式，直接输出力矩)：钳在 θ≈0
     Serial.println("# ★进入平衡窗 → 接管 PID 平衡控制器(钳 θ≈0)。");
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x10));  // 绿青：平衡中
-    balanceReset(motorSpeedRPM());           // 命令对齐当前飞轮转速，防跳变
-    uint32_t tb = millis(), tPrev = millis();
+    balanceReset(0);
+    uint32_t tb = millis();
     while (millis() - tb < BAL_TO) {
         delay(TICK_MS);
         float p = sampleAndLog("BALANCE");
         if (speedDanger(p)) { Serial.println("# 平衡中触发危险 → 断电、仅监视。"); return; }
-        uint32_t now = millis();
-        float dt = (now - tPrev) / 1000.0f; if (dt <= 0) dt = TICK_MS / 1000.0f; tPrev = now;
-        float wcmd = balanceStep(g_fusedPitch, g_lastGyRate, g_lastSpeed, dt);   // θ,θ̇,ω_w
-        motorSetSpeedRPM(wcmd);
+        float u = balanceStep(g_fusedPitch, g_lastGyRate, g_lastSpeed, 0.0f);   // θ,θ̇,ω_w → 力矩(mA)
+        motorSetCurrentmA(u);
     }
     motorStop(); motorPowerOff();
     Serial.printf("# 平衡测试时段结束(%lums)，末态 pitch=%.1f → 断电、仅监视。\n", (unsigned long)BAL_TO, (double)g_fusedPitch);
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 
-// 探测结果：能让机体朝平衡挣脱起跳的扭矩(mA 当量，力矩∝电流)，0=未测出。
-float g_breakawayTorque = 0;
-float swingUpBreakawayTorque() { return g_breakawayTorque; }
-
-// ===== 探测"能起跳的扭矩 τ_break"（system-model §6：作用量是扭矩，非转速方向）=====
-// 逐步增大**速度环力矩上限(maxCurrent≈扭矩)**、施加朝平衡方向，找机体**挣脱静止态阱起跳**的最小扭矩。
-//   速度模式实现：setSpeedMaxCurrent(τ) + 命令大目标转速 → 速度环以 τ 全力加速 = 施加扭矩 τ。
-//   方向是该扭矩的属性：先按物理约定 dir=−st；若机体**朝外棱挣脱**(符号反)→取反同档重试。
-//   外棱仅 3-4°：朝外判据用更小阈值(防翻)。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInitSpeed 后调用。
+// ===== 探测"能起跳的扭矩 τ_break"（电流模式；system-model §6：作用量是扭矩）=====
+// 电流模式下**扭矩=电流，直接施加**：逐步增大电流(mA)朝平衡方向，找机体**挣脱静止态阱起跳**的最小扭矩。
+//   方向是该扭矩的属性：先按物理约定 dir=−st(朝平衡电流符号)；若机体**朝外棱挣脱**(符号反)→取反同档重试。
+//   外棱仅 3-4°：朝外判据用更小阈值(防翻)。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInit 后调用。
 void probeBreakawayTorque() {
-    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
     int st = prepAtRest();
     if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
     if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
 
     const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
-    const float    TAU_START = 100.0f, TAU_STEP = 80.0f, TAU_MAX = MOTOR_MAX_MA;  // 扭矩(mA)逐增
-    const float    SPIN_RPM  = 2500.0f;   // 大目标转速：让速度环以 τ 全力加速 = 施加扭矩 τ
+    const float    TAU_START = 100.0f, TAU_STEP = 80.0f, TAU_MAX = MOTOR_MAX_MA;  // 电流(扭矩,mA)逐增
     const float    BREAK_BAL = 6.0f;      // 朝平衡前进超此 = 挣脱起跳
     const float    BREAK_EDGE = 3.0f;     // 朝外棱前进超此 = 朝外挣脱(外棱仅3-4°，小阈值防翻)
     const uint32_t PUSH_TO   = 900;
-    int   dir = -st;                      // 朝平衡方向初猜(物理约定)
+    int   dir = -st;                      // 朝平衡电流符号初猜(物理约定)
     bool  dirFlipped = false;
 
-    Serial.printf("# [探扭矩] 起始=%s。逐增力矩上限(扭矩,起%.0f步%.0f顶%.0fmA)施加朝平衡，找挣脱起跳的 τ_break。\n",
+    Serial.printf("# [探扭矩·电流模式] 起始=%s。逐增电流(扭矩,起%.0f步%.0f顶%.0fmA)朝平衡，找挣脱起跳的 τ_break。\n",
                   (st == +1) ? "B" : "A", TAU_START, TAU_STEP, TAU_MAX);
     float tau = TAU_START, tauBreak = 0;
     while (tau <= TAU_MAX + 0.1f) {
         if (!confirmSettledAtRest(startRest, 500, 4000, "TQ_SETL")) { Serial.println("# 未能稳回起始态 → 终止。"); break; }
-        motorReenable();
-        motorSetSpeedMaxCurrent(tau);                 // 力矩上限 = 扭矩 τ
-        Serial.printf("# [扭矩档 %.0fmA] 施加朝平衡(飞轮速度变化方向%+d)…\n", tau, dir);
+        Serial.printf("# [扭矩档 %.0fmA] 施加朝平衡电流(符号%+d)…\n", tau, dir);
         M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
-        motorSetSpeedRPM((float)dir * SPIN_RPM);      // 命令大速度 → 速度环以 τ 全力加速
+        motorSetCurrentmA((float)dir * tau);          // **电流模式：直接施加扭矩 τ**
         float advBal = 0, advEdge = 0; int outcome = 0;  // 0=没挣脱 1=朝平衡挣脱 2=朝外挣脱
         uint32_t t0 = millis();
         while (millis() - t0 < PUSH_TO) {
             delay(TICK_MS); float p = sampleAndLog("TQ");
-            if (speedDanger(p)) { motorSetSpeedMaxCurrent(MOTOR_MAX_MA); return; }
+            if (speedDanger(p)) return;
             float aB = (float)st * (startRest - p); if (aB > advBal)  advBal  = aB;
             float aE = (float)st * (p - startRest); if (aE > advEdge) advEdge = aE;
             if (advBal  > BREAK_BAL)  { outcome = 1; break; }
             if (advEdge > BREAK_EDGE) { outcome = 2; break; }
         }
-        motorSetSpeedRPM(0);
+        motorStop();
 
-        if (outcome == 1) { tauBreak = tau; Serial.printf("# ★挣脱起跳！能起跳的扭矩 τ_break≈%.0fmA（朝平衡%.1f°，飞轮速度变化方向%+d）。\n", tau, advBal, dir); break; }
+        if (outcome == 1) { tauBreak = tau; Serial.printf("# ★挣脱起跳！能起跳的扭矩 τ_break≈%.0fmA（朝平衡%.1f°，电流符号%+d）。\n", tau, advBal, dir); break; }
         if (outcome == 2) {
-            if (!dirFlipped) { dir = -dir; dirFlipped = true; Serial.printf("# 机体朝外棱挣脱(%.1f°)→此方向把机体推离平衡、方向反，取反为%+d 同档重试。\n", advEdge, dir); continue; }
+            if (!dirFlipped) { dir = -dir; dirFlipped = true; Serial.printf("# 机体朝外棱挣脱(%.1f°)→此电流方向把机体推离平衡、方向反，取反为%+d 同档重试。\n", advEdge, dir); continue; }
             Serial.println("# 两个方向都朝外挣脱？异常 → 终止。"); break;
         }
         settleSpeedSafe(1200, "TQ_RST");
         tau += TAU_STEP;
     }
-    motorSetSpeedMaxCurrent(MOTOR_MAX_MA);   // 恢复力矩上限
     motorStop(); motorPowerOff();
     if (tauBreak > 0) {
         g_breakawayTorque = tauBreak; g_swingUpDir = dir;
-        Serial.printf("# ★记录：能起跳扭矩 τ_break=%.0fmA，朝平衡飞轮速度变化方向=%+d。终止、仅监视。\n", tauBreak, dir);
+        Serial.printf("# ★记录：能起跳扭矩 τ_break=%.0fmA，朝平衡电流符号=%+d。终止、仅监视。\n", tauBreak, dir);
         M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
     } else {
-        Serial.printf("# 升至力矩上限 %.0fmA 仍未挣脱起跳(供电/机械?)。终止、仅监视。\n", TAU_MAX);
+        Serial.printf("# 升至电流上限 %.0fmA 仍未挣脱起跳(供电/机械?)。终止、仅监视。\n", TAU_MAX);
         M5.dis.fillpix(CRGB(0x28, 0x18, 0x00));
     }
 }
