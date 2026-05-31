@@ -72,6 +72,9 @@
 - ✅ `speedDanger` 改仅横向+超速硬断电（`checkDanger` 保留给电流模式遗留函数）。
 - ✅ 统一消能封装 `cancelEnergyToRest`（反向阻尼 side-agnostic）——回落/落地/自救共用。
 - ✅ 阶段二监视 `attitudeReportTick`（全速率 CSV + 1s 窗判定）作终点态。
+- ✅ 平衡控制器 `src/balance.*`（**PID 主用 + LQR 备用**，可切；全程速度模式：输出飞轮角加速度→内部积分成
+  飞轮目标转速命令）；`swingUpToBalance()` 接"识别A/B→实测起跳方向→起跳冲量送到平衡窗→接管平衡控制器钳 θ≈0"。
+  增益(PID_KP/KD/KW、LQR_K1..3)与起跳量(SU_RPM)、接管窗(CATCH_DEG) 均占位，**待机械单轴约束就绪后实测整定**。
 - ⏳ **未实测**：机体需先复位到合法静止态（A/B 且 lat≈0）才能跑；`ROUND_*/ADV_*/K_DAMP/J_RATIO` 待实测拟合调。
 
 ## 实测注意（run_006a / run_006c）

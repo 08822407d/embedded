@@ -5,6 +5,7 @@
 
 #include "imu.h"
 #include "motor.h"
+#include "balance.h"
 #include "dir_test.h"
 
 // ===== 标定值（来自 agent-context/system-model.md）=====
@@ -1222,6 +1223,64 @@ void swingUpStepwiseTest() {
     }
     motorPowerOff();
     Serial.printf("# 逐步起跳测试结束：**最大安全回落档 SU≈%.0frpm**。终止、仅监视。\n", lastSafeSU);
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
+// ===== 起跳直接到平衡 + 保持平衡（decision 006；PID 主用，LQR 备用）=====
+// 流程：识别A/B → 实测起跳方向 → 一记起跳冲量把机体送到平衡附近 → **接管平衡控制器**(速度模式)钳在 θ≈0。
+// 平衡控制器(balance.*)输出飞轮目标转速命令；危险(超平衡40°/横向/超速)→ 断电、仅监视。
+// 注意：增益/起跳量为占位初值，需机械单轴约束就绪后实测整定；当前侧向不约束下机体会出平面、跑不稳。
+void swingUpToBalance() {
+    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    // 1) 实测起跳方向（不靠对称约定）
+    int dir = measureSwingUpDir(st, 350.0f);
+    if (dir == 0) { Serial.println("# 方向实测不明确 → 终止。"); motorPowerOff(); return; }
+    g_swingUpDir = dir;
+    int thetaDown = dir * st;   // 使 θ 减小的飞轮速度变化方向
+    balanceInit(thetaDown);
+    balanceSetMethod(BALANCE_PID);
+    Serial.printf("# [起跳→平衡] 起始=%s 起跳方向=%+d θ减小方向=%+d 平衡法=PID。\n", (st == +1) ? "B" : "A", dir, thetaDown);
+
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    SU_RPM    = 1000.0f;   // 起跳冲量(送机体到平衡附近)，占位待调
+    const float    CATCH_DEG = 15.0f;     // |θ|<此 → 接管平衡控制器
+    const uint32_t SU_TO = 1500, BAL_TO = 8000;
+
+    // 2) 起跳冲量：把机体推向平衡，进 CATCH 窗就接管
+    Serial.printf("# 起跳冲量 → %+.0frpm，待 |θ|<%.0f° 接管平衡…\n", dir * SU_RPM, CATCH_DEG);
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
+    motorReenable();
+    motorSetSpeedRPM((float)dir * SU_RPM);
+    bool caught = false;
+    uint32_t t0 = millis();
+    while (millis() - t0 < SU_TO) {
+        delay(TICK_MS);
+        float p = sampleAndLog("BAL_KICK");
+        if (speedDanger(p)) return;
+        if (fabsf(g_fusedPitch) < CATCH_DEG) { caught = true; break; }   // 进平衡窗
+    }
+    if (!caught) { Serial.println("# 起跳未把机体送进平衡窗(冲量/方向/机械) → 断电、仅监视。"); motorPowerOff(); return; }
+
+    // 3) 接管平衡控制器：钳在 θ≈0
+    Serial.println("# ★进入平衡窗 → 接管 PID 平衡控制器(钳 θ≈0)。");
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x10));  // 绿青：平衡中
+    balanceReset(motorSpeedRPM());           // 命令对齐当前飞轮转速，防跳变
+    uint32_t tb = millis(), tPrev = millis();
+    while (millis() - tb < BAL_TO) {
+        delay(TICK_MS);
+        float p = sampleAndLog("BALANCE");
+        if (speedDanger(p)) { Serial.println("# 平衡中触发危险 → 断电、仅监视。"); return; }
+        uint32_t now = millis();
+        float dt = (now - tPrev) / 1000.0f; if (dt <= 0) dt = TICK_MS / 1000.0f; tPrev = now;
+        float wcmd = balanceStep(g_fusedPitch, g_lastGyRate, g_lastSpeed, dt);   // θ,θ̇,ω_w
+        motorSetSpeedRPM(wcmd);
+    }
+    motorStop(); motorPowerOff();
+    Serial.printf("# 平衡测试时段结束(%lums)，末态 pitch=%.1f → 断电、仅监视。\n", (unsigned long)BAL_TO, (double)g_fusedPitch);
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 

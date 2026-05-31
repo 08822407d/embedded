@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [decisions/006] 逐步起跳测试：识别A/B→SU逐轮渐增(起跳冲量→强制单次消能→断电滑行→看落点)，记最大安全档");
+    Serial.println("# [decisions/006] 起跳→平衡：识别A/B→实测起跳方向→起跳冲量送到平衡附近→接管PID平衡控制器钳θ≈0");
     if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    swingUpStepwiseTest();   // 起跳能量逐轮渐增 + 每轮强制单次消能 + 滑行落定
+    swingUpToBalance();   // 起跳直接到平衡 + PID 保持（LQR 备用，balanceSetMethod 可切）
 }
 
 void loop() {

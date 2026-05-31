@@ -72,3 +72,7 @@ void swingUpOneShotTest();
 // 逐步起跳测试（decision 006）：起跳目标转速 SU 从小到大**逐轮渐增**，每轮强制一次消能+断电滑行+看落点，
 //   打印每档落点并记最大安全回落档(lastSafeSU)。越平衡成功/翻越即停。需 motorInitSpeed 后调用。
 void swingUpStepwiseTest();
+
+// 起跳直接到平衡 + 保持平衡（decision 006）：识别A/B→实测起跳方向→起跳冲量送机体到平衡附近→
+//   接管平衡控制器(balance.*，PID主用/LQR备用)钳 θ≈0。危险即断电、仅监视。需 motorInitSpeed 后调用。
+void swingUpToBalance();
