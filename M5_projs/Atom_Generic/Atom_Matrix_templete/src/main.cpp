@@ -24,7 +24,7 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [decisions/006] 全速度模式：自检→识别A/B→分轮探测(一次性递增)→越平衡起跳→统一消能落地→兜底");
+    Serial.println("# [decisions/006] 全速度模式：自检→识别A/B→分轮探测(模型自适应)→越平衡起跳→统一消能落地→兜底");
     if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("ERR: 电机[速度模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
     swingUpSetStrategy(SWINGUP_SPEED);
     swingUpTest();    // 阶段一~四（自带断电收尾）
