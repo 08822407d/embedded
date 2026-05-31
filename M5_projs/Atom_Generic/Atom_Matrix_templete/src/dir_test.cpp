@@ -749,12 +749,19 @@ static int cancelEnergyToRest(float targetRestDeg, uint32_t timeoutMs, const cha
     const float    K_DAMP   = 4.0f;                    // rpm per (°/s) 阻尼增益，估算初值待实测
     const float    GY_STOP  = 12.0f;                   // 机体角速度认定"摆停"阈(°/s)
     const float    W_CLAMP  = SPEED_LIMIT_RPM * 0.9f;  // 飞轮目标转速限幅(<硬超速)
+    const float    LAT_BAIL = 18.0f;                   // 机体出平面超此 → 立即停消能（见下）
     const uint32_t DESAT_MS = 1500;                    // 去饱和斜坡时长
     uint32_t t0 = millis();
     while (millis() - t0 < timeoutMs) {
         delay(TICK_MS);
         float p = sampleAndLog(phase);
         if (speedDanger(p)) return DAMP_DANGER;
+        // 关键(run_006c 教训)：机体一旦出平面，本阻尼器按"面内陀螺率"驱动飞轮会**越追越歪、把飞轮泵到高速**
+        //   (实测泵到 ~868rpm)，反而加剧震荡。出平面飞轮无 authority → 立即停飞轮、断电、交收尾自救。
+        if (fabsf(g_lastLateral) > LAT_BAIL) {
+            Serial.printf("# 消能中机体出平面(lat=%.1f>%.0f) → 停飞轮、断电交收尾(防越追越歪)。\n", g_lastLateral, LAT_BAIL);
+            motorSetSpeedRPM(0); motorPowerOff(); g_faulted = true; return DAMP_DANGER;
+        }
         float target = g_lastSpeed - K_DAMP * g_lastGyRate;   // 反向阻尼：刹机体当前运动
         if (target >  W_CLAMP) target =  W_CLAMP;
         if (target < -W_CLAMP) target = -W_CLAMP;
@@ -797,41 +804,45 @@ static bool confirmSettledAtRest(float targetRest, uint32_t holdMs, uint32_t cap
     return false;
 }
 
-// 速度模式条件化兜底恢复（保留 recoverFlipTest 的判别轴，命令换成速度）：
-//   读新鲜 IMU：|面内 pitch|≤40 未翻越→正常收尾断电；|垂直 lat|≥10 三维翻滚→断电不救；
-//   否则面内翻越→用大目标转速(速度命令)两方向各击杀一次，尝试磕回范围内。全程 recoverGuard 宽松保底。
-static void failsafeRecoverSpeed() {
+// 收尾 + **一次性**条件自救（decision 006·D；按用户实测：导向第三/四面后若可救，磕一次即回）：
+//   起跳/消能不论怎么退出(危险断电/越平衡落地/探测耗尽)都走这里。步骤：
+//   1) **先等机体震荡/翻滚停下、稳定到第三/四面**（断电后飞轮滑行 + 机体落定，约 2.5s）。
+//   2) 读新鲜稳定姿态判可救性：
+//      · |pitch|>40°(已翻越到第三/四面) 且 |lat|<10°(已落回平面内、飞轮有 authority) → **单次击杀**磕回最近静止态。
+//      · |lat|≥10°(仍横向倾倒/三维) 或 |pitch|≤40°(没翻越/已在静止态) → 不救、断电收尾。
+static void finalizeOrRescueSpeed() {
+    // 1) 等震荡停下、机体落定（断电下飞轮滑行；只读不驱动）
+    Serial.println("# [D] 收尾：等机体震荡/翻滚停下、落定…");
+    M5.dis.fillpix(CRGB(0x10, 0x10, 0x10));
+    uint32_t t0 = millis();
+    while (millis() - t0 < 2500) { delay(TICK_MS); sampleAndLog("FIN_SETL"); }
+
     double p0 = 0, r0 = 0; imuReadAttitude(&p0, &r0);
     float  lat0 = g_lastLateral;
     const float ROLLED_DEG = 40.0f, PERP_GIVEUP = 10.0f;
-    Serial.printf("# [D] 兜底检查: 面内pitch=%.1f° 垂直lat=%.1f°（翻越阈%.0f 垂直救助阈%.0f）\n",
-                  p0, lat0, ROLLED_DEG, PERP_GIVEUP);
-    if (fabsf(p0) <= ROLLED_DEG) { Serial.println("# 未翻越正常范围 → 正常收尾断电。"); motorPowerOff(); return; }
-    if (fabsf(lat0) >= PERP_GIVEUP) { Serial.printf("# 三维翻滚(lat=%.1f≥%.0f) → 断电不救。\n", fabsf(lat0), PERP_GIVEUP); motorPowerOff(); return; }
-    Serial.printf("# 面内翻越(pitch=%.1f 但 lat=%.1f<%.0f) → 速度模式击杀试救。\n", p0, fabsf(lat0), PERP_GIVEUP);
+    Serial.printf("# [D] 收尾姿态: 面内pitch=%.1f° 垂直lat=%.1f°（翻越阈%.0f 可救阈%.0f）\n", p0, lat0, ROLLED_DEG, PERP_GIVEUP);
 
-    const float    KICK_RPM = 2600.0f;     // 大动量击杀目标转速
-    const uint32_t KICK_TO  = 700, DAMP_TO = 2200;
-    const int      dirs[2]  = {-1, +1};
-    bool recovered = false;
-    for (int d = 0; d < 2 && !recovered; d++) {
-        Serial.printf("# 速度击杀尝试%d: 目标 %+.0frpm\n", d + 1, dirs[d] * KICK_RPM);
-        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
-        motorSetSpeedRPM((float)dirs[d] * KICK_RPM);
-        uint32_t t0 = millis();
-        while (millis() - t0 < KICK_TO) { delay(TICK_MS); sampleAndLog("RCS_KICK"); if (recoverGuard()) return; }
-        // 击回后用统一消能把机体收停到最近静止态（自救复用 cancelEnergyToRest）
-        float pk = sampleAndLog("RCS_K");
-        float tRest = (pk >= 0.0f) ? REST_B_DEG : REST_A_DEG;
-        if (cancelEnergyToRest(tRest, DAMP_TO, "RCS_DAMP") == DAMP_DANGER) return;
-        double pe = 0, re = 0; imuReadAttitude(&pe, &re);
-        Serial.printf("# 尝试%d 落点: pitch=%.1f lat=%.1f\n", d + 1, pe, g_lastLateral);
-        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) recovered = true;
-    }
+    if (fabsf(p0) <= ROLLED_DEG) { Serial.println("# 未翻越(在范围内/静止态) → 断电收尾。"); motorPowerOff(); return; }
+    if (fabsf(lat0) >= PERP_GIVEUP) { Serial.printf("# 仍横向倾倒(lat=%.1f≥%.0f，三维) → 不救、断电。\n", fabsf(lat0), PERP_GIVEUP); motorPowerOff(); return; }
+
+    // 2) 可救：翻越到第三/四面 且 已落回平面内 → **单次**击杀磕回最近静止态
+    int   kickSign = (p0 > 0) ? -1 : +1;                 // 朝**减小 |pitch|**(回最近静止态)方向
+    float tRest    = (p0 > 0) ? REST_B_DEG : REST_A_DEG; // 第三/四面在正侧→回B，负侧→回A
+    Serial.printf("# 翻越到第三/四面(pitch=%.1f) 但已落回平面(lat=%.1f<%.0f) → **单次**击杀 %+.0frpm 磕回 %s。\n",
+                  p0, fabsf(lat0), PERP_GIVEUP, kickSign * 2600.0f, (p0 > 0) ? "B" : "A");
+    if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("# 自救前电机重使能失败 → 断电"); motorPowerOff(); return; }
+    const float    KICK_RPM = 2600.0f;
+    const uint32_t KICK_TO  = 700;
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+    motorSetSpeedRPM((float)kickSign * KICK_RPM);
+    uint32_t tk = millis();
+    while (millis() - tk < KICK_TO) { delay(TICK_MS); sampleAndLog("FIN_KICK"); if (recoverGuard()) return; }
+    // 击回后用统一消能收停到最近静止态（出平面会自动 bail）
+    if (cancelEnergyToRest(tRest, 2500, "FIN_DAMP") == DAMP_DANGER) { Serial.println("# 自救中出平面/危险 → 断电。"); return; }
     motorStop(); motorPowerOff();
-    double pf = 0, rf = 0; imuReadAttitude(&pf, &rf);
-    if (recovered) { Serial.printf("# ★速度兜底自救成功 pitch=%.1f\n", pf); M5.dis.fillpix(CRGB(0x00, 0x28, 0x00)); }
-    else           { Serial.printf("# 速度兜底未成功 pitch=%.1f，需人工复位。\n", pf); M5.dis.fillpix(CRGB(0x28, 0x00, 0x00)); }
+    double pe = 0, re = 0; imuReadAttitude(&pe, &re);
+    if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) { Serial.printf("# ★单次击杀自救成功 pitch=%.1f\n", pe); M5.dis.fillpix(CRGB(0x00, 0x28, 0x00)); }
+    else { Serial.printf("# 单次击杀后 pitch=%.1f（未完全归位），停、不再追加。\n", pe); M5.dis.fillpix(CRGB(0x28, 0x18, 0x00)); }
 }
 
 // ---- 策略4：全速度模式 起跳（离散分轮探测 + 一次性起跳 + 统一消能落地 + 兜底）----
@@ -955,8 +966,8 @@ static void swingUpSpeed(int st) {
         Serial.printf("# 升至顶档 %.0frpm 仍未越平衡。安全收尾（下次上调 ROUND_MAX）。\n", ROUND_MAX);
     }
 
-    // ---- [D] 终点兜底 + 断电 ----
-    failsafeRecoverSpeed();
+    // [D] 收尾/自救由分派器在 swingUpSpeed 返回后统一调用 finalizeOrRescueSpeed()
+    //   （这样**所有退出路径**——危险断电/越平衡落地/探测耗尽——都会走收尾自救）。
 }
 
 // ===== 起跳分派器：识别 A/B + Vin 自检 → 按 g_swingUpStrategy 调对应策略 =====
@@ -983,7 +994,8 @@ void swingUpTest() {
     if (vin < 6.0f) { Serial.println("# ABORT: Vin<6V，未接 12V，不试。"); motorPowerOff(); return; }
 
     if (g_swingUpStrategy == SWINGUP_SPEED) {
-        swingUpSpeed(st);   // 自带 [0]自检→[A/B]探测→[C]缓落→[D]兜底，并自行断电+置状态 LED
+        swingUpSpeed(st);          // [0]自检→分轮探测→越平衡落地（各危险路径会提前返回、已断电）
+        finalizeOrRescueSpeed();   // [D] 统一收尾：等震荡停 + 第三/四面可救则**单次**击杀自救
         return;
     }
 
