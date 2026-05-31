@@ -779,6 +779,24 @@ static int cancelEnergyToRest(float targetRestDeg, uint32_t timeoutMs, const cha
     return DAMP_TIMEOUT;
 }
 
+// 确认"已稳定回到静止态"（decision 006·B 加严）：要求 pitch 入带 且 **横向(出平面)≈0** 且 角速度小，
+//   **连续保持 holdMs(≥0.5s)** 才算稳定回位——单帧入带不算，防震荡未停/未察觉的侧向失稳就开下一轮。
+//   capMs 内未达成返回 false。speedDanger 危险即断电返回 false。
+static bool confirmSettledAtRest(float targetRest, uint32_t holdMs, uint32_t capMs, const char *phase) {
+    const float LAT_OK = 6.0f;   // 横向(出平面)需接近 0（防侧倒未察觉）
+    const float GY_OK  = 8.0f;   // 角速度需小
+    uint32_t okStart = 0, t0 = millis();
+    while (millis() - t0 < capMs) {
+        delay(TICK_MS);
+        float p = sampleAndLog(phase);
+        if (speedDanger(p)) return false;
+        bool ok = fabsf(p - targetRest) < REST_BAND_DEG && fabsf(g_lastLateral) < LAT_OK && fabsf(g_lastGyRate) < GY_OK;
+        if (ok) { if (okStart == 0) okStart = millis(); if (millis() - okStart >= holdMs) return true; }
+        else okStart = 0;   // 任何一帧违例 → 稳定计时重置
+    }
+    return false;
+}
+
 // 速度模式条件化兜底恢复（保留 recoverFlipTest 的判别轴，命令换成速度）：
 //   读新鲜 IMU：|面内 pitch|≤40 未翻越→正常收尾断电；|垂直 lat|≥10 三维翻滚→断电不救；
 //   否则面内翻越→用大目标转速(速度命令)两方向各击杀一次，尝试磕回范围内。全程 recoverGuard 宽松保底。
@@ -832,13 +850,16 @@ static void swingUpSpeed(int st) {
     const float oppRest   = (st == +1) ? REST_A_DEG : REST_B_DEG;
     const int   driveSign = -st;   // 朝平衡(|pitch|减小)的飞轮转向（负转速=朝平衡）
 
-    const float    ROUND_START = 250.0f;   // 首轮固定目标转速(rpm)，保守
-    const float    ROUND_STEP  = 150.0f;   // 轮间增大步长
-    const float    ROUND_MAX   = 1500.0f;  // 目标转速上限（首 run 保守；越不过下次上调）
+    const float    ROUND_START = 200.0f;   // 首轮固定目标转速(rpm)，小
+    const float    ROUND_MAX   = 2000.0f;  // 目标转速硬天花板（安全上限）
+    const float    ADV_INC_CAP = 8.0f;     // 每轮最多再追加的"朝平衡前进量"(°)——防贪心
+    const float    ADV_FRAC    = 0.45f;    // 想吃掉剩余 gap 的比例（稳步逼近）
+    const float    DT_MIN = 40.0f, DT_MAX = 200.0f;  // 轮间 ΔT 限幅(rpm)
     const uint32_t ROUND_TO    = 1500;     // 单轮观察时长（一次性冲量后看越平衡/顶点回落）
     const uint32_t DAMP_TO     = 3000;     // 消能收停超时
     const uint32_t SETTLE_MS   = 1500;
     const int      CROSS_NEED  = 3;        // 越平衡去抖帧数（防噪声假越界）
+    const float    barrier     = fabsf(startRest);  // 静止态→平衡 的角距(越过即起跳)
 
     // ---- [0] 速度驱动/供电自检 ----
     Serial.println("# [0] 速度模式驱动自检：命令 +150rpm 看飞轮响应…");
@@ -848,22 +869,31 @@ static void swingUpSpeed(int st) {
     if (fabsf(wTest) < 30.0f) { Serial.println("# 飞轮无响应(供电/驱动异常) → 断电"); motorPowerOff(); return; }
     if (!settleSpeedSafe(SETTLE_MS, "SP0_SET")) return;
 
-    // ---- [探测·分轮] 每轮一次性固定目标转速，轮间增大；未越回落消能再加档 ----
-    Serial.printf("# [探测] 离散分轮：每轮一次性固定目标转速(起%.0f 步%.0f 顶%.0f)，未越回落消能再加档。\n",
-                  ROUND_START, ROUND_STEP, ROUND_MAX);
+    // ---- [探测·分轮·模型自适应] 一次性冲量 → 读峰值前进 → adv-vs-T 局部拟合稳步加档 ----
+    // 简易模型：一次性目标转速 T 给机体一记冲量，机体朝平衡峰值前进 adv(°)。多轮拟合 adv-vs-T 斜率，
+    //   据此把"想再前进 X°"换算成"加多少 ΔT"；每轮**只追加有限前进量**(≤ADV_INC_CAP)，**不贪心一次到位**，
+    //   稳步逼近越平衡——避免某轮 T 过大、动量过猛冲过外棱翻倒不可复。(torque 在速度模式不可直接算，
+    //   故用 输入T→输出adv 的经验拟合隐式代表 torque 效果。)
+    Serial.printf("# [探测] 离散分轮(模型自适应)：首档%.0frpm，每轮一次性冲量、读峰值前进、按拟合稳步加档(每轮≤%.0f°)。\n",
+                  ROUND_START, ADV_INC_CAP);
     bool  crossed  = false;
     float crossTgt = 0;
-    for (float T = ROUND_START; T <= ROUND_MAX && !crossed; T += ROUND_STEP) {
-        // 轮前：确认已停稳回到起始静止态（防震荡累积）
-        float pPre = sampleAndLog("SP_PRE");
-        if (fabsf(pPre - startRest) > REST_BAND_DEG) {
+    float T = ROUND_START, prevT = 0, prevAdv = 0;
+    bool  haveSlope = false;
+    int   roundIdx = 0;
+    while (T <= ROUND_MAX && !crossed) {
+        roundIdx++;
+        // 轮前：必须"已稳定回位 ≥0.5s"(pitch 入带 且 横向≈0 且 角速度小)才开下一轮（防震荡累积/未察觉侧倒）
+        if (!confirmSettledAtRest(startRest, 500, 4000, "SP_SETL")) {
             if (cancelEnergyToRest(startRest, DAMP_TO, "SP_PRESET") == DAMP_DANGER) return;
-            pPre = sampleAndLog("SP_PRE");
-            if (fabsf(pPre - startRest) > REST_BAND_DEG * 2) { Serial.printf("# 未回到起始态(%.1f)，跳过档%.0f\n", pPre, T); continue; }
+            if (!confirmSettledAtRest(startRest, 500, 4000, "SP_SETL2")) {
+                Serial.println("# 未能在限时内稳定回位(疑横向失稳) → 终止探测、转兜底。");
+                break;
+            }
         }
 
         // 一次性施加固定目标转速（不在轮内加速）
-        Serial.printf("# [档 %.0frpm] 一次性起跳冲量 → %+.0frpm…\n", T, driveSign * T);
+        Serial.printf("# [轮%d 档%.0frpm] 一次性冲量 → %+.0frpm…\n", roundIdx, T, driveSign * T);
         M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
         motorSetSpeedRPM((float)driveSign * T);
         int   crossStreak = 0;
@@ -879,18 +909,39 @@ static void swingUpSpeed(int st) {
             else crossStreak = 0;
             if ((float)driveSign * g_lastGyRate <= 0 && fabsf(p - startRest) > 3.0f) { peaked = true; break; }  // 顶点未越
         }
+        float peakAdv = (float)st * (startRest - closest);   // 本轮朝平衡峰值前进(°)
 
         if (crossed) {
-            Serial.printf("# ★[档 %.0frpm] 越平衡(去抖%d帧)！= 最小起跳量。→ 反向消能/动量接住落地。\n", T, CROSS_NEED);
+            Serial.printf("# ★[轮%d 档%.0frpm] 越平衡(去抖%d帧)！= 最小起跳量。→ 反向消能/动量接住落地。\n", roundIdx, T, CROSS_NEED);
             break;
         }
-        // 未越 → 同向回落消能、收停回起始态、再加档
-        Serial.printf("# [档 %.0frpm] 未越平衡(最朝平衡 %.1f°, %s)。回落消能、收停后加档。\n",
-                      T, closest, peaked ? "已顶点回落" : "观察超时");
+        // 异常：本轮朝外棱(远离平衡)动 → 疑方向反/失稳，停止贪进
+        if (peakAdv < -2.0f) {
+            Serial.printf("# ⚠[轮%d 档%.0frpm] 机体朝外棱动(前进%.1f°<0) → 疑方向反/失稳，终止探测转兜底。\n", roundIdx, T, peakAdv);
+            cancelEnergyToRest(startRest, DAMP_TO, "SP_ABORT");
+            break;
+        }
+        // 未越 → 同向回落消能
+        Serial.printf("# [轮%d 档%.0frpm] 未越(峰值前进%.1f°/%.0f°, %s)。回落消能。\n",
+                      roundIdx, T, peakAdv, barrier, peaked ? "顶点回落" : "观察超时");
         M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝
-        int dr = cancelEnergyToRest(startRest, DAMP_TO, "SP_DAMP");
-        if (dr == DAMP_DANGER) return;
-        if (dr == DAMP_TIMEOUT) Serial.println("# 回落消能超时(未完全收停)，仍尝试下一档。");
+        if (cancelEnergyToRest(startRest, DAMP_TO, "SP_DAMP") == DAMP_DANGER) return;
+
+        // —— 模型自适应：据 adv-vs-T 斜率，换算"再前进 desiredInc°"所需 ΔT，稳步加档 ——
+        float remaining  = barrier - peakAdv;
+        float desiredInc = remaining * ADV_FRAC;
+        if (desiredInc > ADV_INC_CAP) desiredInc = ADV_INC_CAP;       // 不贪心：每轮最多追加 ADV_INC_CAP°
+        float slope;                                                 // °前进 per rpm
+        if (haveSlope && T > prevT + 1.0f) slope = (peakAdv - prevAdv) / (T - prevT);
+        else                               slope = peakAdv / T;       // 初轮：从原点(T=0,adv=0)割线估
+        if (slope < 0.002f) slope = 0.002f;                          // 防 0/负(未脱阱)→给较大 ΔT(后续被 DT_MAX 钳)
+        float dT = desiredInc / slope;
+        if (dT < DT_MIN) dT = DT_MIN;
+        if (dT > DT_MAX) dT = DT_MAX;
+        Serial.printf("# 模型: 前进%.1f° 剩余%.1f° 斜率%.4f°/rpm → 目标再进%.1f° → ΔT=%.0frpm（下档%.0f）\n",
+                      peakAdv, remaining, slope, desiredInc, dT, T + dT);
+        prevT = T; prevAdv = peakAdv; haveSlope = true;
+        T += dT;
     }
 
     // ---- [起跳落地] 越平衡 → 反向消能/动量接住 收停到对面静止态 ----
