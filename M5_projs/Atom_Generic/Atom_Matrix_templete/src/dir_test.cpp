@@ -1143,6 +1143,78 @@ void swingUpOneShotTest() {
                   g_accelPitch, g_lastLateral, oppRest, startRest);
 }
 
+// ===== 逐步起跳测试（起跳能量逐轮渐增 + 每轮强制单次消能 + 断电滑行）decision 006 =====
+// 用户方案：**不要一次性改大起跳参数**，从小到大**逐轮渐增** SU(起跳目标转速)，每轮打印 SU 与落点，
+//   这样始终记得清"哪个 SU 能安全起跳并平稳回落"(lastSafeSU)。每轮**强制施加一次消能**(回落同向/越过反向)，
+//   施加完即断电滑行、自然落定。停止条件：越平衡成功落到对面，或翻越/危险(报最后安全档)。
+//   目的：在安全范围内逐步逼近，验证回落能量抵消是否生效、并找到能越平衡的起跳量。
+void swingUpStepwiseTest() {
+    if (motorMode() != MOTOR_MODE_SPD && !motorInitSpeed(MOTOR_MAX_MA)) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    oppRest   = (st == +1) ? REST_A_DEG : REST_B_DEG;
+    const int      dir       = -st;
+    const float    SU_START = 500.0f, SU_STEP = 150.0f, SU_MAX = 1700.0f;  // 逐轮渐增
+    const uint32_t SU_TO = 1200, CANCEL_TO = 500, OBSERVE_TO = 2500;
+    const int      CROSS_NEED = 3;
+    const float    LAND_BAND = REST_BAND_DEG * 1.5f;
+    float lastSafeSU = 0;
+
+    Serial.printf("# [逐步起跳] 起始=%s dir=%+d。SU 从 %.0f 每轮 +%.0f(顶%.0f) 渐增；每轮 起跳冲量→单次消能→断电滑行→看落点。\n",
+                  (st == +1) ? "B" : "A", dir, SU_START, SU_STEP, SU_MAX);
+
+    for (float SU = SU_START; SU <= SU_MAX; SU += SU_STEP) {
+        if (!confirmSettledAtRest(startRest, 500, 4000, "STEP_SETL")) { Serial.println("# 未能稳定回到起始态 → 终止。"); break; }
+
+        // 起跳冲量
+        Serial.printf("# [档 SU=%.0frpm] 起跳冲量 → %+.0frpm\n", SU, dir * SU);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+        motorSetSpeedRPM((float)dir * SU);
+        bool crossed = false; int cs = 0; float closest = startRest;
+        uint32_t t0 = millis();
+        while (millis() - t0 < SU_TO) {
+            delay(TICK_MS); float p = sampleAndLog("STEP_KICK");
+            if (speedDanger(p)) { Serial.printf("# 档 SU=%.0f 触发硬危险 → 断电。最后安全档=%.0f。\n", SU, lastSafeSU); return; }
+            if ((float)st * (startRest - p) > (float)st * (startRest - closest)) closest = p;
+            if ((float)st * p < 0) { if (++cs >= CROSS_NEED) { crossed = true; break; } } else cs = 0;
+            if ((float)dir * g_lastGyRate <= 0 && fabsf(p - startRest) > 3.0f) break;
+        }
+        float adv = (float)st * (startRest - closest);
+
+        // 强制单次消能：回落同向(dir)、越过反向(-dir)
+        int   cancelDir = crossed ? -dir : dir;
+        float cancelMag = SU * 1.3f;
+        Serial.printf("# 档 SU=%.0f：%s(峰值前进%.1f°) → **强制单次消能** 方向%+d %.0frpm\n",
+                      SU, crossed ? "越平衡" : "未越回落", adv, cancelDir, cancelMag);
+        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));
+        motorSetSpeedRPM((float)cancelDir * cancelMag);
+        uint32_t t1 = millis();
+        while (millis() - t1 < CANCEL_TO) { delay(TICK_MS); float p = sampleAndLog("STEP_CANCEL"); if (speedDanger(p)) { Serial.printf("# 消能中危险 → 断电。最后安全档=%.0f。\n", lastSafeSU); return; } }
+
+        // 断电滑行 + 观察落点
+        motorPowerOff();
+        M5.dis.fillpix(CRGB(0x00, 0x20, 0x10));
+        uint32_t t2 = millis();
+        while (millis() - t2 < OBSERVE_TO) { delay(TICK_MS); sampleAndLog("STEP_COAST"); }
+        float pe = g_accelPitch, le = g_lastLateral;
+
+        const char *outcome;
+        bool stop = false;
+        if      (fabsf(pe - startRest) < LAND_BAND) { outcome = "回落起始态(安全)"; lastSafeSU = SU; }
+        else if (fabsf(pe - oppRest)   < LAND_BAND) { outcome = "★越平衡落到对面(成功)"; stop = true; }
+        else if (fabsf(pe) > 40.0f)                 { outcome = "翻越外棱(不安全)"; stop = true; }
+        else                                        { outcome = "落在中间(异常)"; stop = true; }
+        Serial.printf("# 档 SU=%.0f 落点 pitch=%.1f lat=%.1f → %s\n", SU, pe, le, outcome);
+        if (stop) break;
+    }
+    motorPowerOff();
+    Serial.printf("# 逐步起跳测试结束：**最大安全回落档 SU≈%.0frpm**。终止、仅监视。\n", lastSafeSU);
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
 // ===== 启动自动表征序列：I²C自检 → 供电探测 → 识别A/B → 当前侧危险边界 =====
 // [1] 两个 I²C 总线自检：IMU(MPU6886 在 Wire1 0x68)、电机(RollerCAN 在 Wire 0x64)。
 static bool i2cSelfCheck() {

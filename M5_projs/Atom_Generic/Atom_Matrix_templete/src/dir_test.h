@@ -68,3 +68,7 @@ int  swingUpDirection();   // 表征结果：+1/-1（飞轮速度变化方向）
 // 正式起跳测试（decision 006）：一记起跳冲量 → 单次消能(回落同向/越过反向) → 断电滑行、观察落点。
 //   只施加一次消能、不连续阻尼。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInitSpeed 后调用。
 void swingUpOneShotTest();
+
+// 逐步起跳测试（decision 006）：起跳目标转速 SU 从小到大**逐轮渐增**，每轮强制一次消能+断电滑行+看落点，
+//   打印每档落点并记最大安全回落档(lastSafeSU)。越平衡成功/翻越即停。需 motorInitSpeed 后调用。
+void swingUpStepwiseTest();
