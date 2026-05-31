@@ -1277,6 +1277,50 @@ void swingUpToBalance() {
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 
+// ===== 系统辨识激励实验（方案B：MCU 只"激励 + 全速率记录"，离线拟合 I_b/Kt/mgl）=====
+// 对机体施加**已知电流台阶**(朝平衡)驱动一小段 → 断电让机体自由回落摆动，全程记录 CSV：
+//   驱动段(SID_DRV)：已知 cmd_mA + 测 θ(pf)/θ̇(gy) → 离线估 Kt/I_b、mgl/I_b。
+//   自由段(SID_FREE)：电流0、I_b·θ̈=mgl·sinθ → 估 mgl/I_b(自然动力学)。
+//   安全：机体朝平衡冲到 |θ|<STOP_DEG 即断电(留余量防冲过平衡/对面外棱)；超平衡40°/横向/超速即断电。
+// MCU 这步**不拟合**，只产生数据；日志交离线分析拟合后把参数写回代码。需 motorInit(电流模式) 后调用。
+void sysIdExperiment() {
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    const int      dir       = (g_swingUpDir != 0) ? g_swingUpDir : -st;   // 朝平衡电流符号
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    levels[]  = {280.0f, 360.0f, 440.0f};   // 已知电流台阶(均>τ_break，挣脱有动态)
+    const float    STOP_DEG  = 18.0f;                       // 机体冲到 |θ|<此 断电(留余量)
+    const uint32_t DRIVE_TO = 600, FREE_TO = 2500;
+
+    Serial.println("# [系统辨识] 已知电流台阶驱动→断电自由摆动，全速率记录(SID_DRV/SID_FREE)供离线拟合 I_b/Kt/mgl。");
+    for (unsigned i = 0; i < sizeof(levels) / sizeof(levels[0]); i++) {
+        if (!confirmSettledAtRest(startRest, 500, 4000, "SID_SETL")) { Serial.println("# 未能稳回起始态 → 终止。"); break; }
+        Serial.printf("# == 辨识档 %u: 驱动电流 %+.0fmA ==\n", i + 1, dir * levels[i]);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红：驱动段
+        motorSetCurrentmA((float)dir * levels[i]);
+        uint32_t t0 = millis();
+        while (millis() - t0 < DRIVE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("SID_DRV");
+            if (speedDanger(p)) return;
+            if (fabsf(g_fusedPitch) < STOP_DEG) break;   // 冲到余量 → 停驱动
+        }
+        Serial.println("# -- 断电，自由摆动 --");
+        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝：自由段
+        motorStop();   // 电流 0（输出仍在）
+        uint32_t t1 = millis();
+        while (millis() - t1 < FREE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("SID_FREE");
+            if (speedDanger(p)) return;
+        }
+    }
+    motorStop(); motorPowerOff();
+    Serial.println("# ★系统辨识实验完成：SID_DRV(驱动段)/SID_FREE(自由段)已记录，供离线拟合。终止、仅监视。");
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
 // ===== 电流模式：起跳 + 回落缓冲测试（专测 起跳过程 与 回落消能过程，system-model §6）=====
 // 起跳=施加朝平衡电流脉冲(≥τ_break)挣脱阱；回落缓冲=**反机体角速度的阻尼力矩** τ=θdown·K_damp·θ̇，
 //   使 θ̇→0、机体平稳落回静止态、不过冲外棱翻。不求越平衡(机械侧向未约束)，专测这两个子过程。

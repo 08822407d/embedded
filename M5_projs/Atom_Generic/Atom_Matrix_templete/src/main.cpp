@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [电流模式] 起跳+回落缓冲测试：识别A/B→朝平衡电流脉冲起跳→反角速度阻尼力矩缓冲落回静止态");
+    Serial.println("# [电流模式·方案B] 系统辨识激励：识别A/B→已知电流台阶驱动+断电自由摆动→全速率记录(SID_DRV/SID_FREE)供离线拟合");
     if (!motorInit()) { Serial.println("ERR: 电机[电流模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    swingUpCushionTest();   // 电流模式：测 起跳过程 + 回落缓冲过程
+    sysIdExperiment();   // 系统辨识：只激励+记录，离线拟合 I_b/Kt/mgl
 }
 
 void loop() {

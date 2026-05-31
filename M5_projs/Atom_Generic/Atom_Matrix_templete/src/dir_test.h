@@ -73,6 +73,10 @@ float swingUpBreakawayTorque();   // 探测结果：能起跳的扭矩(mA当量)
 // 电流模式 起跳+回落缓冲测试：朝平衡电流脉冲起跳 → 反角速度阻尼力矩缓冲落回静止态。需 motorInit 后调用。
 void  swingUpCushionTest();
 
+// 系统辨识激励实验（方案B）：已知电流台阶驱动→断电自由摆动，全速率记录(SID_DRV/SID_FREE)供离线拟合
+//   I_b/Kt/mgl。MCU 只激励+记录、不拟合。需 motorInit(电流模式) 后调用。
+void  sysIdExperiment();
+
 // 正式起跳测试（decision 006）：一记起跳冲量 → 单次消能(回落同向/越过反向) → 断电滑行、观察落点。
 //   只施加一次消能、不连续阻尼。安全：超平衡40°/横向/超速即断电、仅监视。需 motorInitSpeed 后调用。
 void swingUpOneShotTest();
