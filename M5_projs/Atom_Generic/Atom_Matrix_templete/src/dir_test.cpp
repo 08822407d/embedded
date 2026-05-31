@@ -1277,6 +1277,58 @@ void swingUpToBalance() {
     M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 
+// ===== 电流模式：起跳 + 回落缓冲测试（专测 起跳过程 与 回落消能过程，system-model §6）=====
+// 起跳=施加朝平衡电流脉冲(≥τ_break)挣脱阱；回落缓冲=**反机体角速度的阻尼力矩** τ=θdown·K_damp·θ̇，
+//   使 θ̇→0、机体平稳落回静止态、不过冲外棱翻。不求越平衡(机械侧向未约束)，专测这两个子过程。
+// 安全：超平衡40°/横向/超速即断电、仅监视。需 motorInit(电流模式) 后调用。
+void swingUpCushionTest() {
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
+    int st = prepAtRest();
+    if (st == 0) { Serial.println("# 不在静止态 A/B → 断电、仅监视。"); motorPowerOff(); return; }
+    if (motorErrorCode() == 1 || motorVoltage() < 6.0f) { Serial.printf("# Vin=%.2f/过压异常 → 断电。\n", motorVoltage()); motorPowerOff(); return; }
+
+    const int      dir       = (g_swingUpDir != 0) ? g_swingUpDir : -st;   // 起跳电流符号
+    const int      thetaDown = dir * st;                                   // 使 θ 减小的电流符号
+    const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
+    const float    KICK_MA   = (g_breakawayTorque > 0) ? (g_breakawayTorque + 40.0f) : 320.0f;  // 起跳电流(≥τ_break，温和)
+    const float    K_DAMP    = 4.0f;       // 回落阻尼增益(mA per °/s)，占位待调
+    const uint32_t KICK_TO = 350, CUSHION_TO = 3500;
+    const float    GY_STOP   = 12.0f;
+
+    // 1) 起跳：施加朝平衡电流脉冲，机体挣脱朝平衡冲
+    Serial.printf("# [起跳] 电流脉冲 %+.0fmA(%lums)，看机体朝平衡冲…\n", dir * KICK_MA, (unsigned long)KICK_TO);
+    M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红
+    motorSetCurrentmA((float)dir * KICK_MA);
+    float closest = startRest;
+    uint32_t t0 = millis();
+    while (millis() - t0 < KICK_TO) {
+        delay(TICK_MS); float p = sampleAndLog("CUSH_KICK");
+        if (speedDanger(p)) return;
+        if ((float)st * (startRest - p) > (float)st * (startRest - closest)) closest = p;
+    }
+    motorStop();
+    Serial.printf("# 起跳脉冲结束：朝平衡峰值 %.1f°。→ 回落阻尼缓冲消能。\n", (float)st * (startRest - closest));
+
+    // 2) 回落缓冲：反机体角速度的阻尼力矩，使 θ̇→0、平稳落回静止态、不过冲外棱
+    M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝
+    float farPeak = closest;
+    uint32_t t1 = millis();
+    while (millis() - t1 < CUSHION_TO) {
+        delay(TICK_MS); float p = sampleAndLog("CUSH_DAMP");
+        if (speedDanger(p)) return;
+        if ((float)st * (p - startRest) > (float)st * (farPeak - startRest)) farPeak = p;   // 朝外最远
+        float tau = (float)thetaDown * K_DAMP * g_lastGyRate;   // 阻尼：反机体角速度(g_lastGyRate)
+        if (tau >  MOTOR_MAX_MA) tau =  MOTOR_MAX_MA;
+        if (tau < -MOTOR_MAX_MA) tau = -MOTOR_MAX_MA;
+        motorSetCurrentmA(tau);
+        if (fabsf(p - startRest) < REST_BAND_DEG && fabsf(g_lastGyRate) < GY_STOP) break;   // 落定静止态
+    }
+    motorStop(); motorPowerOff();
+    Serial.printf("# 回落缓冲结束：落点 pitch=%.1f（朝外最远%.1f° / 起始%.0f°）→ 断电、仅监视。\n",
+                  (double)g_accelPitch, (double)((float)st * (farPeak - startRest)), startRest);
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
 // ===== 探测"能起跳的扭矩 τ_break"（电流模式；system-model §6：作用量是扭矩）=====
 // 电流模式下**扭矩=电流，直接施加**：逐步增大电流(mA)朝平衡方向，找机体**挣脱静止态阱起跳**的最小扭矩。
 //   方向是该扭矩的属性：先按物理约定 dir=−st(朝平衡电流符号)；若机体**朝外棱挣脱**(符号反)→取反同档重试。

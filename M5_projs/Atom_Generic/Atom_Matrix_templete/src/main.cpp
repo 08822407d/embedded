@@ -24,9 +24,9 @@ void setup() {
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [电流模式·system-model §6] 探能起跳的扭矩：识别A/B→逐增电流施加朝平衡→找挣脱起跳的 τ_break→记录、终止监视");
+    Serial.println("# [电流模式] 起跳+回落缓冲测试：识别A/B→朝平衡电流脉冲起跳→反角速度阻尼力矩缓冲落回静止态");
     if (!motorInit()) { Serial.println("ERR: 电机[电流模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    probeBreakawayTorque();   // 探"能起跳的扭矩"(电流模式，扭矩=电流直接施加)
+    swingUpCushionTest();   // 电流模式：测 起跳过程 + 回落缓冲过程
 }
 
 void loop() {
