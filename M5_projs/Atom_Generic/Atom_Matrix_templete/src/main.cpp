@@ -1,36 +1,62 @@
 /*
- * 屏动平衡系统 —— 主程序（装配各功能模块）
- * 硬件: M5Stack ATOM Matrix (MPU6886 IMU + 5x5 点阵) + RollerCAN 反作用轮电机
+ * 屏动平衡系统 —— 主程序（命令常驻架构）
+ * 硬件: M5Stack ATOM Matrix (MPU6886 IMU + 5x5 点阵) + RollerCAN 反作用轮电机（电流/力矩模式）
  *
- * 代码组织：按功能分模块，main 只做初始化与主循环装配。
- *   - imu.*       IMU 姿态读取（IMU 在 Wire1）
- *   - motor.*     RollerCAN 电机驱动（电流模式，Wire/Grove）
- *   - dir_test.*  电机旋转方向辨识 + 防翻保底
- *   - led.*       LED 点阵（临时，未接入）
+ * 架构（2026-05-31）：**固件常驻、串口命令分发**——烧一次，之后发字符命令触发流程，不必重编烧。
+ *   loop 持续监视(83Hz 紧凑日志) + 收串口命令；命令跑完回监视。电机待命时输出断开。
+ *   发命令：用 tools/serial_bridge.py（单进程独占串口、并发收发）→ `echo "r" > tools/serial.cmd`。
  *
- * 当前阶段：电机旋转方向辨识（一次性，含安全保底）。
+ * 命令：r=急救(大力矩把卡第三面的机体磕回A/B)  i=系统辨识  b=探扭矩  c=起跳+缓冲  g=起跳→平衡  s=姿态  h=菜单
  */
 #include <M5Atom.h>
 
 #include "imu.h"
 #include "motor.h"
 #include "dir_test.h"
-#include "reboot_test.h"
 
-// === 简化流程（decisions/006）：开机只表征"起跳所需飞轮速度变化方向"→记录→终止(断电+持续监视) ===
-//   危险(超平衡40°/横向/超速)即断电、仅监视、不自救。运行中绝不切控制模式。
+static void printMenu() {
+    Serial.println("# === 命令待命(发 字符+换行) ===");
+    Serial.println("#   r=急救(大力矩磕回A/B)  i=系统辨识  b=探扭矩  c=起跳+缓冲  g=起跳→平衡  s=姿态  h=菜单");
+    Serial.println("#   loop 持续监视(紧凑日志)；命令跑完回监视。");
+}
+
+static void dispatchCommand(const String &cmd) {
+    char c = cmd.length() ? cmd[0] : 'h';
+    Serial.printf("# >>> CMD '%c'\n", c);
+    // 驱动类命令：先重新使能电流输出（上个流程/待命时输出是断的；不重 begin，避免双 I²C 挂死）
+    if (c == 'r' || c == 'i' || c == 'b' || c == 'c' || c == 'g') motorReenable();
+    switch (c) {
+        case 'r': recoverFlipTest();       break;   // 急救：面内翻越(第三面)且横向小 → 蓄能+全力急刹磕回 A/B
+        case 'i': sysIdExperiment();       break;   // 系统辨识激励
+        case 'b': probeBreakawayTorque();  break;   // 探能起跳的扭矩 τ_break
+        case 'c': swingUpCushionTest();    break;   // 起跳 + 回落缓冲
+        case 'g': swingUpToBalance();      break;   // 起跳 → 平衡
+        case 's': { double p = 0, r = 0; imuReadAttitude(&p, &r); Serial.printf("# 姿态 pitch=%.1f roll=%.1f\n", p, r); break; }
+        case 'h':
+        default:  printMenu();             break;
+    }
+    motorPowerOff();   // 命令收尾：输出断开，回待命/监视
+    Serial.println("# >>> done，回监视。");
+}
+
 void setup() {
     M5.begin(true, true, true);   // 串口 + 内部 I2C(IMU 在 Wire1) + 5×5 点阵
     M5.dis.setBrightness(20);
     imuInit();
     Serial.println();
-    Serial.println("# [电流模式·方案B] 系统辨识激励：识别A/B→已知电流台阶驱动+断电自由摆动→全速率记录(SID_DRV/SID_FREE)供离线拟合");
-    if (!motorInit()) { Serial.println("ERR: 电机[电流模式] I2C 初始化失败，停止。"); motorPowerOff(); return; }
-    sysIdExperiment();   // 系统辨识：只激励+记录，离线拟合 I_b/Kt/mgl
+    Serial.println("# [命令常驻] 固件烧一次，串口发命令触发流程，不必重烧。");
+    if (!motorInit()) { Serial.println("ERR: 电机 I2C 初始化失败。"); }
+    motorPowerOff();   // 待命：输出断开
+    printMenu();
+    M5.dis.fillpix(CRGB(0x00, 0x00, 0x20));  // 蓝：待命/监视
 }
 
 void loop() {
-    attitudeReportTick();   // 终点态：每窗聚合判定机体静止态 + 全速率打印（电机已断电）
+    if (Serial.available()) {
+        String line = Serial.readStringUntil('\n');
+        line.trim();
+        if (line.length()) dispatchCommand(line);
+        return;
+    }
+    attitudeReportTick();   // 无命令 → 跑一个监视窗（紧凑日志）
 }
-
-// 双路供电重启诊断暂停用：需要时把 setup 换成 rebootTestSetup()/loop 换成 rebootTestLoop()。
