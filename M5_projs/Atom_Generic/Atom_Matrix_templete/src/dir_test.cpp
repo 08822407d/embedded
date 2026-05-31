@@ -1296,9 +1296,9 @@ void sysIdExperiment() {
 
     const int      dir       = (g_swingUpDir != 0) ? g_swingUpDir : -st;   // 朝平衡电流符号
     const float    startRest = (st == +1) ? REST_B_DEG : REST_A_DEG;
-    const float    levels[]  = {280.0f, 360.0f, 440.0f};   // 已知电流台阶(均>τ_break，挣脱有动态)
-    const float    STOP_DEG  = 18.0f;                       // 机体冲到 |θ|<此 断电(留余量)
-    const uint32_t DRIVE_TO = 600, FREE_TO = 2500;
+    const float    levels[]  = {270.0f, 330.0f, 390.0f};   // 已知电流台阶(刚过τ_break)
+    const float    STOP_DEG  = 8.0f;                        // 保护：机体冲到 |θ|<此 提前断电(防冲过平衡)
+    const uint32_t DRIVE_TO = 80, FREE_TO = 3000;          // **短脉冲80ms**(给小冲量，机体小幅离阱再摆回，不冲过平衡)+长自由段记衰减
 
     Serial.println("# [系统辨识] 已知电流台阶驱动→断电自由摆动，全速率记录(SID_DRV/SID_FREE)供离线拟合 I_b/Kt/mgl。");
     for (unsigned i = 0; i < sizeof(levels) / sizeof(levels[0]); i++) {
