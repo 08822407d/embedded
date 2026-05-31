@@ -32,6 +32,9 @@ bool    motorInitSpeed(float maxCurrentmA);
 void    motorSetCurrentmA(float mA);
 // 下发目标转速（RPM，正负=方向）。仅速度模式有效。
 void    motorSetSpeedRPM(float rpm);
+// 运行时调整**速度环电流(力矩)上限**（mA）。仍是速度模式、非切模式。
+//   用于 Cubli 蓄能(小扭矩、机体留静止态) / 急刹起跳(大扭矩) 之间切换力矩上限。
+void    motorSetSpeedMaxCurrent(float mA);
 // 软停：电流置 0（仍使能，飞轮滑行）。
 void    motorStop();
 // 重新使能输出（仅 setOutput(1)+清零命令，**不重新 begin I²C**）——用于 motorPowerOff 之后想再驱动。

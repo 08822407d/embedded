@@ -41,6 +41,10 @@ void motorSetSpeedRPM(float rpm) {
     roller.setSpeed((int32_t)lroundf(rpm * 100.0f));  // raw = rpm × 100
 }
 
+void motorSetSpeedMaxCurrent(float mA) {
+    roller.setSpeedMaxCurrent((int32_t)lroundf(mA * 100.0f));  // 运行时调速度环力矩上限(非切模式)
+}
+
 void motorSetCurrentmA(float mA) {
     if (mA >  MOTOR_MAX_MA) mA =  MOTOR_MAX_MA;
     if (mA < -MOTOR_MAX_MA) mA = -MOTOR_MAX_MA;
