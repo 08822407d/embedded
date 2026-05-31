@@ -54,6 +54,13 @@ void motorStop() {
     else                          roller.setCurrent(0);  // 电流模式：零力矩（飞轮滑行）
 }
 
+void motorReenable() {
+    g_lastCmdMA = 0;
+    if (g_mode == MOTOR_MODE_SPD) roller.setSpeed(0);
+    else                          roller.setCurrent(0);
+    roller.setOutput(1);   // 仅重新使能输出，不重新 begin（避免双 I²C 挂死）
+}
+
 void motorPowerOff() {
     g_lastCmdMA = 0;
     if (g_mode == MOTOR_MODE_SPD) roller.setSpeed(0);

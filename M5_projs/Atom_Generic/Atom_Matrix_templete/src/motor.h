@@ -34,6 +34,9 @@ void    motorSetCurrentmA(float mA);
 void    motorSetSpeedRPM(float rpm);
 // 软停：电流置 0（仍使能，飞轮滑行）。
 void    motorStop();
+// 重新使能输出（仅 setOutput(1)+清零命令，**不重新 begin I²C**）——用于 motorPowerOff 之后想再驱动。
+//   注意：**绝不要运行中再调 motorInit/motorInitSpeed**（会重 begin Wire，与 IMU 的 Wire1 共存时实测会挂死）。
+void    motorReenable();
 // 断驱动：setOutput(0)。**保底用**——已确认不可恢复时切断，防空转烧毁。
 void    motorPowerOff();
 

@@ -817,8 +817,8 @@ static void finalizeOrRescueSpeed() {
     uint32_t t0 = millis();
     while (millis() - t0 < 2500) { delay(TICK_MS); sampleAndLog("FIN_SETL"); }
 
-    double p0 = 0, r0 = 0; imuReadAttitude(&p0, &r0);
-    float  lat0 = g_lastLateral;
+    float p0   = g_accelPitch;    // 用 settle 末帧的新鲜读数（勿再额外 imuReadAttitude，曾在此挂死）
+    float lat0 = g_lastLateral;
     const float ROLLED_DEG = 40.0f, PERP_GIVEUP = 10.0f;
     Serial.printf("# [D] 收尾姿态: 面内pitch=%.1f° 垂直lat=%.1f°（翻越阈%.0f 可救阈%.0f）\n", p0, lat0, ROLLED_DEG, PERP_GIVEUP);
 
@@ -830,7 +830,7 @@ static void finalizeOrRescueSpeed() {
     float tRest    = (p0 > 0) ? REST_B_DEG : REST_A_DEG; // 第三/四面在正侧→回B，负侧→回A
     Serial.printf("# 翻越到第三/四面(pitch=%.1f) 但已落回平面(lat=%.1f<%.0f) → **单次**击杀 %+.0frpm 磕回 %s。\n",
                   p0, fabsf(lat0), PERP_GIVEUP, kickSign * 2600.0f, (p0 > 0) ? "B" : "A");
-    if (!motorInitSpeed(MOTOR_MAX_MA)) { Serial.println("# 自救前电机重使能失败 → 断电"); motorPowerOff(); return; }
+    motorReenable();   // 自救前重新使能输出（**不重 begin**，避免双 I²C 挂死）
     const float    KICK_RPM = 2600.0f;
     const uint32_t KICK_TO  = 700;
     M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
@@ -840,7 +840,7 @@ static void finalizeOrRescueSpeed() {
     // 击回后用统一消能收停到最近静止态（出平面会自动 bail）
     if (cancelEnergyToRest(tRest, 2500, "FIN_DAMP") == DAMP_DANGER) { Serial.println("# 自救中出平面/危险 → 断电。"); return; }
     motorStop(); motorPowerOff();
-    double pe = 0, re = 0; imuReadAttitude(&pe, &re);
+    float pe = g_accelPitch;
     if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) { Serial.printf("# ★单次击杀自救成功 pitch=%.1f\n", pe); M5.dis.fillpix(CRGB(0x00, 0x28, 0x00)); }
     else { Serial.printf("# 单次击杀后 pitch=%.1f（未完全归位），停、不再追加。\n", pe); M5.dis.fillpix(CRGB(0x28, 0x18, 0x00)); }
 }
@@ -984,7 +984,14 @@ void swingUpTest() {
     }
 
     int st = prepAtRest();
-    if (st == 0) return;
+    if (st == 0 && wantSpeed) {
+        // 起始就不在 A/B：若是可救的第三/四面 → **单次**自救磕回，再重判（避免开机即卡在第三面）。
+        Serial.println("# 起始不在 A/B：尝试单次自救（第三/四面且 lat 小才救），成功后重判 A/B…");
+        finalizeOrRescueSpeed();   // 自带可救判据；结束电机断电
+        motorReenable();           // 自救后重新使能（不重 begin，避免双 I²C 挂死）
+        st = prepAtRest();
+    }
+    if (st == 0) { motorPowerOff(); return; }
     float   vin  = motorVoltage();
     uint8_t err0 = motorErrorCode();
     Serial.printf("# 起跳自检: Vin=%.2fV err=%u 起始=%s 策略=[%s] 模式=%s\n",
