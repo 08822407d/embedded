@@ -13,10 +13,12 @@
 static BalanceMethod g_method    = BALANCE_PID;
 static int           g_thetaDown = -1;   // 使 θ 减小的电流符号(+1/-1)
 
-// ---- PID(PD-on-θ + 飞轮去饱和)增益（mA，占位待实测调）----
+// ---- PID(PD-on-θ + 飞轮去饱和)增益 ----
 //   u(mA) = thetaDown·(Kp·θ + Kd·θ̇) − Kw·ω_w(去饱和)
-static const float PID_KP = 8.0f;    // mA per °      （角度比例）
-static const float PID_KD = 1.0f;    // mA per (°/s)  （角速度阻尼）
+//   ★由系统辨识(2026-06-01)算得：模型 θ̈=a·sinθ+b·I, a=mgl/I_b≈4400°/s², b=Kt/I_b≈16°/s²/mA。
+//     取 ωn=10rad/s、ζ=1: Kp=(ωn²+a·π/180)/b≈11, Kd=2ζωn/b≈1.25。(辨识 R²=0.53 偏低，待更好数据精化)
+static const float PID_KP = 11.0f;   // mA per °      （角度比例，辨识初值）
+static const float PID_KD = 1.25f;   // mA per (°/s)  （角速度阻尼，辨识初值）
 static const float PID_KW = 0.05f;   // mA per rpm    （飞轮转速去饱和，慢慢把飞轮往 0 泄）
 
 // ---- LQR 备用增益 u = -K·x（mA，占位待整定）----
