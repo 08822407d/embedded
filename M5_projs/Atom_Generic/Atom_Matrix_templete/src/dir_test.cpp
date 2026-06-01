@@ -1312,14 +1312,23 @@ void sysIdExperiment() {
             if (speedDanger(p)) return;
             if (fabsf(g_fusedPitch) < STOP_DEG) break;   // 冲到余量 → 停驱动
         }
-        Serial.println("# -- 断电，自由摆动 --");
-        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝：自由段
-        motorStop();   // 电流 0（输出仍在）
+        // 改：**阻尼缓冲**收回 B（代替纯自由摆动——这个机体自由摆动必过冲外棱翻；用已验证 τ=θdown·K·θ̇）。
+        //   缓冲段电流(cmd)也已记录，可辅助辨识。
+        Serial.println("# -- 阻尼缓冲收回B(防过冲翻) --");
+        M5.dis.fillpix(CRGB(0x00, 0x10, 0x30));  // 蓝：缓冲段
+        const int   thetaDown = dir * st;
+        const float K_DAMP    = 4.0f;
         uint32_t t1 = millis();
         while (millis() - t1 < FREE_TO) {
-            delay(TICK_MS); float p = sampleAndLog("SID_FREE");
+            delay(TICK_MS); float p = sampleAndLog("SID_DAMP");
             if (speedDanger(p)) return;
+            float tau = (float)thetaDown * K_DAMP * g_lastGyRate;   // 反角速度阻尼
+            if (tau >  MOTOR_MAX_MA) tau =  MOTOR_MAX_MA;
+            if (tau < -MOTOR_MAX_MA) tau = -MOTOR_MAX_MA;
+            motorSetCurrentmA(tau);
+            if (fabsf(p - startRest) < REST_BAND_DEG && fabsf(g_lastGyRate) < 12.0f) break;  // 落定 B
         }
+        motorStop();
     }
     motorStop(); motorPowerOff();
     Serial.println("# ★系统辨识实验完成：SID_DRV(驱动段)/SID_FREE(自由段)已记录，供离线拟合。终止、仅监视。");
