@@ -22,6 +22,12 @@ phase,iter,t_ms,pf_cdeg,gy_cdps,cmd_ma,cur_ma,spd_rpm,lat_cdeg,err
 ## 注释行
 以 `#` 开头：阶段标记(如 `# == 辨识档1: 驱动电流 -280mA ==`)、判定(`# === 1s窗判定…`)、表头、ABORT 等。**非数据，解析时跳过**。
 
+## 本地分析工具（先本地解析，模型只读精简结论 → 省 token/算力）
+- **`tools/analyze.py [log]`**：按 `phase` 分段，每段输出 θ/θ̇/飞轮/电流/侧向 的范围与峰值 + **自动诊断标记**
+  （翻越±40 / 起跳猛(θ̇峰) / 飞轮近饱和 / **⚠pf污染**(gy≈0却pf大变=假翻) / 末段θ̇≈0(稳) / 出平面）；
+  MON 监视段自动折叠只留末态；末尾抽取事件时间线(CMD/硬危险/落点/挣脱…)。**跑完实验先跑它，看结论即可。**
+- **`tools/fit_sysid.py [log]`**：从 SID_DRV 驱动段最小二乘拟合 `θ̈=a·sinθ+b·I_cmd`，出 a=mgl/I_b、b=Kt/I_b + R²。
+
 ## 用途
 - 估 θ̈：对 `gy_cdps`(θ̇) 按 `t_ms` 求一阶差分（或对 pf 求二阶）。
 - 辨识：`I_b·θ̈ = Kt·cmd_ma + mgl·sin(θ)` → 用 (θ̈, cmd, θ) 回归估 Kt/I_b、mgl/I_b。
