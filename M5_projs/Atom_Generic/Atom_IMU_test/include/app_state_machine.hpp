@@ -6,29 +6,30 @@
 /*
 AppStateMachine
 ===============
-Runtime mode management for a no-jump balancing workflow:
-Disarmed -> RefCapture -> Balancing -> Fault
+不带“起跳”功能时的运行状态机：
+`Disarmed -> RefCapture -> Balancing -> Fault`
 
-Key principle:
-- Do not assume startup orientation equals balance.
-- In RefCapture, user manually holds upright and system captures theta_ref.
+核心原则：
+- 不假设上电姿态就是平衡态
+- 在 `RefCapture` 阶段由用户手动扶正
+- 系统在稳定窗口内采集参考角 `theta_ref`
 */
 class AppStateMachine {
 public:
-    // Initialize state machine to Disarmed.
+    // 初始化到 Disarmed。
     void begin();
-    // External arm/disarm request (button or command interface).
+    // 外部请求使能或关闭，例如按键或串口命令。
     void requestEnabled(bool enabled);
-    // Periodic state update.
+    // 周期性更新状态机。
     void update(uint32_t now_ms, const ImuSample& imu, const MotorFeedback& motor, const SafetyGuard& safety);
 
-    // Read-only state outputs.
+    // 只读状态输出接口。
     AppMode mode() const;
     FaultCode fault() const;
-    float thetaRefDeg() const;                     // Captured reference angle.
-    float thetaErrorDeg(const ImuSample& imu) const; // Current control error relative to captured reference.
-    bool motorShouldEnable() const;                // Whether output stage should be enabled.
-    bool controlActive() const;                    // Whether controller should compute/output commands.
+    float thetaRefDeg() const;                       // 已采集到的参考平衡角。
+    float thetaErrorDeg(const ImuSample& imu) const;  // 当前相对参考角的控制误差。
+    bool motorShouldEnable() const;                  // 当前是否应该打开电机输出级。
+    bool controlActive() const;                      // 当前是否允许控制器输出指令。
 
 private:
     void enterDisarmed();
@@ -36,12 +37,12 @@ private:
     void enterBalancing();
     void enterFault(FaultCode code);
 
-    AppMode mode_ = AppMode::Disarmed;  // Current runtime mode.
-    FaultCode fault_ = FaultCode::None; // Last fault cause.
-    bool requested_enabled_ = false;    // User arm/disarm intent.
-    float theta_ref_deg_ = 0.0f;        // Captured reference angle for theta error.
+    AppMode mode_ = AppMode::Disarmed;   // 当前运行模式。
+    FaultCode fault_ = FaultCode::None;  // 最近一次故障原因。
+    bool requested_enabled_ = false;     // 用户请求的使能状态。
+    float theta_ref_deg_ = 0.0f;         // 已采集的参考角，用于计算姿态误差。
 
-    // Capture-window bookkeeping.
+    // 参考角采集窗口的累计变量。
     uint32_t last_update_ms_ = 0;
     uint32_t capture_stable_ms_ = 0;
     float capture_sum_deg_ = 0.0f;

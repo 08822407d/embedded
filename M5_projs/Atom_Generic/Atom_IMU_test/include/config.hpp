@@ -3,87 +3,88 @@
 #include <stdint.h>
 
 /*
-Configuration notes
-===================
-This file is intentionally central: most field tuning should happen here first.
+配置说明
+========
+本文件是项目的集中参数入口，现场调试时通常优先修改这里。
 
-Recommended tuning order for first bring-up:
-1) Confirm direction/sign mapping: kUseRollAxis, kAngleSign, gMotorDirection.
-2) Confirm safety limits: kFaultTiltDeg, kCurrentCmdAbsMax.
-3) Tune control gains: Kp -> Kd -> Ki.
-4) Add wheel-speed damping Kw only after basic balance works.
+推荐调试顺序：
+1) 先确认方向和符号：`kUseRollAxis`、`kAngleSign`、`gMotorDirection`
+2) 再确认保护参数：`kFaultTiltDeg`、`kCurrentCmdAbsMax`
+3) 再调控制参数：`Kp -> Kd -> Ki`
+4) 最后再加 `Kw`，用于抑制飞轮长期偏速
 
-All angle values are in degrees, angular rate in deg/s, and loop rates in Hz.
-Motor command values are "Roller command units" (not strict SI units).
+这里的角度单位为“度”，角速度单位为“度/秒”，频率单位为“Hz”。
+电机指令值使用 Roller 的工程量，不严格对应 SI 物理单位。
 */
 
-// Global motor direction switch.
-// +1: normal direction, -1: reversed direction.
+// 全局电机方向开关。
+// `+1` 为默认方向，`-1` 为反向。
 extern int gMotorDirection;
 
 namespace appcfg {
 
-// IMU axis selection and orientation mapping.
-static constexpr bool kUseRollAxis = true;   // true: use roll, false: use pitch.
-static constexpr float kAngleSign = +1.0f;   // Set to -1 if tilt response direction is inverted.
-static constexpr float kMountOffsetDeg = 0;  // Fixed mechanical mounting offset around balance axis.
+// IMU 轴选择和方向映射。
+static constexpr bool kUseRollAxis = true;   // `true` 用 roll，`false` 用 pitch。
+static constexpr float kAngleSign = +1.0f;   // 倾斜方向判断反了就改成 `-1`。
+static constexpr float kMountOffsetDeg = 0;  // 机械安装造成的固定角度偏移。
 
-// Loop rates.
-static constexpr uint32_t kImuHz = 200;       // IMU update/read frequency.
-static constexpr uint32_t kCtrlHz = 100;      // Balance controller execution frequency.
-static constexpr uint32_t kFeedbackHz = 50;   // Motor telemetry readback frequency.
-static constexpr uint32_t kUiHz = 20;         // LED/UI refresh frequency.
-static constexpr uint32_t kLogHz = 10;        // Serial logging frequency.
+// 各模块运行频率。
+static constexpr uint32_t kImuHz = 200;       // IMU 采样和估计更新频率。
+static constexpr uint32_t kCtrlHz = 100;      // 平衡控制器运行频率。
+static constexpr uint32_t kFeedbackHz = 50;   // 电机读反馈频率。
+static constexpr uint32_t kUiHz = 20;         // LED 刷新频率。
+static constexpr uint32_t kLogHz = 10;        // 串口日志输出频率。
 
-// IMU filters.
-// First-order low-pass filter alpha:
-// y = y + alpha * (x - y)
-// Higher alpha follows sensor faster but keeps more noise.
-static constexpr float kAngleLpfAlpha = 0.25f;  // Angle smoothing.
-static constexpr float kRateLpfAlpha = 0.30f;   // Rate smoothing.
+// IMU 滤波参数。
+// 这里使用一阶低通：
+// `y = y + alpha * (x - y)`
+// alpha 越大，跟随越快，但噪声也会更明显。
+static constexpr float kAngleLpfAlpha = 0.25f;  // 角度滤波强度。
+static constexpr float kRateLpfAlpha = 0.30f;   // 角速度滤波强度。
 
-// Roller I2C wiring/config. Adjust pins to your actual Atom + Roller wiring.
+// Roller 的 I2C 接线参数，需要按你的实际接线修改。
 static constexpr uint8_t kRollerI2cAddr = 0x64;
 static constexpr uint8_t kRollerSdaPin = 26;
 static constexpr uint8_t kRollerSclPin = 32;
-static constexpr uint32_t kRollerI2cHz = 400000;  // 400kHz fast mode.
+static constexpr uint32_t kRollerI2cHz = 400000;  // 400kHz Fast Mode。
 
-// Control parameters. These are first-pass startup values.
-// Controller structure:
-// u = Kp*theta_err + Kd*theta_rate + Ki*integral(theta_err) - Kw*wheel_speed
+// 控制参数。当前是第一版的起步值，不是最终值。
+// 控制律形式：
+// `u = Kp*theta_err + Kd*theta_rate + Ki*integral(theta_err) - Kw*wheel_speed`
 //
-// Sign conventions:
-// - theta_err is measured around the balance axis in degrees.
-// - wheel_speed is Roller readback raw speed value.
-// - Direction of final command is additionally controlled by gMotorDirection.
-static constexpr float kKp = 35.0f;        // Stiffness against tilt error.
-static constexpr float kKi = 2.0f;         // Slow bias cancellation.
-static constexpr float kKd = 1.1f;         // Damping using body rate.
-static constexpr float kKw = 0.00035f;     // Weak wheel-speed damping (momentum management).
+// 其中：
+// `theta_err` 是机体相对参考平衡角的误差，单位是“度”
+// `wheel_speed` 是 Roller 返回的原始速度值
+// 最终输出方向还会再乘以 `gMotorDirection`
+static constexpr float kKp = 35.0f;        // 姿态误差刚度，负责“扶正”。
+static constexpr float kKi = 2.0f;         // 慢速消除静差和偏置。
+static constexpr float kKd = 1.1f;         // 利用角速度提供阻尼。
+static constexpr float kKw = 0.00035f;     // 轻微抑制飞轮长期偏速。
 
-// Command shaping:
-// - Integral limit prevents windup.
-// - Abs limit caps maximum torque/current command.
-// - Slew limit prevents sudden current steps that can destabilize startup.
+// 输出整形参数。
+// - `IntegralLimit`：限制积分，防止积分饱和。
+// - `CurrentCmdAbsMax`：限制最大输出，保护电机和电源。
+// - `CurrentCmdSlewPerSec`：限制输出变化速度，避免电流突跳。
 static constexpr float kIntegralLimit = 200.0f;
 static constexpr float kCurrentCmdAbsMax = 700.0f;
 static constexpr float kCurrentCmdSlewPerSec = 2000.0f;
 
-// Arm/capture behavior (manual upright then capture reference angle).
-// During reference capture, we intentionally do NOT assume table level.
-// The controller stores the current body angle as theta_ref once stable.
-static constexpr uint32_t kCaptureStableMs = 600;  // Required stable duration.
-static constexpr float kCaptureMaxRateDps = 12.0f; // Max body rate allowed for "stable".
+// 人工扶正并采集参考角时的判定参数。
+// 这里明确不假设桌面水平，也不假设上电姿态就是平衡态。
+// 只要人工把系统扶到接近平衡的位置，并在短时间内保持足够稳定，
+// 就把那一刻的机体角度记为 `theta_ref`。
+static constexpr uint32_t kCaptureStableMs = 600;   // 需要持续稳定多久才算采集成功。
+static constexpr float kCaptureMaxRateDps = 12.0f;  // 参考角采集阶段允许的最大角速度。
 
-// Safety.
-// If balancing is active and |theta_err| exceeds this threshold, output is cut.
+// 安全保护参数。
+// 平衡运行中，如果姿态误差超过该阈值，就立即触发故障并停机。
 static constexpr float kFaultTiltDeg = 30.0f;
-// Motor error readback policy: non-zero means fault.
+// 电机错误码判定策略：当前版本里非零就算故障。
 static constexpr uint8_t kFaultMotorErrorNonZero = 1;
 
-// LED/UI.
+// LED 显示参数。
 static constexpr uint8_t kLedBrightness = 20;
-static constexpr float kLedDeadbandDeg = 3.0f;  // Center column range.
-static constexpr float kLedMidbandDeg = 10.0f;  // Inner side columns range.
+static constexpr float kLedDeadbandDeg = 3.0f;   // 中间列对应的误差范围。
+static constexpr float kLedMidbandDeg = 10.0f;   // 中间两侧列对应的误差范围。
 
 }  // namespace appcfg

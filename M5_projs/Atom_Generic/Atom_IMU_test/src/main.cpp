@@ -9,70 +9,70 @@
 #include "safety_guard.hpp"
 
 /*
-Main architecture (single-thread cooperative scheduler)
-=======================================================
-This first version keeps everything in loop() with fixed-period sections:
+主程序结构（单线程协作式调度）
+==============================
+第一版没有引入 RTOS 任务划分，而是在 `loop()` 里按固定周期执行几个子模块：
 
-1) IMU section      @ kImuHz
-   - update attitude/rate estimator.
+1) IMU 部分      @ `kImuHz`
+   - 更新姿态角和角速度估计
 
-2) Feedback section @ kFeedbackHz
-   - read Roller speed/current/status/error.
+2) 电机反馈部分  @ `kFeedbackHz`
+   - 读取 Roller 的速度、电流、状态和错误码
 
-3) Control section  @ kCtrlHz
-   - run state machine.
-   - enable/disable motor output on state transitions.
-   - compute current command when balancing.
+3) 状态机与控制部分 @ `kCtrlHz`
+   - 更新状态机
+   - 根据状态切换控制电机输出级
+   - 在平衡态下计算当前电流指令
 
-4) UI section       @ kUiHz
-   - show concise mode/tilt visualization on Atom 5x5 LED.
+4) UI 部分       @ `kUiHz`
+   - 用 Atom 的 5x5 LED 显示状态和误差方向
 
-5) Log section      @ kLogHz
-   - print diagnostics for tuning and troubleshooting.
+5) 日志部分      @ `kLogHz`
+   - 输出调试信息，便于现场调参
 
-The scheduler uses elapsed micros() checks instead of delay() so each section
-can run at independent rates with predictable cadence.
+这里使用 `micros()` 做非阻塞定时，而不是大量 `delay()`，
+目的是让不同模块可以用各自频率运行，同时保持整体节奏稳定。
 */
 
-// Global motor direction switch requested by user.
-// +1: normal, -1: reverse.
+// 全局电机方向开关。
+// `+1` 表示默认方向，`-1` 表示反向。
 int gMotorDirection = +1;
 
 namespace {
 
-// Core modules.
+// 核心模块实例。
 ImuEstimator gImu;
 RollerI2CDriver gRoller;
 BalanceController gController;
 SafetyGuard gSafety;
 AppStateMachine gStateMachine;
 
-// Shared runtime state.
+// 运行时共享状态。
 MotorFeedback gMotorFeedback{};
 float gLastCurrentCmd = 0.0f;
 bool gEnableRequested = false;
 bool gMotorOutputEnabled = false;
 bool gRollerOnline = false;
 
-// Per-section scheduler timestamps in microseconds.
+// 各调度分区的时间戳，单位是微秒。
 uint32_t gLastImuUs = 0;
 uint32_t gLastCtrlUs = 0;
 uint32_t gLastFeedbackUs = 0;
 uint32_t gLastUiUs = 0;
 uint32_t gLastLogUs = 0;
 
-// Helper conversion for fixed-rate sections.
+// 频率转秒，用于控制器和估计器。
 float periodSec(uint32_t hz) {
     return 1.0f / static_cast<float>(hz);
 }
 
-// Helper conversion for fixed-rate sections.
+// 频率转微秒，用于调度判定。
 uint32_t periodUs(uint32_t hz) {
     return static_cast<uint32_t>(1000000UL / hz);
 }
 
-// Convert signed angle magnitude into one of 5 LED columns.
-// This is mainly a debugging visualization of control error.
+// 把有符号角度误差映射成 5 列 LED 的索引。
+// 这只是调试可视化，不参与控制。
 int angleToIndex(float angleDegSigned) {
     float absA = fabsf(angleDegSigned);
     if (absA <= appcfg::kLedDeadbandDeg) return 2;
@@ -80,7 +80,7 @@ int angleToIndex(float angleDegSigned) {
     return (angleDegSigned > 0.0f) ? 0 : 4;
 }
 
-// Utility to paint all 25 LEDs.
+// 把 5x5 LED 全部填成同一种颜色。
 void fillAll(uint32_t color) {
     for (uint8_t y = 0; y < 5; ++y) {
         for (uint8_t x = 0; x < 5; ++x) {
@@ -89,13 +89,13 @@ void fillAll(uint32_t color) {
     }
 }
 
-// DISARMED indication: blue center dot.
+// `Disarmed` 状态的 LED：中心蓝点。
 void drawDisarmed() {
     M5.dis.clear();
     M5.dis.drawpix(2, 2, 0x000030);
 }
 
-// REF_CAPTURE indication: blinking amber bar.
+// `RefCapture` 状态的 LED：闪烁的黄色横条。
 void drawRefCapture(bool blinkOn) {
     M5.dis.clear();
     if (blinkOn) {
@@ -105,7 +105,7 @@ void drawRefCapture(bool blinkOn) {
     }
 }
 
-// BALANCING indication: green column shifts with signed angle error.
+// `Balancing` 状态的 LED：绿色列随误差方向左右移动。
 void drawBalancing(float thetaErrDeg) {
     M5.dis.clear();
     const int idx = angleToIndex(thetaErrDeg);
@@ -115,12 +115,12 @@ void drawBalancing(float thetaErrDeg) {
     }
 }
 
-// FAULT indication: solid red.
+// `Fault` 状态的 LED：全红。
 void drawFault() {
     fillAll(0x200000);
 }
 
-// String name used by serial log stream.
+// 串口日志中使用的模式名称。
 const char* modeName(AppMode mode) {
     switch (mode) {
         case AppMode::Disarmed:
@@ -139,28 +139,28 @@ const char* modeName(AppMode mode) {
 }  // namespace
 
 void setup() {
-    // Serial diagnostics are essential for first tuning sessions.
+    // 第一版调试强依赖串口日志，因此默认开启。
     Serial.begin(115200);
 
-    // Atom board + display init.
+    // 初始化 Atom 板卡和点阵显示。
     M5.begin(true, true, true);
     delay(80);
     M5.dis.setBrightness(appcfg::kLedBrightness);
     M5.dis.clear();
 
-    // IMU init must happen before estimator begins.
+    // IMU 必须先初始化，再启动估计器。
     M5.IMU.Init();
     delay(60);
     gImu.begin();
 
-    // Bring up motor interface (I2C + current mode).
+    // 初始化 Roller I2C 接口，并切到电流模式。
     gRollerOnline = gRoller.begin();
 
-    // Start state machine in disarmed mode.
+    // 状态机从空闲态开始。
     gStateMachine.begin();
     gStateMachine.requestEnabled(false);
 
-    // Align all scheduler phases to "now".
+    // 把所有调度时钟对齐到当前时刻。
     const uint32_t nowUs = micros();
     gLastImuUs = nowUs;
     gLastCtrlUs = nowUs;
@@ -174,8 +174,8 @@ void setup() {
 void loop() {
     M5.update();
 
-    // Short press toggles arm request.
-    // Arm only allowed when Roller is online.
+    // 按键短按切换“请求使能”状态。
+    // 只有 Roller 在线时才允许进入工作流程。
     if (M5.Btn.wasPressed()) {
         if (gRollerOnline) {
             gEnableRequested = !gEnableRequested;
@@ -186,37 +186,37 @@ void loop() {
     const uint32_t nowUs = micros();
     const uint32_t nowMs = millis();
 
-    // 1) IMU loop.
+    // 1) IMU 更新区。
     if (static_cast<uint32_t>(nowUs - gLastImuUs) >= periodUs(appcfg::kImuHz)) {
         gLastImuUs += periodUs(appcfg::kImuHz);
         gImu.update(periodSec(appcfg::kImuHz));
     }
 
-    // 2) Motor feedback loop.
+    // 2) 电机反馈读取区。
     if (static_cast<uint32_t>(nowUs - gLastFeedbackUs) >= periodUs(appcfg::kFeedbackHz)) {
         gLastFeedbackUs += periodUs(appcfg::kFeedbackHz);
         gMotorFeedback = gRoller.readFeedback();
     }
 
-    // 3) State + control loop (core logic).
+    // 3) 状态机 + 控制区，这是主逻辑核心。
     if (static_cast<uint32_t>(nowUs - gLastCtrlUs) >= periodUs(appcfg::kCtrlHz)) {
         gLastCtrlUs += periodUs(appcfg::kCtrlHz);
 
         const ImuSample imu = gImu.sample();
 
-        // State machine decides mode transitions and safety latch behavior.
+        // 状态机负责决定模式切换，以及故障是否锁定。
         gStateMachine.update(nowMs, imu, gMotorFeedback, gSafety);
 
-        // Output-stage control is tied to mode transitions, not raw button state.
+        // 电机输出级是否打开，跟随状态机，而不是直接跟按键绑定。
         const bool shouldEnableMotor = gStateMachine.motorShouldEnable();
         if (shouldEnableMotor != gMotorOutputEnabled) {
             if (shouldEnableMotor) {
-                // Fresh controller state prevents stale integral/output memory.
+                // 进入闭环前先重置控制器，避免积分和上一拍输出残留。
                 gController.reset();
                 gRoller.setOutput(true);
                 gMotorOutputEnabled = true;
             } else {
-                // On any non-balancing mode, force safe stop.
+                // 只要离开平衡态，就执行安全停机。
                 gController.reset();
                 gLastCurrentCmd = 0.0f;
                 gRoller.stop();
@@ -224,7 +224,7 @@ void loop() {
             }
         }
 
-        // Compute and send command only in Balancing mode.
+        // 只有在 `Balancing` 状态下才真正计算并下发控制指令。
         if (gStateMachine.controlActive()) {
             const float thetaErr = gStateMachine.thetaErrorDeg(imu);
             gLastCurrentCmd =
@@ -233,7 +233,7 @@ void loop() {
         }
     }
 
-    // 4) UI loop.
+    // 4) LED/UI 更新区。
     if (static_cast<uint32_t>(nowUs - gLastUiUs) >= periodUs(appcfg::kUiHz)) {
         gLastUiUs += periodUs(appcfg::kUiHz);
 
@@ -241,13 +241,13 @@ void loop() {
         const ImuSample imu = gImu.sample();
         const float thetaErr = gStateMachine.thetaErrorDeg(imu);
 
-        // Offline Roller is treated visually as fault.
+        // Roller 离线时，视觉上直接按故障态处理。
         if (!gRollerOnline) {
             drawFault();
         } else if (mode == AppMode::Disarmed) {
             drawDisarmed();
         } else if (mode == AppMode::RefCapture) {
-            // Blink helps user hold system still while ref is captured.
+            // 闪烁提示用户此时应尽量把系统扶稳不动。
             const bool blinkOn = ((nowMs / 250) % 2) == 0;
             drawRefCapture(blinkOn);
         } else if (mode == AppMode::Balancing) {
@@ -257,9 +257,9 @@ void loop() {
         }
     }
 
-    // 5) Log loop.
-    // This is the main tuning stream: mode, reference angle, current angle/rate,
-    // command output, and motor readback.
+    // 5) 串口日志区。
+    // 这是调参时最重要的观察窗口：
+    // 模式、参考角、当前角度、角速度、控制输出、电机反馈都会从这里看到。
     if (static_cast<uint32_t>(nowUs - gLastLogUs) >= periodUs(appcfg::kLogHz)) {
         gLastLogUs += periodUs(appcfg::kLogHz);
         const ImuSample imu = gImu.sample();

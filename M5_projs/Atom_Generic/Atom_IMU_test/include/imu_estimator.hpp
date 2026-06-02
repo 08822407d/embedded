@@ -5,21 +5,21 @@
 /*
 ImuEstimator
 ============
-Lightweight estimator for one balancing axis.
+单轴姿态估计模块。
 
-Design intent:
-- Keep estimator deterministic and cheap for MCU.
-- Avoid heavy AHRS dependency in first version.
-- Output stable angle/rate pair suitable for PID-style control.
+设计目的：
+- 尽量轻量，适合 MCU 实时运行
+- 第一版不引入更重的姿态融合框架
+- 输出相对稳定的角度/角速度，供 PID 类控制器直接使用
 */
 class ImuEstimator {
 public:
-    // Reset internal states. Call once after IMU init.
+    // 复位内部状态。应在 IMU 初始化完成后调用一次。
     void begin();
-    // Update estimator by one fixed-step cycle.
-    // dt_s should match the scheduler period.
+    // 执行一次固定步长更新。
+    // `dt_s` 应与调度周期保持一致。
     void update(float dt_s);
-    // Return latest sample snapshot.
+    // 返回当前的状态快照。
     ImuSample sample() const;
 
 private:
