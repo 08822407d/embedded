@@ -1,0 +1,93 @@
+ADB serial: axera-ax620e
+Timestamp: 20260602-174644
+Command: for d in /proc/device-tree/soc/ax_uart@*; do [ -d "$d" ] || continue; echo "NODE $d"; for f in name compatible status; do [ -f "$d/$f" ] && { printf "  %s: " "$f"; tr "\000" " " < "$d/$f"; echo; }; done; [ -f "$d/reg" ] && { printf "  reg(hex): "; od -An -tx4 "$d/reg" 2>/dev/null; }; done; echo; cat /proc/tty/driver/serial 2>/dev/null || true; echo; ls -l /sys/class/tty/ttyS*/device 2>/dev/null || true
+
+NODE /proc/device-tree/soc/ax_uart@4880000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: okay 
+
+  reg(hex):  00000000 00008804 00000000 00040000
+
+NODE /proc/device-tree/soc/ax_uart@4881000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: okay 
+
+  reg(hex):  00000000 00108804 00000000 00040000
+
+NODE /proc/device-tree/soc/ax_uart@4882000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: disabled 
+
+  reg(hex):  00000000 00208804 00000000 00040000
+
+NODE /proc/device-tree/soc/ax_uart@6080000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: disabled 
+
+  reg(hex):  00000000 00000806 00000000 00040000
+
+NODE /proc/device-tree/soc/ax_uart@6081000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: disabled 
+
+  reg(hex):  00000000 00100806 00000000 00040000
+
+NODE /proc/device-tree/soc/ax_uart@6082000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: disabled 
+
+  reg(hex):  00000000 00200806 00000000 00040000
+
+
+
+serinfo:1.0 driver revision:
+
+0: uart:16550A mmio:0x04880000 irq:5 tx:1289 rx:0 RTS|CTS|DTR
+
+1: uart:16550A mmio:0x04881000 irq:6 tx:0 rx:0 RTS|CTS|DTR
+
+2: uart:unknown port:00000000 irq:0
+
+3: uart:unknown port:00000000 irq:0
+
+4: uart:unknown port:00000000 irq:0
+
+5: uart:unknown port:00000000 irq:0
+
+
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS0/device -> ../../../4880000.ax_uart
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS1/device -> ../../../4881000.ax_uart
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS2/device -> ../../../serial8250
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS3/device -> ../../../serial8250
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS4/device -> ../../../serial8250
+
+lrwxrwxrwx 1 root root 0 Aug 22 06:30 /sys/class/tty/ttyS5/device -> ../../../serial8250

@@ -1,0 +1,55 @@
+## Host command: install Android SDK Platform Tools from official Google ZIP
+
+Tuesday, June 2, 2026 4:34:12 PM
+
+$risk = Host low risk; installs adb under current user LocalAppData, does not touch device
+
+Official URL: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+SDK root: C:\Users\cheyh\AppData\Local\Android\Sdk
+ZIP path: C:\Users\cheyh\AppData\Local\Temp\platform-tools-latest-windows-20260602-163412.zip
+Install path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools
+
+Downloading...
+Downloaded bytes: 8092164
+SHA256: 4FE305812DB074CEA32903A489D061EB4454CBC90A49E8FEA677F4B7AF764918
+
+Expanding archive...
+
+adb.exe path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+adb.exe SHA256: 957E46B8615F7AF5B7292A2DDABE98D2E61940C3FB2B0545756507F080613E71
+adb.exe Authenticode:
+
+Status            : Valid
+StatusMessage     : Signature verified.
+SignerCertificate : [Subject]
+                      CN=Google LLC, O=Google LLC, L=Mountain View, S=California, C=US, SERIALNUMBER=3582691, OID.2.5.4.15=Private Organization, OID.1.3.6.1.4.1.311.60.2.1.2=Delaware, OID.1.3.6.1.4.1.311.60.2.1.3=US
+                    
+                    [Issuer]
+                      CN=DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1, O="DigiCert, Inc.", C=US
+                    
+                    [Serial Number]
+                      0B50CF246B263EFD85A729315158F3FF
+                    
+                    [Not Before]
+                      4/8/2024 8:00:00 AM
+                    
+                    [Not After]
+                      4/11/2027 7:59:59 AM
+                    
+                    [Thumbprint]
+                      607A3EDAA64933E94422FC8F0C80388E0590986C
+                    
+
+
+
+adb version:
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Running on Windows 10.0.19045
+
+
+Set for current process:
+$env:ADB_BIN = C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Done.
+

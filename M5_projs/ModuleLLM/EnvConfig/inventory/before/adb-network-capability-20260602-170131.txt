@@ -1,0 +1,325 @@
+## Host command: ADB preflight + read-only network capability check
+
+Tuesday, June 2, 2026 5:01:31 PM
+
+Risk: read-only network/interface/route/service checks; no route/NAT/proxy changes; no apt update/install
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+selected serial: axera-ax620e
+
+## adb version
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Running on Windows 10.0.19045
+
+## adb start-server
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## existing adb forward/reverse mappings
+adb forward --list:
+
+adb reverse --list:
+error: closed
+
+## ADB shell: network capability read-only probe
+## date
+
+Tue Aug 22 05:46:54 CST 2023
+
+## host
+
+m5stack-LLM
+
+Linux m5stack-LLM 4.19.125 #1 SMP PREEMPT Wed Nov 20 14:43:36 CST 2024 aarch64 aarch64 aarch64 GNU/Linux
+
+PRETTY_NAME="Ubuntu 22.04 LTS"
+
+NAME="Ubuntu"
+
+VERSION_ID="22.04"
+
+VERSION="22.04 (Jammy Jellyfish)"
+
+VERSION_CODENAME=jammy
+
+ID=ubuntu
+
+ID_LIKE=debian
+
+HOME_URL="https://www.ubuntu.com/"
+
+SUPPORT_URL="https://help.ubuntu.com/"
+
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+
+UBUNTU_CODENAME=jammy
+
+## net interfaces: ip -br link
+
+lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP> 
+
+eth0             DOWN           9a:0b:8c:9b:e0:6c <NO-CARRIER,BROADCAST,MULTICAST,UP> 
+
+sit0@NONE        DOWN           0.0.0.0 <NOARP> 
+
+## net interfaces: ip -br addr
+
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+
+eth0             DOWN           
+
+sit0@NONE        DOWN           
+
+## routes
+
+::1 dev lo proto kernel metric 256 pref medium
+
+## route get probes
+
+RTNETLINK answers: Network is unreachable
+
+RTNETLINK answers: Network is unreachable
+
+## dns config
+
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+
+# Do not edit.
+
+#
+
+# This file might be symlinked as /etc/resolv.conf. If you're looking at
+
+# /etc/resolv.conf and seeing this text, you have followed the symlink.
+
+#
+
+# This is a dynamic resolv.conf file for connecting local clients to the
+
+# internal DNS stub resolver of systemd-resolved. This file lists all
+
+# configured search domains.
+
+#
+
+# Run "resolvectl status" to see details about the uplink DNS servers
+
+# currently in use.
+
+#
+
+# Third party programs should typically not access this file directly, but only
+
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+
+# different way, replace this symlink by a static file or a different symlink.
+
+#
+
+# See man:systemd-resolved.service(8) for details about the supported modes of
+
+# operation for /etc/resolv.conf.
+
+
+
+nameserver 127.0.0.53
+
+options edns0 trust-ad
+
+search .
+
+## sysfs net details
+
+iface=eth0 type=1
+
+iface=eth0 operstate=down
+
+iface=eth0 address=9a:0b:8c:9b:e0:6c
+
+iface=eth0 device=/sys/devices/platform/soc/104c0000.ethernet
+
+iface=eth0 driver=/sys/bus/platform/drivers/stmmaceth
+
+---
+
+iface=lo type=772
+
+iface=lo operstate=unknown
+
+iface=lo address=00:00:00:00:00:00
+
+iface=lo device=/sys/devices/virtual/net/lo/device
+
+iface=lo driver=---
+
+iface=sit0 type=776
+
+iface=sit0 operstate=down
+
+iface=sit0 address=00:00:00:00
+
+iface=sit0 device=/sys/devices/virtual/net/sit0/device
+
+iface=sit0 driver=---
+
+## likely network hardware from /proc/bus/input and /sys omitted; lspci/lsusb if present
+
+lsusb NOT_FOUND
+
+lspci NOT_FOUND
+
+## usb gadget/config hints
+
+mem=1024M console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000 board_id=0,boot_reason=0x0 initcall_debug=0 quiet loglevel=0 usbcore.autosuspend=-1 root=/dev/mmcblk0p16 rootfstype=ext4 rw rootwait blkdevparts=mmcblk0:768K(spl),512K(ddrinit),256K(atf),256K(atf_b),1536K(uboot),1536K(uboot_b),1024K(env),6144K(logo),6144K(logo_b),1024K(optee),1024K(optee_b),1024K(dtb),1024K(dtb_b),262144K(kernel),262144K(kernel_b),29889536K(ubuntu_rootfs)
+
+/sys/kernel/config/usb_gadget/usb_adb/os_desc/qw_sign
+
+--- /sys/kernel/config/usb_gadget/usb_adb/os_desc/qw_sign
+
+
+
+/sys/kernel/config/usb_gadget/usb_adb/os_desc/b_vendor_code
+
+--- /sys/kernel/config/usb_gadget/usb_adb/os_desc/b_vendor_code
+
+0x00
+
+/sys/kernel/config/usb_gadget/usb_adb/os_desc/use
+
+--- /sys/kernel/config/usb_gadget/usb_adb/os_desc/use
+
+0
+
+/sys/kernel/config/usb_gadget/usb_adb/strings/0x409/serialnumber
+
+--- /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/serialnumber
+
+axera-ax620e
+
+/sys/kernel/config/usb_gadget/usb_adb/strings/0x409/product
+
+--- /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/product
+
+ax620e-adb
+
+/sys/kernel/config/usb_gadget/usb_adb/strings/0x409/manufacturer
+
+--- /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/manufacturer
+
+axera
+
+/sys/kernel/config/usb_gadget/usb_adb/configs/c.1/bmAttributes
+
+--- /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/bmAttributes
+
+0x80
+
+/sys/kernel/config/usb_gadget/usb_adb/configs/c.1/MaxPower
+
+--- /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/MaxPower
+
+120
+
+/sys/kernel/config/usb_gadget/usb_adb/UDC
+
+--- /sys/kernel/config/usb_gadget/usb_adb/UDC
+
+8000000.dwc3
+
+/sys/kernel/config/usb_gadget/usb_adb/bcdUSB
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bcdUSB
+
+0x0200
+
+/sys/kernel/config/usb_gadget/usb_adb/bcdDevice
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bcdDevice
+
+0x0419
+
+/sys/kernel/config/usb_gadget/usb_adb/idProduct
+
+--- /sys/kernel/config/usb_gadget/usb_adb/idProduct
+
+0x2003
+
+/sys/kernel/config/usb_gadget/usb_adb/idVendor
+
+--- /sys/kernel/config/usb_gadget/usb_adb/idVendor
+
+0x32c9
+
+/sys/kernel/config/usb_gadget/usb_adb/bMaxPacketSize0
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bMaxPacketSize0
+
+0x40
+
+/sys/kernel/config/usb_gadget/usb_adb/bDeviceProtocol
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bDeviceProtocol
+
+0x00
+
+/sys/kernel/config/usb_gadget/usb_adb/bDeviceSubClass
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bDeviceSubClass
+
+0x00
+
+/sys/kernel/config/usb_gadget/usb_adb/bDeviceClass
+
+--- /sys/kernel/config/usb_gadget/usb_adb/bDeviceClass
+
+0x00
+
+/sys/class/udc/8000000.dwc3
+
+## processes/services possibly relevant
+
+root        1648       1  0 05:11 ?        00:00:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+
+root        2068       1  0 05:11 ?        00:00:00 /sbin/dhclient -1 -4 -v -i -pf /run/dhclient.eth0.pid -lf /var/lib/dhcp/dhclient.eth0.leases -I -df /var/lib/dhcp/dhclient6.eth0.leases eth0
+
+root        2224       1  0 05:11 ?        00:00:00 adbd
+
+## firewall/nat commands availability and read-only summaries
+
+-P PREROUTING ACCEPT
+
+-P INPUT ACCEPT
+
+-P OUTPUT ACCEPT
+
+-P POSTROUTING ACCEPT
+
+nft unavailable or no permission
+
+## tools for direct network test availability
+
+curl	/usr/bin/curl
+
+wget	/usr/bin/wget
+
+ping	/usr/bin/ping
+
+nc	NOT_FOUND
+
+ssh	/usr/bin/ssh
+
+ip	/usr/sbin/ip
+
+route	/usr/sbin/route
+
+resolvectl	/usr/bin/resolvectl
+
+systemctl	/usr/bin/systemctl
+
+

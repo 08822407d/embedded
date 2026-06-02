@@ -1,0 +1,42 @@
+## Host command: USB/ADB device details (read-only)
+
+Tuesday, June 2, 2026 4:30:18 PM
+
+## adb availability
+ADB_BIN=
+ANDROID_HOME=
+ANDROID_SDK_ROOT=
+where.exe adb:
+INFO: Could not find files for the given pattern(s).
+Get-Command adb:
+
+
+## exact PnP match for Module LLM ADB USB device
+
+Status       : OK
+Class        : USBDevice
+FriendlyName : ax620e-adb
+InstanceId   : USB\VID_32C9&PID_2003\AXERA-AX620E
+
+
+
+## signed driver info
+
+DeviceName         : ADB Device
+Manufacturer       : WinUsb Device
+DriverProviderName : Microsoft
+DriverVersion      : 10.0.19041.1
+InfName            : winusb.inf
+DeviceID           : USB\VID_32C9&PID_2003\AXERA-AX620E
+
+
+
+## COM ports
+
+DeviceID Name                         Description          PNPDeviceID
+-------- ----                         -----------          -----------
+COM10    蓝牙链接上的标准串行 (COM10) 蓝牙链接上的标准串行 BTHENUM\{00001101-0000-1000-8000-00805F9B34FB}_LOCALMFG&0000…
+COM9     蓝牙链接上的标准串行 (COM9)  蓝牙链接上的标准串行 BTHENUM\{00001101-0000-1000-8000-00805F9B34FB}_LOCALMFG&0002…
+
+
+

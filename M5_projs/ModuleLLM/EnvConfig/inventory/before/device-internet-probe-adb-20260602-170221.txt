@@ -1,0 +1,51 @@
+## Host command: ADB read-only device internet probe
+
+Tuesday, June 2, 2026 5:02:21 PM
+
+Risk: read-only outbound connectivity tests from device; no route/NAT/proxy changes
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+selected serial: axera-ax620e
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## route before tests
+
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+
+eth0             DOWN           
+
+sit0@NONE        DOWN           
+
+## ping IP
+
+PING 1.1.1.1 (1.1.1.1): 56 data bytes
+
+ping: sending packet: Network is unreachable
+
+## curl IP
+
+curl: (7) Couldn't connect to server
+
+## curl M5 repo
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0curl: (6) Could not resolve host: repo.llm.m5stack.com
+
+## wget M5 repo
+
+Spider mode enabled. Check if remote file exists.
+
+--2023-08-22 05:47:44--  https://repo.llm.m5stack.com/
+
+Resolving repo.llm.m5stack.com (repo.llm.m5stack.com)... failed: Temporary failure in name resolution.
+
+wget: unable to resolve host address ‘repo.llm.m5stack.com’
+
+

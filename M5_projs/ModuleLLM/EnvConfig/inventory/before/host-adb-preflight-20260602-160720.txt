@@ -1,0 +1,20 @@
+Host command risk: read-only / host-side adb server check only
+Timestamp: 2026-06-02 16:07:20 +08:00
+PWD: C:\Users\cheyh\Desktop\embedded\M5_projs\ModuleLLM\EnvConfig
+
+OS:
+
+Caption        : Microsoft Windows 10 专业版
+Version        : 10.0.19045
+OSArchitecture : 64 位
+
+Shell:
+PowerShell 7.5.5
+
+adb:
+adb path: NOT FOUND
+adb version/start-server/devices: SKIPPED because adb is not in PATH
+
+ssh:
+ssh path: C:\Windows\System32\OpenSSH\ssh.exe
+OpenSSH_for_Windows_9.5p1, LibreSSL 3.8.2

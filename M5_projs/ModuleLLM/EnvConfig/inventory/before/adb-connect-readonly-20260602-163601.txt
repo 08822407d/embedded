@@ -1,0 +1,71 @@
+## Host command: ADB read-only connection verification with explicit serial
+
+Tuesday, June 2, 2026 4:36:01 PM
+
+Risk: read-only device shell commands only
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+selected serial: axera-ax620e
+
+## adb version
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Running on Windows 10.0.19045
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## read-only shell probe
+## whoami
+
+root
+
+## id
+
+uid=0(root) gid=0(root) groups=0(root)
+
+## hostname
+
+m5stack-LLM
+
+## uname
+
+Linux m5stack-LLM 4.19.125 #1 SMP PREEMPT Wed Nov 20 14:43:36 CST 2024 aarch64 aarch64 aarch64 GNU/Linux
+
+## os-release
+
+PRETTY_NAME="Ubuntu 22.04 LTS"
+
+NAME="Ubuntu"
+
+VERSION_ID="22.04"
+
+VERSION="22.04 (Jammy Jellyfish)"
+
+VERSION_CODENAME=jammy
+
+ID=ubuntu
+
+ID_LIKE=debian
+
+HOME_URL="https://www.ubuntu.com/"
+
+SUPPORT_URL="https://help.ubuntu.com/"
+
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+
+UBUNTU_CODENAME=jammy
+
+## uptime
+
+ 05:21:24 up 9 min,  1 user,  load average: 1.69, 1.39, 0.77
+
+## pwd
+
+/
+
+

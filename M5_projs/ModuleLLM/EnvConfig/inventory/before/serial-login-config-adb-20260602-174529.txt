@@ -1,0 +1,244 @@
+ADB serial: axera-ax620e
+Timestamp: 20260602-174529
+
+===== date =====
+date
+Tue Aug 22 06:30:52 CST 2023
+
+===== identity =====
+hostname; whoami; id
+m5stack-LLM
+
+root
+
+uid=0(root) gid=0(root) groups=0(root)
+
+===== kernel cmdline =====
+cat /proc/cmdline 2>/dev/null || true
+mem=1024M console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000 board_id=0,boot_reason=0x0 initcall_debug=0 quiet loglevel=0 usbcore.autosuspend=-1 root=/dev/mmcblk0p16 rootfstype=ext4 rw rootwait blkdevparts=mmcblk0:768K(spl),512K(ddrinit),256K(atf),256K(atf_b),1536K(uboot),1536K(uboot_b),1024K(env),6144K(logo),6144K(logo_b),1024K(optee),1024K(optee_b),1024K(dtb),1024K(dtb_b),262144K(kernel),262144K(kernel_b),29889536K(ubuntu_rootfs)
+
+===== kernel consoles =====
+cat /proc/consoles 2>/dev/null || true
+ttyS0                -W- (EC   a)    4:64
+
+pstore-1             -W- (E  p a)
+
+===== tty device nodes =====
+ls -l /dev/console /dev/tty /dev/ttyS* /dev/ttyAMA* /dev/tty0 2>/dev/null || true
+crw------- 1 root root    5,  1 Aug 22 05:11  /dev/console
+
+crw-rw-rw- 1 root tty     5,  0 Aug 22 05:11  /dev/tty
+
+crw--w---- 1 root tty     4,  0 Aug 22 05:11  /dev/tty0
+
+crw------- 1 root tty     4, 64 Aug 22 05:11  /dev/ttyS0
+
+crw-rw---- 1 root dialout 4, 65 Aug 22 05:11  /dev/ttyS1
+
+crw-rw---- 1 root dialout 4, 66 Aug 22 05:11  /dev/ttyS2
+
+crw-rw---- 1 root dialout 4, 67 Aug 22 05:11  /dev/ttyS3
+
+crw-rw---- 1 root dialout 4, 68 Aug 22 05:11  /dev/ttyS4
+
+crw-rw---- 1 root dialout 4, 69 Aug 22 05:11  /dev/ttyS5
+
+===== serial driver =====
+cat /proc/tty/driver/serial 2>/dev/null || true
+serinfo:1.0 driver revision:
+
+0: uart:16550A mmio:0x04880000 irq:5 tx:1289 rx:0 RTS|CTS|DTR
+
+1: uart:16550A mmio:0x04881000 irq:6 tx:0 rx:0 RTS|CTS|DTR
+
+2: uart:unknown port:00000000 irq:0
+
+3: uart:unknown port:00000000 irq:0
+
+4: uart:unknown port:00000000 irq:0
+
+5: uart:unknown port:00000000 irq:0
+
+===== sysfs tty mapping =====
+for t in /sys/class/tty/ttyS* /sys/class/tty/ttyAMA*; do [ -e "$t" ] || continue; echo "$t -> $(readlink -f "$t/device" 2>/dev/null || true)"; [ -f "$t/dev" ] && { printf "dev: "; cat "$t/dev"; }; done
+/sys/class/tty/ttyS0 -> /sys/devices/platform/soc/4880000.ax_uart
+
+dev: 4:64
+
+/sys/class/tty/ttyS1 -> /sys/devices/platform/soc/4881000.ax_uart
+
+dev: 4:65
+
+/sys/class/tty/ttyS2 -> /sys/devices/platform/serial8250
+
+dev: 4:66
+
+/sys/class/tty/ttyS3 -> /sys/devices/platform/serial8250
+
+dev: 4:67
+
+/sys/class/tty/ttyS4 -> /sys/devices/platform/serial8250
+
+dev: 4:68
+
+/sys/class/tty/ttyS5 -> /sys/devices/platform/serial8250
+
+dev: 4:69
+
+===== systemd getty units =====
+systemctl list-units --all "serial-getty*" "getty*" --no-pager 2>/dev/null || true
+  UNIT                       LOAD   ACTIVE   SUB     DESCRIPTION
+
+  getty-static.service       loaded inactive dead    getty on tty2-tty6 if dbus…
+
+  getty@tty1.service         loaded active   running Getty on tty1
+
+  serial-getty@ttyS0.service loaded active   running Serial Getty on ttyS0
+
+  getty-pre.target           loaded inactive dead    Preparation for Logins
+
+  getty.target               loaded active   active  Login Prompts
+
+
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+
+SUB    = The low-level unit activation state, values depend on unit type.
+
+5 loaded units listed.
+
+To show all installed unit files use 'systemctl list-unit-files'.
+
+===== systemd serial getty status =====
+systemctl is-enabled serial-getty@ttyS0.service 2>/dev/null || true; systemctl is-active serial-getty@ttyS0.service 2>/dev/null || true; systemctl show serial-getty@ttyS0.service -p Id -p Names -p LoadState -p ActiveState -p SubState -p FragmentPath -p UnitFileState -p ExecMainStartTimestamp --no-pager 2>/dev/null || true
+enabled-runtime
+
+active
+
+ExecMainStartTimestamp=Tue 2023-08-22 05:11:46 CST
+
+Id=serial-getty@ttyS0.service
+
+Names=serial-getty@ttyS0.service
+
+LoadState=loaded
+
+ActiveState=active
+
+SubState=running
+
+FragmentPath=/lib/systemd/system/serial-getty@.service
+
+UnitFileState=enabled-runtime
+
+===== systemd getty symlinks =====
+ls -la /etc/systemd/system/getty.target.wants /etc/systemd/system/serial-getty.target.wants /lib/systemd/system/serial-getty@.service /lib/systemd/system/getty@.service 2>/dev/null || true
+-rw-r--r-- 1 root root 1966 Aug 22 05:11 /lib/systemd/system/getty@.service
+
+-rw-r--r-- 1 root root 1544 Nov 20  2024 /lib/systemd/system/serial-getty@.service
+
+
+
+/etc/systemd/system/getty.target.wants:
+
+total 8
+
+drwxr-xr-x  2 root root 4096 Oct 19  2023 .
+
+drwxr-xr-x 12 root root 4096 Dec  5  2024 ..
+
+lrwxrwxrwx  1 root root   34 Oct 19  2023 getty@tty1.service -> /lib/systemd/system/getty@.service
+
+===== getty processes =====
+ps -ef | grep -E "[a]getty|[g]etty|ttyS|ttyAMA" || true
+root        2272       1  0 05:11 tty1     00:00:00 /sbin/agetty -o -p -- \u --noclear tty1 linux
+
+root        2273       1  0 05:11 ttyS0    00:00:00 /bin/login -f
+
+root        2302    2273  0 05:11 ttyS0    00:00:00 -bash
+
+root       22671    2224  0 06:30 pts/0    00:00:00 /bin/sh -c ps -ef | grep -E "[a]getty|[g]etty|ttyS|ttyAMA" || true
+
+root       22674   22671  0 06:30 pts/0    00:00:00 grep -E [a]getty|[g]etty|ttyS|ttyAMA
+
+===== dmesg serial excerpts =====
+dmesg 2>/dev/null | grep -Ei "ttyS|console|uart|serial|getty" | head -120 || true
+[    0.000000] earlycon: uart8250 at MMIO32 0x0000000004880000 (options '')
+
+[    0.000000] bootconsole [uart8250] enabled
+
+[    0.000000] Kernel command line: mem=1024M console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000 board_id=0,boot_reason=0x0 initcall_debug=0 quiet loglevel=0 usbcore.autosuspend=-1 root=/dev/mmcblk0p16 rootfstype=ext4 rw rootwait blkdevparts=mmcblk0:768K(spl),512K(ddrinit),256K(atf),256K(atf_b),1536K(uboot),1536K(uboot_b),1024K(env),6144K(logo),6144K(logo_b),1024K(optee),1024K(optee_b),1024K(dtb),1024K(dtb_b),262144K(kernel),262144K(kernel_b),29889536K(ubuntu_rootfs)
+
+[    0.001553] Console: colour dummy device 80x25
+
+[    0.225996] console [pstore-1] enabled
+
+[    0.304372] Serial: 8250/16550 driver, 6 ports, IRQ sharing enabled
+
+[    0.306215] console [ttyS0] disabled
+
+[    0.306244] 4880000.ax_uart: ttyS0 at MMIO 0x4880000 (irq = 5, base_baud = 13000000) is a 16550A
+
+[    0.306267] console [ttyS0] enabled
+
+[    0.306270] bootconsole [uart8250] disabled
+
+[    0.307017] 4881000.ax_uart: ttyS1 at MMIO 0x4881000 (irq = 6, base_baud = 13000000) is a 16550A
+
+[    0.322452] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+
+[    0.322463] usb usb1: SerialNumber: xhci-hcd.1.auto
+
+[    0.323273] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+
+[    0.323284] usb usb2: SerialNumber: xhci-hcd.1.auto
+
+[    0.324259] usbcore: registered new interface driver usbserial_generic
+
+[    0.324277] usbserial: USB Serial support registered for generic
+
+[    0.450811] ax-apb-uart 4880000.ax_uart: forbid DMA for kernel console
+
+[    1.254936] systemd[1]: Created slice Slice /system/getty.
+
+[    1.258713] systemd[1]: Created slice Slice /system/serial-getty.
+
+[    1.260437] systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+
+[    3.699341] ax-apb-uart 4881000.ax_uart: failed to request DMA
+
+===== device-tree chosen and aliases =====
+for p in /proc/device-tree/chosen/stdout-path /proc/device-tree/chosen/bootargs /proc/device-tree/aliases/serial0 /proc/device-tree/aliases/serial1 /proc/device-tree/aliases/uart0 /proc/device-tree/aliases/uart1; do [ -e "$p" ] || continue; echo "FILE $p"; tr "\000" "\n" < "$p" 2>/dev/null; echo; done
+FILE /proc/device-tree/chosen/bootargs
+
+mem=1024M console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000 board_id=0,boot_reason=0x0 initcall_debug=0 quiet loglevel=0 usbcore.autosuspend=-1 root=/dev/mmcblk0p16 rootfstype=ext4 rw rootwait blkdevparts=mmcblk0:768K(spl),512K(ddrinit),256K(atf),256K(atf_b),1536K(uboot),1536K(uboot_b),1024K(env),6144K(logo),6144K(logo_b),1024K(optee),1024K(optee_b),1024K(dtb),1024K(dtb_b),262144K(kernel),262144K(kernel_b),29889536K(ubuntu_rootfs)
+
+
+
+FILE /proc/device-tree/aliases/serial0
+
+/soc/ax_uart@4880000
+
+
+
+FILE /proc/device-tree/aliases/serial1
+
+/soc/ax_uart@4881000
+
+===== device-tree uart paths =====
+find /proc/device-tree -maxdepth 6 \( -iname "*serial*" -o -iname "*uart*" \) -print 2>/dev/null | head -160
+
+
+===== device-tree uart node details =====
+for d in $(find /proc/device-tree -maxdepth 6 -type d \( -iname "*serial*" -o -iname "*uart*" \) 2>/dev/null | head -40); do echo "NODE $d"; for f in name compatible status pinctrl-names; do [ -f "$d/$f" ] && { printf "  %s: " "$f"; tr "\000" " " < "$d/$f"; echo; }; done; [ -f "$d/reg" ] && { printf "  reg(hex): "; od -An -tx4 "$d/reg" 2>/dev/null; }; done
+
+
+===== boot files =====
+find /boot -maxdepth 3 \( -type f -o -type l \) -print 2>/dev/null | sed -n "1,120p"
+
+
+===== targeted tty references =====
+grep -R "ttyS0\|serial-getty\|console=tty\|earlycon" /etc/systemd /etc/default /boot 2>/dev/null | head -160 || true
+/etc/systemd/system/getty.target.wants/getty@tty1.service:# that serial gettys are covered by serial-getty@.service, not this

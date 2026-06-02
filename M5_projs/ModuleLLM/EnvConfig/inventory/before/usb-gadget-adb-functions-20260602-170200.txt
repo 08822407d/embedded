@@ -1,0 +1,96 @@
+## Host command: ADB read-only USB gadget function check
+
+Tuesday, June 2, 2026 5:02:00 PM
+
+Risk: read-only sysfs/configfs listing; no USB gadget changes
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+selected serial: axera-ax620e
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## usb gadget tree directories and symlinks
+
+d /sys/kernel/config/usb_gadget/usb_adb -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1 -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/strings -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/strings/0x409 -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/functions -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/functions/ffs.adb -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/os_desc -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/strings -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/strings/0x409 -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/UDC -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bDeviceClass -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bDeviceProtocol -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bDeviceSubClass -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bMaxPacketSize0 -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bcdDevice -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/bcdUSB -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/MaxPower -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/bmAttributes -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/idProduct -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/idVendor -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/os_desc/b_vendor_code -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/os_desc/qw_sign -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/os_desc/use -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/manufacturer -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/product -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/strings/0x409/serialnumber -> 
+
+l /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/ffs.adb -> ../../../../usb_gadget/usb_adb/functions/ffs.adb
+
+## functions
+
+d /sys/kernel/config/usb_gadget/usb_adb/functions -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/functions/ffs.adb -> 
+
+## config c.1 entries
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1 -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/strings -> 
+
+d /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/strings/0x409 -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/MaxPower -> 
+
+f /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/bmAttributes -> 
+
+l /sys/kernel/config/usb_gadget/usb_adb/configs/c.1/ffs.adb -> ../../../../usb_gadget/usb_adb/functions/ffs.adb
+
+## loaded usb/network modules if lsmod exists
+
+lsmod not available or no matches
+
+

@@ -1,0 +1,251 @@
+## Host command: ADB preflight + device toolchain check
+
+Tuesday, June 2, 2026 4:55:52 PM
+
+Risk: read-only package/command/version checks; no apt install/update; no device config changes
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+
+## adb version
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Running on Windows 10.0.19045
+
+## adb start-server
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## selected serial
+
+
+## ADB shell: toolchain package and command check
+## date
+
+Tue Aug 22 05:41:15 CST 2023
+
+## host
+
+m5stack-LLM
+
+Linux m5stack-LLM 4.19.125 #1 SMP PREEMPT Wed Nov 20 14:43:36 CST 2024 aarch64 aarch64 aarch64 GNU/Linux
+
+PRETTY_NAME="Ubuntu 22.04 LTS"
+
+NAME="Ubuntu"
+
+VERSION_ID="22.04"
+
+VERSION="22.04 (Jammy Jellyfish)"
+
+VERSION_CODENAME=jammy
+
+ID=ubuntu
+
+ID_LIKE=debian
+
+HOME_URL="https://www.ubuntu.com/"
+
+SUPPORT_URL="https://help.ubuntu.com/"
+
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+
+UBUNTU_CODENAME=jammy
+
+## dpkg package status
+
+		
+
+		
+
+		
+
+		
+
+		
+
+		
+
+		
+
+		
+
+		
+
+gdbserver	not-installed	-
+
+cmake	not-installed	-
+
+ninja-build	not-installed	-
+
+pkg-config	not-installed	-
+
+## command availability
+
+cc	/usr/bin/cc
+
+c++	/usr/bin/c++
+
+gcc	/usr/bin/gcc
+
+g++	/usr/bin/g++
+
+make	/usr/bin/make
+
+ld	/usr/bin/ld
+
+as	/usr/bin/as
+
+ar	/usr/bin/ar
+
+ranlib	/usr/bin/ranlib
+
+strip	/usr/bin/strip
+
+objcopy	/usr/bin/objcopy
+
+objdump	/usr/bin/objdump
+
+readelf	/usr/bin/readelf
+
+addr2line	/usr/bin/addr2line
+
+nm	/usr/bin/nm
+
+size	/usr/bin/size
+
+strings	/usr/bin/strings
+
+gdb	/usr/bin/gdb
+
+gdbserver	NOT_FOUND
+
+cmake	NOT_FOUND
+
+ninja	NOT_FOUND
+
+pkg-config	NOT_FOUND
+
+## command versions
+
+### cc
+
+cc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+
+Copyright (C) 2021 Free Software Foundation, Inc.
+
+This is free software; see the source for copying conditions.  There is NO
+
+### c++
+
+c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+
+Copyright (C) 2021 Free Software Foundation, Inc.
+
+This is free software; see the source for copying conditions.  There is NO
+
+### gcc
+
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+
+Copyright (C) 2021 Free Software Foundation, Inc.
+
+This is free software; see the source for copying conditions.  There is NO
+
+### g++
+
+g++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+
+Copyright (C) 2021 Free Software Foundation, Inc.
+
+This is free software; see the source for copying conditions.  There is NO
+
+### make
+
+GNU Make 4.3
+
+Built for aarch64-unknown-linux-gnu
+
+Copyright (C) 1988-2020 Free Software Foundation, Inc.
+
+### ld
+
+GNU ld (GNU Binutils for Ubuntu) 2.38
+
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+This program is free software; you may redistribute it under the terms of
+
+### as
+
+GNU assembler (GNU Binutils for Ubuntu) 2.38
+
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+This program is free software; you may redistribute it under the terms of
+
+### ar
+
+GNU ar (GNU Binutils for Ubuntu) 2.38
+
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+This program is free software; you may redistribute it under the terms of
+
+### objdump
+
+GNU objdump (GNU Binutils for Ubuntu) 2.38
+
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+This program is free software; you may redistribute it under the terms of
+
+### readelf
+
+GNU readelf (GNU Binutils for Ubuntu) 2.38
+
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+This program is free software; you may redistribute it under the terms of
+
+### gdb
+
+GNU gdb (GDB) 9.2
+
+Copyright (C) 2020 Free Software Foundation, Inc.
+
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+
+## default compiler target/details
+
+aarch64-linux-gnu
+
+11
+
+aarch64-linux-gnu
+
+11
+
+## relevant installed package grep
+
+ii  binutils                                                  2.38-4ubuntu2.6                         arm64        GNU assembler, linker and binary utilities
+
+ii  binutils-aarch64-linux-gnu                                2.38-4ubuntu2.6                         arm64        GNU binary utilities, for aarch64-linux-gnu target
+
+ii  build-essential                                           12.9ubuntu3                             arm64        Informational list of build-essential packages
+
+ii  dpkg-dev                                                  1.21.1ubuntu2.3                         all          Debian package development tools
+
+ii  g++                                                       4:11.2.0-1ubuntu1                       arm64        GNU C++ compiler
+
+ii  gcc                                                       4:11.2.0-1ubuntu1                       arm64        GNU C compiler
+
+ii  libc6-dev:arm64                                           2.35-0ubuntu3.8                         arm64        GNU C Library: Development Libraries and Header Files
+
+ii  make                                                      4.3-4.1build1                           arm64        utility for directing compilation
+
+

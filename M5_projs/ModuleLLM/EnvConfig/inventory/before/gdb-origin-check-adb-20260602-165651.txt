@@ -1,0 +1,80 @@
+## Host command: ADB read-only gdb origin check
+
+Tuesday, June 2, 2026 4:56:51 PM
+
+Risk: read-only file/package metadata checks
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+selected serial: axera-ax620e
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## gdb path metadata
+
+/usr/bin/gdb
+
+-rwxrwxr-x 1 root root 7527744 Nov 20  2024 /usr/bin/gdb
+
+/usr/bin/gdb
+
+## dpkg ownership
+
+## dpkg-query variants
+
+gdb	unknown ok not-installed	
+
+## gdb version/config head
+
+GNU gdb (GDB) 9.2
+
+Copyright (C) 2020 Free Software Foundation, Inc.
+
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+
+This is free software: you are free to change and redistribute it.
+
+There is NO WARRANTY, to the extent permitted by law.
+
+This GDB was configured as follows:
+
+   configure --host=aarch64-none-linux-gnu --target=aarch64-none-linux-gnu
+
+             --with-auto-load-dir=$debugdir:$datadir/auto-load
+
+             --with-auto-load-safe-path=$debugdir:$datadir/auto-load
+
+             --without-expat
+
+             --with-gdb-datadir=/home/lihua/projects/tools/memtool/core_analyzer/install/share/gdb (relocatable)
+
+             --with-jit-reader-dir=/home/lihua/projects/tools/memtool/core_analyzer/install/lib/gdb (relocatable)
+
+             --without-libunwind-ia64
+
+             --without-lzma
+
+             --without-babeltrace
+
+		             --without-intel-pt
+
+             --without-mpfr
+
+             --without-xxhash
+
+             --without-python
+
+             --without-guile
+
+             --disable-source-highlight
+
+             --with-separate-debug-dir=/home/lihua/projects/tools/memtool/core_analyzer/install/lib/debug (relocatable)
+
+
+
+("Relocatable" means the directory can be moved with the GDB installation
+
+tree, and GDB will still find it.)
+
+

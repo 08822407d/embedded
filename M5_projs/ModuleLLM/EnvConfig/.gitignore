@@ -1,0 +1,16 @@
+# local/private
+.env
+*.key
+*.pem
+id_rsa*
+secrets/
+credentials/
+
+# transient logs
+*.log
+tmp/
+
+# keep inventory/backups directory but ignore huge raw archives by default
+backups/*.axp
+backups/*.img
+backups/*.bin

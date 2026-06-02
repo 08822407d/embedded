@@ -1,0 +1,16 @@
+Host: 
+Timestamp: 20260602-173920
+ADB: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+
+adb version:
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Running on Windows 10.0.19045
+
+adb start-server:
+
+
+adb devices -l:
+List of devices attached
+axera-ax620e           device product:occam model:Nexus_4 device:mako transport_id:1

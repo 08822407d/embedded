@@ -1,0 +1,106 @@
+ADB serial: axera-ax620e
+Timestamp: 20260602-174558
+
+===== soc uart node names =====
+ls -la /proc/device-tree/soc | grep -Ei "uart|serial" || true
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@4880000
+
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@4881000
+
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@4882000
+
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@6080000
+
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@6081000
+
+drwxr-xr-x   2 root root  0 Aug 22 06:31 ax_uart@6082000
+
+===== uart node details =====
+for d in /proc/device-tree/soc/ax_uart@4880000 /proc/device-tree/soc/ax_uart@4881000; do [ -d "$d" ] || continue; echo "NODE $d"; for f in name compatible status clock-frequency pinctrl-names; do [ -f "$d/$f" ] && { printf "  %s: " "$f"; tr "\000" " " < "$d/$f"; echo; }; done; for f in reg interrupts pinctrl-0 clocks; do [ -f "$d/$f" ] && { printf "  %s(hex): " "$f"; od -An -tx4 "$d/$f" 2>/dev/null; }; done; done
+NODE /proc/device-tree/soc/ax_uart@4880000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: okay 
+
+  clock-frequency: e� 
+
+  reg(hex):  00000000 00008804 00000000 00040000
+
+  interrupts(hex):  00000000 76000000 04000000
+
+NODE /proc/device-tree/soc/ax_uart@4881000
+
+  name: ax_uart 
+
+  compatible: axera,ax-apb-uart 
+
+  status: okay 
+
+  clock-frequency: e� 
+
+  reg(hex):  00000000 00108804 00000000 00040000
+
+  interrupts(hex):  00000000 77000000 04000000
+
+===== aliases =====
+for p in /proc/device-tree/aliases/*; do [ -f "$p" ] || continue; b=$(basename "$p"); case "$b" in serial*|uart*) printf "%s=" "$b"; tr "\000" " " < "$p"; echo;; esac; done
+serial0=/soc/ax_uart@4880000 
+
+serial1=/soc/ax_uart@4881000 
+
+serial2=/soc/ax_uart@4882000 
+
+serial3=/soc/ax_uart@6080000 
+
+serial4=/soc/ax_uart@6081000 
+
+serial5=/soc/ax_uart@6082000
+
+===== device-tree symbols uart =====
+if [ -d /proc/device-tree/__symbols__ ]; then for p in /proc/device-tree/__symbols__/*uart* /proc/device-tree/__symbols__/*serial*; do [ -f "$p" ] || continue; printf "%s=" "$(basename "$p")"; tr "\000" " " < "$p"; echo; done; else echo "no __symbols__"; fi
+no __symbols__
+
+===== pinctrl related paths =====
+find /proc/device-tree -maxdepth 6 -type d | grep -Ei "pin|mux|gpio|uart" | head -200 || true
+
+
+===== sysfs platform uart attributes =====
+for d in /sys/devices/platform/soc/4880000.ax_uart /sys/devices/platform/soc/4881000.ax_uart; do [ -d "$d" ] || continue; echo "NODE $d"; find "$d" -maxdepth 2 -type f -printf "%p\n" 2>/dev/null | sed -n "1,80p"; done
+NODE /sys/devices/platform/soc/4880000.ax_uart
+
+/sys/devices/platform/soc/4880000.ax_uart/uevent
+
+/sys/devices/platform/soc/4880000.ax_uart/power/runtime_active_time
+
+/sys/devices/platform/soc/4880000.ax_uart/power/runtime_status
+
+/sys/devices/platform/soc/4880000.ax_uart/power/autosuspend_delay_ms
+
+/sys/devices/platform/soc/4880000.ax_uart/power/runtime_suspended_time
+
+/sys/devices/platform/soc/4880000.ax_uart/power/control
+
+/sys/devices/platform/soc/4880000.ax_uart/driver_override
+
+/sys/devices/platform/soc/4880000.ax_uart/modalias
+
+NODE /sys/devices/platform/soc/4881000.ax_uart
+
+/sys/devices/platform/soc/4881000.ax_uart/uevent
+
+/sys/devices/platform/soc/4881000.ax_uart/power/runtime_active_time
+
+/sys/devices/platform/soc/4881000.ax_uart/power/runtime_status
+
+/sys/devices/platform/soc/4881000.ax_uart/power/autosuspend_delay_ms
+
+/sys/devices/platform/soc/4881000.ax_uart/power/runtime_suspended_time
+
+/sys/devices/platform/soc/4881000.ax_uart/power/control
+
+/sys/devices/platform/soc/4881000.ax_uart/driver_override
+
+/sys/devices/platform/soc/4881000.ax_uart/modalias
