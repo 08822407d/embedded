@@ -1,0 +1,11 @@
+#pragma once
+
+#define USB_DEBUG_BAUD 115200
+
+#define LOGIN_UART_BAUD 115200
+#define LOGIN_UART_RX_PIN 38
+#define LOGIN_UART_TX_PIN 37
+
+#define SCREEN_ROTATION 1
+#define TERMINAL_TEXT_SIZE 2
+#define STATUS_BAR_HEIGHT 32
