@@ -122,6 +122,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\host_check.ps1
 - 至少一个目标设备显示为 `device` 状态；若没有，则停止。
 - 多个设备时必须显式选择 serial。
 
+Linux 若出现 `no permissions`：
+
+```bash
+id
+lsusb -d 32c9:2003
+adb devices -l
+stat -c '%A %U %G %a %n' /dev/bus/usb/<BUS>/<DEV>
+grep -RIn '32c9\|axera\|2003' /etc/udev/rules.d /usr/lib/udev/rules.d
+```
+
+本项目为 M5Stack/AXERA `32c9:2003` ADB 设备准备了 Host 侧修复脚本：
+
+```bash
+bash scripts/fix_m5stack_adb_udev.sh
+APPLY=1 bash scripts/fix_m5stack_adb_udev.sh
+adb kill-server
+adb start-server
+adb devices -l
+```
+
+该脚本默认 dry-run；`APPLY=1` 会写入 Host 侧 `/etc/udev/rules.d/51-m5stack-axera-adb.rules`，需要 sudo。它不修改 Module LLM 设备系统。
+
 ## 3. ADB 设备选择规则
 
 ### 单设备
@@ -215,7 +237,14 @@ adb devices -l
 默认密码：123456
 ```
 
-首次配置后应修改默认密码，但不要把新密码写入仓库。
+官方默认密码信息只用于需要密码登录的路径；不要把新密码写入仓库。
+
+当前现场状态（2026-06-02）：
+
+- `ttyS0` / `DBG_TXD/DBG_RXD` 保留为默认系统 Log/调试登录路径。
+- M5-Bus UART `/dev/ttyS1` 已按用户目标改作额外运行期实体终端登录口。
+- `ttyS1` 当前使用 `--autologin root`，不需要输入账号/密码；外部终端接入后应直接得到 root shell。
+- 为释放 `ttyS1`，`llm-sys.service` 已 mask/inactive；M5-Bus StackFlow/JSON API 通信不可用，回滚见 `scripts/enable_m5bus_uart_login_adb.sh`。
 
 针对“外部独立终端设备”的检查顺序：
 
@@ -223,7 +252,8 @@ adb devices -l
 2. 确认外部终端板侧 UART：3.3V TTL、电平兼容、TX/RX 交叉、公共 GND、无硬件流控。
 3. 确认外部终端板的软件：能运行串口终端程序，把键盘输入发到 UART，把 UART 输出显示到屏幕。
 4. 确认 Module LLM 侧服务：`console=ttyS0,115200n8`、`serial-getty@ttyS0.service` active/running。
-5. 若用户想改到其他 UART，先查 `CFG-SERIAL-LOGIN-001`；区分“额外启用 getty”和“迁移 kernel console/earlycon”，后者属于高风险。
+5. 若目标是 M5-Bus UART 实体终端，查 `CFG-M5BUS-UART-LOGIN-001`，确认 `serial-getty@ttyS1.service` active/running 且 `llm-sys.service` masked/inactive。
+6. 若用户想把 M5-Bus UART 改成账号/密码登录，不要记录密码；先把 ttyS1 drop-in 中的 `--autologin root` 去掉，再验证 root 密码和恢复路径。
 
 ## 6. SSH 接入
 
@@ -368,3 +398,32 @@ dd if=* of=/dev/mmcblk0*
 ```
 
 若必须做镜像底包更新，另开高风险任务，使用官方 Windows 烧录工具路径，并先写恢复计划。
+
+## 12. SoC 温度读取
+
+风险等级：只读。
+
+当前已验证温度节点：
+
+```text
+/sys/class/thermal/thermal_zone0/type = soc_thm
+/sys/class/thermal/thermal_zone0/temp = 毫摄氏度
+```
+
+Host 侧通过 ADB 持续读取：
+
+```bash
+bash scripts/read_soc_temp_adb.sh
+```
+
+默认每 5 秒读取一次并持续运行。短测三次：
+
+```bash
+COUNT=3 INTERVAL=5 bash scripts/read_soc_temp_adb.sh
+```
+
+输出示例：
+
+```text
+2023-08-22 06:00:06 zone=/sys/class/thermal/thermal_zone0 type=soc_thm raw=42350 temp=42.350 C
+```

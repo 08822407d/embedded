@@ -25,7 +25,9 @@ https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1131/K144_Sch_Module13.2_LLM_MA
 - 支持 ADB 调试。
 - 官方称内置 Ubuntu 系统。
 - Type-C / RJ45 / FPC-8P / M5-Bus / HT3.96*9P 等接口和 Mate 板相关。
-- 2026-06-02 复核：产品页 M5-Bus 表中 Module LLM 的串口相关信号标为 `TRM_TXD(NT)` / `TRM_RXD(NT)`，`NT` 引脚可通过引脚切换方式适配不同主控。
+- 2026-06-02 复核：Module LLM Kit 产品页 M5-Bus 表中 Module LLM 的串口相关信号标为 `TRM_TXD(NT)` / `TRM_RXD(NT)`，`NT` 引脚可通过引脚切换方式适配不同主控。
+- 2026-06-02 复核：Module LLM Kit 产品页 M5-Bus 表显示 Module LLM 的 I2C 为 `SoC_SCL` 在 pin 17、`SoC_SDA` 在 pin 18；Module13.2 LLM Mate 表显示 `SCL` 在 pin 17、`SDA` 在 pin 18。该方向与标准 M5-Bus / CoreS3 / Fan v1.1 的 `SDA` pin 17、`SCL` pin 18 相反。
+- 2026-06-02 注意：M5Stack 官方不同页面/原理图之间存在不一致。Module LLM Kit 页面显示 17/18 反向；Module LLM 单品页和部分原理图文本提取显示 `G21/SYS_SDA` pin 17、`G22/SYS_SCL` pin 18。当前实机叠插 Fan v1.1 后 `0x18` 不应答，支持“默认叠插未形成可用 I2C”这一现场判断。
 - 2026-06-02 复核：Module LLM 原理图中 `DBG_TXD/DBG_RXD` 与 `TRM_TXD/TRM_RXD` 分属不同信号；`DBG_TXD/DBG_RXD` 接到 FPC-8P 调试/系统 Log 路径，`TRM_TXD/TRM_RXD` 接到 M5-Bus 可切换通信引脚。
 - 2026-06-02 复核：Module LLM 原理图的 AX630C UART 区域同时标出 `UART0_RXD/UART0_TXD`、`UART1_RXD/UART1_TXD` 以及 `DBG_TXD/DBG_RXD`、`TRM_TXD/TRM_RXD`；结合 ADB 实测 `serial0=/soc/ax_uart@4880000`、`ttyS0` 为 kernel console，可判断默认 Linux 登录终端走 `DBG_TXD/DBG_RXD` 调试路径。
 - 支持 apt 快速更新软件和模型包。
@@ -64,6 +66,32 @@ https://docs.m5stack.com/zh_CN/stackflow/module_llm/arduino_api
 - `M5ModuleLLM.begin(Stream *targetPort)` 初始化的是 Module LLM UART 接口，`checkConnection()` / `sys.ping` 通过该 UART 检查模块响应。
 - 引脚切换教程明确这组 RX/TX 是“通信引脚”；例如 CoreS3 + Module LLM 默认出厂通信引脚为 G18/G17。
 - 结论：M5-Bus 上 `TRM_TXD/TRM_RXD` / 主控侧 `UART_TX/UART_RX` 是 StackFlow/JSON API 通信用 UART，不是默认 Linux shell 登录终端；系统 Log/调试终端走调试板或 Module13.2 LLM Mate 的系统 Log/调试串口路径。
+
+### Module Fan v1.1
+
+```text
+https://docs.m5stack.com/zh_CN/module/Module%20Fan%20v1.1
+https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1125/M013_v11_Schematic.pdf
+https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1125/Module-FAN_Protol_ZH.pdf
+https://docs.m5stack.com/en/arduino/projects/module/module_fan_v1.1
+```
+
+已提取事实：
+
+- SKU：M013-V11。
+- 内置 MCU：STM32F030F4P6。
+- 通信方式：I2C，默认地址 `0x18`。
+- M5-Bus 使用：`SDA` 在 pin 17，`SCL` 在 pin 18，另需电源/地；风扇自身 `FanCtr/PWM` 与 `FG_OUT` 由模块内 STM32 连接和处理，不直接作为 M5-Bus 控制脚给主控。
+- 与 Module LLM Kit M5-Bus I2C 对照：Fan v1.1 是 `SDA` pin 17、`SCL` pin 18；Module LLM Kit 页面显示 LLM/Mate 是 `SCL` pin 17、`SDA` pin 18，正好相反。未改焊盘/未用转接时，Fan 叠插在 LLM Kit 上很可能无法通过默认 M5-Bus I2C 通信；这可解释实机 `0x18` 不应答。
+- 与 Module LLM M5-Bus UART 对照：这仍不属于 UART 脚冲突；问题是 I2C 的 SDA/SCL 位置疑似相反。UART `TRM_TXD/TRM_RXD` 仍在独立的 `NT` 引脚组。
+- I2C 协议寄存器：
+  - `0x00` R/W：风扇工作状态，`0` 停止，`1` 工作。
+  - `0x10` R/W：PWM 频率，`0=1kHz`、`1=12kHz`、`2=24kHz`、`3=48kHz`。
+  - `0x20` R/W：PWM 占空比，`0~100`。
+  - `0x30` R：风扇 RPM，低字节/高字节。
+  - `0x40` R：风扇 FG 信号频率，低字节/高字节。
+  - `0xF0` 写回 Flash/固件版本/地址相关寄存器；避免频繁写 Flash。
+- Arduino 示例通过库函数 `setPWMDutyCycle()`、`setPWMFrequency()`、`setStatus()` 控制转速/启停，并用 `getRPM()` 读取转速；示例中的 CoreS3 GPIO 不应直接套用到 AX630C Linux。
 
 ### 软件包更新
 

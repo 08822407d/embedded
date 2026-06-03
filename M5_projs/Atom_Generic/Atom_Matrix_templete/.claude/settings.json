@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pio run *)",
+      "Bash(~/.platformio/penv/bin/pio run *)",
+      "Bash(python3 tools/*)",
+      "Bash(python3 - *)",
+      "Bash(python3 -)",
+      "Bash(python3 -c *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(cat tools/*)",
+      "Bash(awk *)",
+      "Bash(fuser /dev/ttyUSB0*)",
+      "Bash(pkill -f serial_bridge.py)",
+      "Bash(pkill -9 -f serial_bridge.py)",
+      "Bash(kill -9 *)"
+    ]
+  }
+}

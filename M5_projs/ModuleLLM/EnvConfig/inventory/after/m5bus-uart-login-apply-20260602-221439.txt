@@ -1,0 +1,230 @@
+ADB serial: axera-ax620e
+MODE=enable APPLY=1
+set -eu
+
+backup_dir="/root/m5bus-uart-login-backup-${HOST_TS}"
+override_dir="/etc/systemd/system/serial-getty@ttyS1.service.d"
+override_file="${override_dir}/override.conf"
+
+snapshot() {
+  {
+    echo "## timestamp"
+    date
+    echo
+    echo "## cmdline"
+    cat /proc/cmdline 2>/dev/null || true
+    echo
+    echo "## serial driver"
+    cat /proc/tty/driver/serial 2>/dev/null || true
+    echo
+    echo "## systemd"
+    systemctl show llm-sys.service serial-getty@ttyS1.service \
+      -p LoadState -p ActiveState -p SubState -p UnitFileState -p FragmentPath \
+      --no-pager 2>/dev/null || true
+    echo
+    echo "## ttyS1 users"
+    for fd in /proc/[0-9]*/fd/*; do
+      target=$(readlink "$fd" 2>/dev/null) || continue
+      [ "$target" = "/dev/ttyS1" ] || continue
+      pid=${fd#/proc/}; pid=${pid%%/*}
+      cmd=$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+      printf 'pid=%s fd=%s target=%s cmd=%s\n' "$pid" "${fd##*/}" "$target" "$cmd"
+    done
+    echo
+    echo "## existing ttyS1 override"
+    if [ -f "$override_file" ]; then
+      cat "$override_file"
+    else
+      echo "<none>"
+    fi
+  }
+}
+
+if [ "$MODE" = "status" ]; then
+  snapshot
+  exit 0
+fi
+
+if [ "$APPLY" != "1" ]; then
+  echo "DRY-RUN: would save snapshot to $backup_dir"
+  if [ "$MODE" = "enable" ]; then
+    echo "DRY-RUN: would stop and disable llm-sys.service"
+    echo "DRY-RUN: would write $override_file for 115200 ttyS1 autologin root"
+    echo "DRY-RUN: would enable and restart serial-getty@ttyS1.service"
+  else
+    echo "DRY-RUN: would disable serial-getty@ttyS1.service"
+    echo "DRY-RUN: would restore llm-sys.service"
+  fi
+  snapshot
+  exit 0
+fi
+
+mkdir -p "$backup_dir"
+snapshot > "${backup_dir}/before.txt"
+
+if [ -f "$override_file" ]; then
+  cp -a "$override_file" "${backup_dir}/override.conf.before"
+fi
+
+if [ "$MODE" = "enable" ]; then
+  systemctl stop llm-sys.service
+  systemctl disable llm-sys.service
+
+  mkdir -p "$override_dir"
+  cat > "$override_file" <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+EOF
+
+  systemctl daemon-reload
+  systemctl enable serial-getty@ttyS1.service
+  systemctl restart serial-getty@ttyS1.service
+else
+  systemctl disable --now serial-getty@ttyS1.service || true
+  systemctl enable llm-sys.service
+  systemctl restart llm-sys.service
+fi
+
+sleep 1
+snapshot > "${backup_dir}/after.txt"
+cat "${backup_dir}/after.txt"
+echo
+echo "Backup: $backup_dir"
+[?2004hsh-5.1# set -eu
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# backup_dir="/root/m5bus-uart-login-backup-${HOST_TS}"
+[?2004l[?2004hsh-5.1# override_dir="/etc/systemd/system/serial-getty@ttyS1.service.d"
+[?2004l[?2004hsh-5.1# override_file="${override_dir}/override.conf"
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# snapshot() {
+[?2004l[?2004h>   {
+[?2004l[?2004h>     echo "## timestamp"
+[?2004l[?2004h>     date
+[?2004l[?2004h>     echo
+[?2004l[?2004h>     echo "## cmdline"
+[?2004l[?2004h>     cat /proc/cmdline 2>/dev/null || true
+[?2004l[?2004h>     echo
+[?2004l[?2004h>     echo "## serial driver"
+[?2004l[?2004h>     cat /proc/tty/driver/serial 2>/dev/null || true
+[?2004l[?2004h>     echo
+[?2004l[?2004h>     echo "## systemd"
+[?2004l[?2004h>     systemctl show llm-sys.service serial-getty@ttyS1.service \
+[?2004l[?2004h>       -p LoadState -p ActiveState -p SubState -p UnitFileState -p FragmentPath \
+[?2004l[?2004h>       --no-pager 2>/dev/null || true
+[?2004l[?2004h>     echo
+[?2004l[?2004h>     echo "## ttyS1 users"
+[?2004l[?2004h>     for fd in /proc/[0-9]*/fd/*; do
+[?2004l[?2004h>       target=$(readlink "$fd" 2>/dev/null) || continue
+[?2004l[?2004h>       [ "$target" = "/dev/ttyS1" ] || continue
+[?2004l[?2004h>       pid=${fd#/proc/}; pid=${pid%%/*}
+[?2004l[?2004h>       cmd=$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+[?2004l[?2004h>       printf 'pid=%s fd=%s target=%s cmd=%s\n' "$pid" "${fd##*/}" "$target" "$cmd"
+[?2004l[?2004h>     done
+[?2004l[?2004h>     echo
+[?2004l[?2004h>     echo "## existing ttyS1 override"
+[?2004l[?2004h>     if [ -f "$override_file" ]; then
+[?2004l[?2004h>       cat "$override_file"
+[?2004l[?2004h>     else
+[?2004l[?2004h>       echo "<none>"
+[?2004l[?2004h>     fi
+[?2004l[?2004h>   }
+[?2004l[?2004h> }
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# if [ "$MODE" = "status" ]; then
+[?2004l[?2004h>   snapshot
+[?2004l[?2004h>   exit 0
+[?2004l[?2004h> fi
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# if [ "$APPLY" != "1" ]; then
+[?2004l[?2004h>   echo "DRY-RUN: would save snapshot to $backup_dir"
+[?2004l[?2004h>   if [ "$MODE" = "enable" ]; then
+[?2004l[?2004h>     echo "DRY-RUN: would stop and disable llm-sys.service"
+[?2004l[?2004h>     echo "DRY-RUN: would write $override_file for 115200 ttyS1 autologin root" [A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[K"
+[?2004l[?2004h>     echo "DRY-RUN: would enable and restart serial-getty@ttyS1.service"
+[?2004l[?2004h>   else
+[?2004l[?2004h>     echo "DRY-RUN: would disable serial-getty@ttyS1.service"
+[?2004l[?2004h>     echo "DRY-RUN: would restore llm-sys.service"
+[?2004l[?2004h>   fi
+[?2004l[?2004h>   snapshot
+[?2004l[?2004h>   exit 0
+[?2004l[?2004h> fi
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# mkdir -p "$backup_dir"
+[?2004l[?2004hsh-5.1# snapshot > "${backup_dir}/before.txt"
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# if [ -f "$override_file" ]; then
+[?2004l[?2004h>   cp -a "$override_file" "${backup_dir}/override.conf.before"
+[?2004l[?2004h> fi
+[?2004l[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# if [ "$MODE" = "enable" ]; then
+[?2004l[?2004h>   systemctl stop llm-sys.service
+[?2004l[?2004h>   systemctl disable llm-sys.service
+[?2004l[?2004h> 
+[?2004l[?2004h>   mkdir -p "$override_dir"
+[?2004l[?2004h>   cat > "$override_file" <<'EOF'
+[?2004l[?2004h> [Service]
+[?2004l[?2004h> ExecStart=
+[?2004l[?2004h> ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+[?2004l[?2004h> EOF
+[?2004l[?2004h> 
+[?2004l[?2004h>   systemctl daemon-reload
+[?2004l[?2004h>   systemctl enable serial-getty@ttyS1.service
+[?2004l[?2004h>   systemctl restart serial-getty@ttyS1.service
+[?2004l[?2004h> else
+[?2004l[?2004h>   systemctl disable --now serial-getty@ttyS1.service || true
+[?2004l[?2004h>   systemctl enable llm-sys.service
+[?2004l[?2004h>   systemctl restart llm-sys.service
+[?2004l[?2004h> fi
+[?2004lRemoved /etc/systemd/system/multi-user.target.wants/llm-sys.service.
+Created symlink /etc/systemd/system/getty.target.wants/serial-getty@ttyS1.service → /lib/systemd/system/serial-getty@.service.
+[?2004hsh-5.1# 
+[?2004l[?2004hsh-5.1# sleep 1
+[?2004l[?2004hsh-5.1# snapshot > "${backup_dir}/after.txt"
+[?2004l[?2004hsh-5.1# cat "${backup_dir}/after.txt"
+[?2004l## timestamp
+Tue Aug 22 05:42:34 CST 2023
+
+## cmdline
+mem=1024M console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000 board_id=0,boot_reason=0x0 initcall_debug=0 quiet loglevel=0 usbcore.autosuspend=-1 root=/dev/mmcblk0p16 rootfstype=ext4 rw rootwait blkdevparts=mmcblk0:768K(spl),512K(ddrinit),256K(atf),256K(atf_b),1536K(uboot),1536K(uboot_b),1024K(env),6144K(logo),6144K(logo_b),1024K(optee),1024K(optee_b),1024K(dtb),1024K(dtb_b),262144K(kernel),262144K(kernel_b),29889536K(ubuntu_rootfs)
+
+## serial driver
+serinfo:1.0 driver revision:
+0: uart:16550A mmio:0x04880000 irq:5 tx:1289 rx:0 RTS|CTS|DTR
+1: uart:16550A mmio:0x04881000 irq:6 tx:563 rx:0 RTS|CTS|DTR
+2: uart:unknown port:00000000 irq:0
+3: uart:unknown port:00000000 irq:0
+4: uart:unknown port:00000000 irq:0
+5: uart:unknown port:00000000 irq:0
+
+## systemd
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+FragmentPath=/lib/systemd/system/llm-sys.service
+UnitFileState=disabled
+
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+UnitFileState=enabled
+
+## ttyS1 users
+pid=14596 fd=0 target=/dev/ttyS1 cmd=/bin/login -f      
+pid=14596 fd=1 target=/dev/ttyS1 cmd=/bin/login -f      
+pid=14596 fd=2 target=/dev/ttyS1 cmd=/bin/login -f      
+pid=14611 fd=0 target=/dev/ttyS1 cmd=-bash 
+pid=14611 fd=1 target=/dev/ttyS1 cmd=-bash 
+pid=14611 fd=2 target=/dev/ttyS1 cmd=-bash 
+pid=14611 fd=255 target=/dev/ttyS1 cmd=-bash 
+
+## existing ttyS1 override
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+[?2004hsh-5.1# echo
+[?2004l
+[?2004hsh-5.1# echo "Backup: $backup_dir"
+[?2004lBackup: /root/m5bus-uart-login-backup-20260602-221439
+[?2004hsh-5.1# Terminated

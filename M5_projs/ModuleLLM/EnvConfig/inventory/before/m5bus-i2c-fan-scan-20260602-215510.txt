@@ -1,0 +1,91 @@
+## Host timestamp
+Tue Jun  2 21:55:10 CST 2026
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device usb:1-3 product:occam model:Nexus_4 device:mako transport_id:2
+
+
+## device i2c nodes
+crw-rw---- 1 root root 89, 0 Aug 22 05:11 /dev/i2c-0
+crw-rw---- 1 root root 89, 2 Aug 22 05:11 /dev/i2c-2
+crw-rw---- 1 root root 89, 4 Aug 22 05:11 /dev/i2c-4
+i2c-0	i2c       	Synopsys DesignWare I2C adapter 	I2C adapter
+i2c-2	i2c       	Synopsys DesignWare I2C adapter 	I2C adapter
+i2c-4	i2c       	Synopsys DesignWare I2C adapter 	I2C adapter
+
+## targeted fan default address 0x18
+### i2c-0 0x18
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                                                 
+10:                         --                      
+20:                                                 
+30:                                                 
+40:                                                 
+50:                                                 
+60:                                                 
+70:                                                 
+### i2c-2 0x18
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                                                 
+10:                         --                      
+20:                                                 
+30:                                                 
+40:                                                 
+50:                                                 
+60:                                                 
+70:                                                 
+### i2c-4 0x18
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                                                 
+10:                         --                      
+20:                                                 
+30:                                                 
+40:                                                 
+50:                                                 
+60:                                                 
+70:                                                 
+
+## read-mode address scans
+### i2c-0
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: -- -- -- -- -- -- -- --                         
+### i2c-2
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: -- -- -- -- -- -- -- --                         
+### i2c-4
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: UU -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- -- -- -- UU -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: -- -- -- -- -- -- -- --                         
+
+## registered i2c devices
+DEV=/sys/bus/i2c/devices/4-0030 -> /sys/devices/platform/soc/4854000.i2c/i2c-4/4-0030
+name=lp5562
+DEV=/sys/bus/i2c/devices/4-0047 -> /sys/devices/platform/soc/4854000.i2c/i2c-4/4-0047
+name=sgm7220
+DEV=/sys/bus/i2c/devices/i2c-0 -> /sys/devices/platform/soc/4850000.i2c/i2c-0
+name=Synopsys DesignWare I2C adapter
+DEV=/sys/bus/i2c/devices/i2c-2 -> /sys/devices/platform/soc/4852000.i2c/i2c-2
+name=Synopsys DesignWare I2C adapter
+DEV=/sys/bus/i2c/devices/i2c-4 -> /sys/devices/platform/soc/4854000.i2c/i2c-4
+name=Synopsys DesignWare I2C adapter

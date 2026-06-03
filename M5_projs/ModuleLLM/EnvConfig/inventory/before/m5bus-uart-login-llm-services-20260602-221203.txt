@@ -1,0 +1,341 @@
+set +e
+printf '## llm systemd units\n'
+systemctl list-units --all '*llm*' '*m5stack*' --no-pager --plain
+printf '\n## llm unit files\n'
+systemctl list-unit-files '*llm*' '*m5stack*' --no-pager --plain
+printf '\n## unit cat candidates\n'
+for u in llm-sys.service llm_sys.service llm.service m5stack.service stackflow.service; do
+  systemctl cat "$u" 2>/dev/null && printf '\n'
+done
+printf '\n## process details for ttyS1 user\n'
+for pid in $(for fd in /proc/[0-9]*/fd/*; do target=$(readlink "$fd" 2>/dev/null) || continue; [ "$target" = /dev/ttyS1 ] && { p=${fd#/proc/}; echo ${p%%/*}; }; done | sort -u); do
+  printf '### pid %s\n' "$pid"
+  tr '\000' ' ' < "/proc/$pid/cmdline"; printf '\n'
+  cat "/proc/$pid/status" | sed -n '1,40p'
+  printf 'fds:\n'
+  ls -l "/proc/$pid/fd" 2>/dev/null | sed -n '1,80p'
+  printf 'environ filtered:\n'
+  tr '\000' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -Ei 'tty|uart|serial|llm|stack|m5' || true
+  printf '\n'
+done
+printf '\n## m5stack config candidates\n'
+find /opt/m5stack /usr/local/m5stack /etc -maxdepth 4 -type f \( -name '*llm*' -o -name '*stack*' -o -name '*uart*' -o -name '*serial*' -o -name '*.json' -o -name '*.toml' -o -name '*.yaml' -o -name '*.conf' -o -name '*.service' \) 2>/dev/null | sed -n '1,240p'
+[?2004hsh-5.1# set +e
+[?2004l[?2004hsh-5.1# printf '## llm systemd units\n'
+[?2004l## llm systemd units
+[?2004hsh-5.1# systemctl list-units --all '*llm*' '*m5stack*' --no-pager --plain
+[?2004l[0m[0;4mUNIT                    [0m[0m[0;4m LOAD  [0m[0m[0;4m ACTIVE  [0m[0m[0;4m SUB    [0m[0m[0;4m DESCRIPTION               [0m
+llm-asr.service          loaded active   running llm-asr Service
+llm-audio.service        loaded active   running llm-audio Service
+llm-camera.service       loaded active   running llm-camera Service
+llm-kws.service          loaded active   running llm-kws Service
+llm-llm.service          loaded active   running llm-llm Service
+llm-melotts.service      loaded active   running llm-melotts Service
+llm-skel.service         loaded active   running llm-skel Service
+llm-sys.service          loaded active   running llm-sys Service
+llm-tts.service          loaded active   running llm-tts Service
+llm-vlm.service          loaded active   running llm-vlm Service
+llm-yolo.service         loaded active   running llm-yolo Service
+m5stack-shutdown.service loaded inactive dead    m5stack to run on shutdown
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+[0;1;39m12 loaded units listed.[0m
+To show all installed unit files use 'systemctl list-unit-files'.
+[?2004hsh-5.1# printf '\n## llm unit files\n'
+[?2004l
+## llm unit files
+[?2004hsh-5.1# systemctl list-unit-files '*llm*' '*m5stack*' --no-pager --plain
+[?2004l[0m[0;4mUNIT FILE               [0m[0m[0;4m STATE  [0m[0m[0;4m VENDOR PRESET[0m
+llm-asr.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-audio.service        [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-camera.service       [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-kws.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-llm.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-melotts.service      [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-skel.service         [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-sys.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-tts.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-vlm.service          [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-yolo.service         [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+m5stack-shutdown.service [0;1;32menabled[0m[0;1;32m [0m[0;1;32menabled      [0m
+
+12 unit files listed.
+[?2004hsh-5.1# printf '\n## unit cat candidates\n'
+[?2004l
+## unit cat candidates
+[?2004hsh-5.1# for u in llm-sys.service llm_sys.service llm.service m5stack.service stackflow.service; do
+[?2004l[?2004h>   systemctl cat "$u" 2>/dev/null && printf '\n'
+[?2004l[?2004h> done
+[?2004l# /lib/systemd/system/llm-sys.service
+[Unit]
+Description=llm-sys Service
+After=ubus.service
+Requires=ubus.service
+
+[Service]
+ExecStart=/opt/m5stack/bin/llm_sys
+WorkingDirectory=/opt/m5stack
+Restart=always
+RestartSec=1
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target
+
+
+[?2004hsh-5.1# printf '\n## process details for ttyS1 user\n'
+[?2004l
+## process details for ttyS1 user
+[?2004hsh-5.1# for pid in $(for fd in /proc/[0-9]*/fd/*; do target=$(readlink "$fd" 2>/dev/null) || continue; [ "$target" = /dev/ttyS1 ] && { p=${fd#/proc/}; echo ${p%%/*}; }; done | sort -u); do
+[?2004l[?2004h>   printf '### pid %s\n' "$pid"
+[?2004l[?2004h>   tr '\000' ' ' < "/proc/$pid/cmdline"; printf '\n'
+[?2004l[?2004h>   cat "/proc/$pid/status" | sed -n '1,40p'
+[?2004l[?2004h>   printf 'fds:\n'
+[?2004l[?2004h>   ls -l "/proc/$pid/fd" 2>/dev/null | sed -n '1,80p'
+[?2004l[?2004h>   printf 'environ filtered:\n'
+[?2004l[?2004h>   tr '\000' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -Ei 'tty|uart|serial|llm|stack|m5' || true
+[?2004l[?2004h>   printf '\n'
+[?2004l[?2004h> done
+[?2004l### pid 1727
+/opt/m5stack/bin/llm_sys 
+Name:	llm_sys
+Umask:	0022
+State:	S (sleeping)
+Tgid:	1727
+Ngid:	0
+Pid:	1727
+PPid:	1
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+FDSize:	128
+Groups:	 
+NStgid:	1727
+NSpid:	1727
+NSpgid:	1727
+NSsid:	1727
+VmPeak:	  679480 kB
+VmSize:	  613944 kB
+VmLck:	       0 kB
+VmPin:	       0 kB
+VmHWM:	    9208 kB
+VmRSS:	    9196 kB
+RssAnon:	    4816 kB
+RssFile:	    4380 kB
+RssShmem:	       0 kB
+VmData:	   83648 kB
+VmStk:	     132 kB
+VmExe:	     952 kB
+VmLib:	    4976 kB
+VmPTE:	     116 kB
+VmSwap:	       0 kB
+HugetlbPages:	       0 kB
+CoreDumping:	0
+Threads:	11
+SigQ:	1/3832
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000000000000
+SigIgn:	0000000000001000
+SigCgt:	0000000100004002
+fds:
+total 0
+lr-x------ 1 root root 64 Aug 22 05:11 0 -> /dev/null
+lrwx------ 1 root root 64 Aug 22 05:11 1 -> socket:[7437]
+lrwx------ 1 root root 64 Aug 22 05:11 10 -> /dev/ttyS1
+lrwx------ 1 root root 64 Aug 22 05:11 11 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 12 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 13 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 14 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 15 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 16 -> socket:[9001]
+lrwx------ 1 root root 64 Aug 22 05:11 2 -> socket:[7437]
+lrwx------ 1 root root 64 Aug 22 05:11 22 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 23 -> socket:[7735]
+l-wx------ 1 root root 64 Aug 22 05:11 26 -> /opt/m5stack/libhv.20230822.log
+l-wx------ 1 root root 64 Aug 22 05:11 27 -> /opt/m5stack/libhv.20230822.log
+lrwx------ 1 root root 64 Aug 22 05:11 28 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 29 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 3 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 30 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 31 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 32 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 33 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 4 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 5 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 6 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 7 -> anon_inode:[eventpoll]
+lrwx------ 1 root root 64 Aug 22 05:11 8 -> anon_inode:[eventfd]
+lrwx------ 1 root root 64 Aug 22 05:11 9 -> socket:[7708]
+environ filtered:
+
+[?2004hsh-5.1# printf '\n## m5stack config candidates\n'
+[?2004l
+## m5stack config candidates
+[?2004hsh-5.1# find /opt/m5stack /usr/local/m5stack /etc -maxdepth 4 -type f \( -name '*llm*' -o -name '*stack*' -o -name '*uart*' -o -name '*serial*' -o -name '*.json' -o -name '*.toml' -o -name '*.yaml' -o -name '*.conf' -o -name '*.service' \) 2>/dev/null | sed -n '1,240p'
+[?2004l/opt/m5stack/bin/llm_asr
+/opt/m5stack/bin/llm_audio
+/opt/m5stack/bin/llm_camera
+/opt/m5stack/bin/llm_kws
+/opt/m5stack/bin/llm_llm
+/opt/m5stack/bin/llm_melotts
+/opt/m5stack/bin/llm_skel
+/opt/m5stack/bin/llm_sys
+/opt/m5stack/bin/llm_tts
+/opt/m5stack/bin/llm_vlm
+/opt/m5stack/bin/llm_yolo
+/opt/m5stack/data/melotts_zh-cn/melotts_zh-cn.json
+/opt/m5stack/data/models/mode_melotts-zh-cn.json
+/opt/m5stack/data/models/mode_qwen2.5-0.5B-prefill-20e.json
+/opt/m5stack/data/models/mode_sherpa-ncnn-streaming-zipformer-20M-2023-02-17.json
+/opt/m5stack/data/models/mode_sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23.json
+/opt/m5stack/data/models/mode_sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json
+/opt/m5stack/data/models/mode_sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.json
+/opt/m5stack/data/models/mode_single-speaker-english-fast.json
+/opt/m5stack/data/models/mode_single-speaker-fast.json
+/opt/m5stack/data/models/mode_yolo11n-pose.json
+/opt/m5stack/data/models/mode_yolo11n-seg.json
+/opt/m5stack/data/models/mode_yolo11n.json
+/opt/m5stack/data/qwen2.5-0.5B-prefill-20e/qwen2.5-0.5B-prefill-20e.json
+/opt/m5stack/data/sherpa-ncnn-streaming-zipformer-20M-2023-02-17/sherpa-ncnn-streaming-zipformer-20M-2023-02-17.json
+/opt/m5stack/data/sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23/sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23.json
+/opt/m5stack/data/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json
+/opt/m5stack/data/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.json
+/opt/m5stack/data/single_speaker_english_fast/single_speaker_english_fast.json
+/opt/m5stack/data/single_speaker_fast/single_speaker_fast.json
+/opt/m5stack/data/yolo11n/mode_yolo11n.json
+/opt/m5stack/data/yolo11n-pose/mode_yolo11n-pose.json
+/opt/m5stack/data/yolo11n-seg/mode_yolo11n-seg.json
+/opt/m5stack/share/audio.json
+/opt/m5stack/share/camera.json
+/opt/m5stack/share/sys_config.json
+/etc/adduser.conf
+/etc/apache2/conf-available/javascript-common.conf
+/etc/apparmor/parser.conf
+/etc/avahi/avahi-daemon.conf
+/etc/ax_syslog.conf
+/etc/ca-certificates.conf
+/etc/containerd/config.toml
+/etc/dbus-1/system.d/avahi-dbus.conf
+/etc/debconf.conf
+/etc/deluser.conf
+/etc/depmod.d/ubuntu.conf
+/etc/dhcp/dhclient.conf
+/etc/dhcp/dhcpd.conf
+/etc/dhcp/dhcpd6.conf
+/etc/e2scrub.conf
+/etc/fonts/conf.avail/10-antialias.conf
+/etc/fonts/conf.avail/10-autohint.conf
+/etc/fonts/conf.avail/10-hinting-full.conf
+/etc/fonts/conf.avail/10-hinting-medium.conf
+/etc/fonts/conf.avail/10-hinting-none.conf
+/etc/fonts/conf.avail/10-hinting-slight.conf
+/etc/fonts/conf.avail/10-no-sub-pixel.conf
+/etc/fonts/conf.avail/10-scale-bitmap-fonts.conf
+/etc/fonts/conf.avail/10-sub-pixel-bgr.conf
+/etc/fonts/conf.avail/10-sub-pixel-rgb.conf
+/etc/fonts/conf.avail/10-sub-pixel-vbgr.conf
+/etc/fonts/conf.avail/10-sub-pixel-vrgb.conf
+/etc/fonts/conf.avail/10-unhinted.conf
+/etc/fonts/conf.avail/11-lcdfilter-default.conf
+/etc/fonts/conf.avail/11-lcdfilter-legacy.conf
+/etc/fonts/conf.avail/11-lcdfilter-light.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-lgc-sans-mono.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-lgc-sans.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-lgc-serif.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-sans-mono.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-sans.conf
+/etc/fonts/conf.avail/20-unhint-small-dejavu-serif.conf
+/etc/fonts/conf.avail/20-unhint-small-vera.conf
+/etc/fonts/conf.avail/25-unhint-nonlatin.conf
+/etc/fonts/conf.avail/30-metric-aliases.conf
+/etc/fonts/conf.avail/40-nonlatin.conf
+/etc/fonts/conf.avail/45-generic.conf
+/etc/fonts/conf.avail/45-latin.conf
+/etc/fonts/conf.avail/49-sansserif.conf
+/etc/fonts/conf.avail/50-user.conf
+/etc/fonts/conf.avail/51-local.conf
+/etc/fonts/conf.avail/53-monospace-lcd-filter.conf
+/etc/fonts/conf.avail/57-dejavu-sans-mono.conf
+/etc/fonts/conf.avail/57-dejavu-sans.conf
+/etc/fonts/conf.avail/57-dejavu-serif.conf
+/etc/fonts/conf.avail/58-dejavu-lgc-sans-mono.conf
+/etc/fonts/conf.avail/58-dejavu-lgc-sans.conf
+/etc/fonts/conf.avail/58-dejavu-lgc-serif.conf
+/etc/fonts/conf.avail/60-generic.conf
+/etc/fonts/conf.avail/60-latin.conf
+/etc/fonts/conf.avail/65-fonts-persian.conf
+/etc/fonts/conf.avail/65-khmer.conf
+/etc/fonts/conf.avail/65-nonlatin.conf
+/etc/fonts/conf.avail/69-unifont.conf
+/etc/fonts/conf.avail/70-force-bitmaps.conf
+/etc/fonts/conf.avail/70-no-bitmaps.conf
+/etc/fonts/conf.avail/70-yes-bitmaps.conf
+/etc/fonts/conf.avail/80-delicious.conf
+/etc/fonts/conf.avail/90-synthetic.conf
+/etc/fonts/fonts.conf
+/etc/gai.conf
+/etc/host.conf
+/etc/idmapd.conf
+/etc/ifplugd/ifplugd.conf
+/etc/inetd.conf
+/etc/ld.so.conf
+/etc/ld.so.conf.d/aarch64-linux-gnu.conf
+/etc/ld.so.conf.d/fakeroot-aarch64-linux-gnu.conf
+/etc/ld.so.conf.d/libc.conf
+/etc/ldap/ldap.conf
+/etc/libaudit.conf
+/etc/lighttpd/conf-available/90-javascript-alias.conf
+/etc/logrotate.conf
+/etc/mke2fs.conf
+/etc/modprobe.d/blacklist-ath_pci.conf
+/etc/modprobe.d/blacklist-firewire.conf
+/etc/modprobe.d/blacklist-framebuffer.conf
+/etc/modprobe.d/blacklist-rare-network.conf
+/etc/modprobe.d/blacklist.conf
+/etc/modprobe.d/iwlwifi.conf
+/etc/nfs.conf
+/etc/nsswitch.conf
+/etc/ntp.conf
+/etc/pam.conf
+/etc/request-key.conf
+/etc/request-key.d/id_resolver.conf
+/etc/rsyslog.conf
+/etc/rsyslog.d/50-default.conf
+/etc/security/access.conf
+/etc/security/capability.conf
+/etc/security/faillock.conf
+/etc/security/group.conf
+/etc/security/limits.conf
+/etc/security/namespace.conf
+/etc/security/pam_env.conf
+/etc/security/sepermit.conf
+/etc/security/time.conf
+/etc/selinux/semanage.conf
+/etc/sudo.conf
+/etc/sudo_logsrvd.conf
+/etc/sysctl.conf
+/etc/sysctl.d/10-console-messages.conf
+/etc/sysctl.d/10-ipv6-privacy.conf
+/etc/sysctl.d/10-kernel-hardening.conf
+/etc/sysctl.d/10-magic-sysrq.conf
+/etc/sysctl.d/10-network-security.conf
+/etc/sysctl.d/10-ptrace.conf
+/etc/sysctl.d/10-zeropage.conf
+/etc/systemd/journald.conf
+/etc/systemd/logind.conf
+/etc/systemd/networkd.conf
+/etc/systemd/pstore.conf
+/etc/systemd/resolved.conf
+/etc/systemd/sleep.conf
+/etc/systemd/system.conf
+/etc/systemd/timesyncd.conf
+/etc/systemd/user.conf
+/etc/ucf.conf
+/etc/udev/udev.conf
+/etc/wpa_supplicant.conf
+/etc/xattr.conf
+/etc/xdg/user-dirs.conf
+[?2004hsh-5.1# 

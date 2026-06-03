@@ -1,0 +1,4 @@
+List of devices attached
+axera-ax620e           device usb:1-3 product:occam model:Nexus_4 device:mako transport_id:2
+
+ERROR: Fan Module v1.1 address 0x18 not detected on /dev/i2c-*; no fan register writes performed.

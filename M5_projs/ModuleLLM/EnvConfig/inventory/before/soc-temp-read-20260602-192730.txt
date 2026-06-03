@@ -1,0 +1,3 @@
+2023-08-22 06:00:06 zone=/sys/class/thermal/thermal_zone0 type=soc_thm raw=42350 temp=42.350 C
+2023-08-22 06:00:11 zone=/sys/class/thermal/thermal_zone0 type=soc_thm raw=42350 temp=42.350 C
+2023-08-22 06:00:16 zone=/sys/class/thermal/thermal_zone0 type=soc_thm raw=42350 temp=42.350 C

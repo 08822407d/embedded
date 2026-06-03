@@ -1,0 +1,72 @@
+Tue Jun  2 19:05:43 CST 2026
+Linux ASUS 6.8.0-117-generic #117-Ubuntu SMP PREEMPT_DYNAMIC Tue May  5 19:26:24 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+uid=1000(cheyh) gid=1000(cheyh) groups=1000(cheyh),4(adm),6(disk),20(dialout),24(cdrom),27(sudo),30(dip),46(plugdev),122(lpadmin),135(lxd),136(sambashare),999(docker),1001(vmraw)
+cheyh adm disk dialout cdrom sudo dip plugdev lpadmin lxd sambashare docker vmraw
+
+Android Debug Bridge version 1.0.41
+Version 34.0.4-debian
+Installed as /usr/lib/android-sdk/platform-tools/adb
+Running on Linux 6.8.0-117-generic (x86_64)
+
+List of devices attached
+axera-ax620e           no permissions (missing udev rules? user is in the plugdev group); see [http://developer.android.com/tools/device.html] usb:1-3 transport_id:1
+
+
+Bus 001 Device 015: ID 32c9:2003 axera ax620e-adb
+
+crw-rw-r-- root root 664 /dev/bus/usb/001/015
+
+DEVPATH=/devices/pci0000:00/0000:00:14.0/usb1/1-3
+DEVNAME=/dev/bus/usb/001/015
+DEVTYPE=usb_device
+DRIVER=usb
+PRODUCT=32c9/2003/419
+TYPE=0/0/0
+BUSNUM=001
+DEVNUM=015
+MAJOR=189
+MINOR=14
+SUBSYSTEM=usb
+USEC_INITIALIZED=113350915
+ID_BUS=usb
+ID_MODEL=ax620e-adb
+ID_MODEL_ENC=ax620e-adb
+ID_MODEL_ID=2003
+ID_SERIAL=axera_ax620e-adb_axera-ax620e
+ID_SERIAL_SHORT=axera-ax620e
+ID_VENDOR=axera
+ID_VENDOR_ENC=axera
+ID_VENDOR_ID=32c9
+ID_REVISION=0419
+ID_USB_MODEL=ax620e-adb
+ID_USB_MODEL_ENC=ax620e-adb
+ID_USB_MODEL_ID=2003
+ID_USB_SERIAL=axera_ax620e-adb_axera-ax620e
+ID_USB_SERIAL_SHORT=axera-ax620e
+ID_USB_VENDOR=axera
+ID_USB_VENDOR_ENC=axera
+ID_USB_VENDOR_ID=32c9
+ID_USB_REVISION=0419
+ID_USB_INTERFACES=:ff4201:
+ID_PATH_WITH_USB_REVISION=pci-0000:00:14.0-usbv2-0:3
+ID_PATH=pci-0000:00:14.0-usb-0:3
+ID_PATH_TAG=pci-0000_00_14_0-usb-0_3
+ID_FOR_SEAT=usb-pci-0000_00_14_0-usb-0_3
+TAGS=:seat:
+CURRENT_TAGS=:seat:
+
+/etc/udev/rules.d/70-snap.snapd.rules:1030:ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_ZTE_PORT_TYPE_MODEM}="1"
+/etc/udev/rules.d/70-snap.snapd.rules:1031:ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_ZTE_PORT_TYPE_AUX}="1"
+/usr/lib/udev/rules.d/69-cd-sensors.rules:37:ATTRS{idVendor}=="0971", ATTRS{idProduct}=="2003", ENV{COLORD_SENSOR_KIND}="i1-display2", ENV{COLORD_SENSOR_CAPS}="lcd crt"
+/usr/lib/udev/rules.d/77-mm-zte-port-types.rules:193:ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+/usr/lib/udev/rules.d/77-mm-zte-port-types.rules:194:ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
+## M5Stack / AXERA ADB udev fix
+Rule file: /etc/udev/rules.d/51-m5stack-axera-adb.rules
+Rule: SUBSYSTEM=="usb", ATTR{idVendor}=="32c9", ATTR{idProduct}=="2003", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+
+## Current matching USB nodes
+/dev/bus/usb/001/015
+
+DRY RUN: no changes made.
+To apply on the Host, run: APPLY=1 bash scripts/fix_m5stack_adb_udev.sh

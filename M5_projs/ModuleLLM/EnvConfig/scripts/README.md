@@ -10,6 +10,56 @@ bash scripts/device_probe_adb.sh
 bash scripts/pull_apt_backup_adb.sh
 ```
 
+持续读取 Module LLM SoC 温度：
+
+```bash
+bash scripts/read_soc_temp_adb.sh
+```
+
+默认每 5 秒持续读取一次。测试固定次数：
+
+```bash
+COUNT=3 INTERVAL=5 bash scripts/read_soc_temp_adb.sh
+```
+
+按 SoC 温度控制 Fan Module v1.1：
+
+```bash
+COUNT=3 INTERVAL=5 bash scripts/fan_temp_control_adb.sh
+```
+
+该脚本先探测 `/dev/i2c-*` 上的 Fan 默认地址 `0x18`；未检测到时会退出且不写风扇寄存器。检测到后按近似 Raspberry Pi 5 的温度曲线写 Fan v1.1 I2C 寄存器：低于 50C 关闭，50C/60C/67.5C/75C 对应 30/50/70/100% 占空比，并使用 5C 回差。
+
+启用 M5-Bus UART `/dev/ttyS1` 实体终端登录：
+
+```bash
+bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+```
+
+当前配置会 mask `llm-sys.service` 以释放 `/dev/ttyS1` 并阻止它开机被其他 `llm-*` 服务依赖拉起，然后启用 `serial-getty@ttyS1.service`。登录方式为 `--autologin root`，外部串口终端接入后不需要账号/密码。回滚到 M5-Bus StackFlow/JSON 通信：
+
+```bash
+MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+```
+
+若 `adb devices -l` 显示 M5Stack/AXERA 设备 `no permissions`，先运行 dry-run：
+
+```bash
+bash scripts/fix_m5stack_adb_udev.sh
+```
+
+确认只匹配 `32c9:2003` 后，可在 Host 侧授权应用：
+
+```bash
+APPLY=1 bash scripts/fix_m5stack_adb_udev.sh
+adb kill-server
+adb start-server
+adb devices -l
+```
+
+该脚本只修改 Linux Host 侧 udev/USB 节点权限，不修改 Module LLM 设备系统。
+
 多个 ADB 设备时：
 
 ```bash

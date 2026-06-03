@@ -1,0 +1,50 @@
+## timestamp
+Tue Aug 22 05:43:46 CST 2023
+
+## service state
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+FragmentPath=/lib/systemd/system/llm-sys.service
+UnitFileState=disabled
+
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+UnitFileState=enabled
+
+## enabled units
+[0m[0;4mUNIT FILE      [0m[0m[0;4m STATE   [0m[0m[0;4m VENDOR PRESET[0m
+llm-sys.service [0;1;31mdisabled[0m[0;1;31m [0m[0;1;32menabled      [0m
+
+1 unit files listed.
+
+## ttyS1 users
+pid=14596 fd=0 target=/dev/ttyS1 cmd=/bin/login -f
+pid=14596 fd=1 target=/dev/ttyS1 cmd=/bin/login -f
+pid=14596 fd=2 target=/dev/ttyS1 cmd=/bin/login -f
+pid=14611 fd=0 target=/dev/ttyS1 cmd=-bash
+pid=14611 fd=1 target=/dev/ttyS1 cmd=-bash
+pid=14611 fd=2 target=/dev/ttyS1 cmd=-bash
+pid=14611 fd=255 target=/dev/ttyS1 cmd=-bash
+
+## ttyS1 stty
+speed 115200 baud; rows 24; columns 80; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+werase = ^W; lnext = <undef>; discard = <undef>; min = 1; time = 0;
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl ixon ixoff
+-iuclc -ixany imaxbel iutf8
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+isig -icanon -iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+echoctl echoke -flusho -extproc
+
+## override
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+
+## backup dirs
+drwxrwxrwx 2 root root 4096 Aug 22 05:42 /root/m5bus-uart-login-backup-20260602-221439

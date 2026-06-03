@@ -1,0 +1,50 @@
+## adb devices -l
+List of devices attached
+axera-ax620e           device usb:1-3 product:occam model:Nexus_4 device:mako transport_id:3
+
+
+## apply mask llm-sys and verify
+### before
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/llm-sys.service
+UnitFileState=disabled
+
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+UnitFileState=enabled
+### apply
+Created symlink /etc/systemd/system/llm-sys.service → /dev/null.
+### after
+LoadState=masked
+ActiveState=inactive
+SubState=dead
+FragmentPath=/etc/systemd/system/llm-sys.service
+UnitFileState=masked
+
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+UnitFileState=enabled
+### ttyS1 users
+pid=5225 fd=0 target=/dev/ttyS1 cmd=/bin/login -f
+pid=5225 fd=1 target=/dev/ttyS1 cmd=/bin/login -f
+pid=5225 fd=2 target=/dev/ttyS1 cmd=/bin/login -f
+pid=5240 fd=0 target=/dev/ttyS1 cmd=-bash
+pid=5240 fd=1 target=/dev/ttyS1 cmd=-bash
+pid=5240 fd=2 target=/dev/ttyS1 cmd=-bash
+pid=5240 fd=255 target=/dev/ttyS1 cmd=-bash
+### failed units
+[0m[0;4mUNIT                    [0m[0m[0;4m LOAD  [0m[0m[0;4m ACTIVE[0m[0m[0;4m SUB   [0m[0m[0;4m DESCRIPTION                       [0m
+dmesg.service            loaded failed failed Save initial kernel messages afte…
+isc-dhcp-server.service  loaded failed failed ISC DHCP IPv4 server
+isc-dhcp-server6.service loaded failed failed ISC DHCP IPv6 server
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+3 loaded units listed.

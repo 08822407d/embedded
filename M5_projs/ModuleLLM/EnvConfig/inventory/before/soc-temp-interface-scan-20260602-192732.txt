@@ -1,0 +1,14 @@
+## Host timestamp
+Tue Jun  2 19:27:49 CST 2026
+
+## adb devices -l
+List of devices attached
+axera-ax620e           device usb:1-3 product:occam model:Nexus_4 device:mako transport_id:1
+
+
+## thermal zones
+ZONE=/sys/class/thermal/thermal_zone0
+type=soc_thm
+temp=43350
+mode=enabled
+

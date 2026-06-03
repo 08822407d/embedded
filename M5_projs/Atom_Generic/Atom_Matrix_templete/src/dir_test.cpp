@@ -1611,36 +1611,74 @@ void recoverFlipTest() {
     }
     Serial.printf("# 已翻越(面内%.0f°) 但 垂直角%.0f°<%.0f°(仍在平面内) → 击杀尝试磕回 A/B。\n", fabsf(p0), fabsf(lat0), PERP_GIVEUP);
 
-    const float    SPIN_MA  = 140.0f;
-    const float    KICK_MA  = MOTOR_MAX_MA;
-    const uint32_t SPIN_TO  = 2500;
-    const uint32_t KICK_TO  = 1500;
-    const uint32_t SETTLE   = 1800;
-    const int      dirs[2]  = {-1, +1};  // 先反向(-)再正向(+)
+    // ====== 急停式急救 + 突然加速基线对照（量化两种起跳给机体的冲击）======
+    // 同方向、同电流上限(1200mA)对比：A.突然加速(飞轮从0全力短脉冲) vs B.蓄能急停(蓄到高速→全力制动、过零即停)。
+    // 机体冲击看陀螺 gy 峰(°/s)。急停的优势=蓄能动能在制动瞬间倾倒，峰值力矩远高于纯电流加速。
+    const float    DIRECT_MA = MOTOR_MAX_MA;   // A基线：从0全力
+    const uint32_t DIRECT_TO = 150;            // A脉冲时长(与急停冲击相当)
+    const float    SPIN_MA   = 140.0f;         // B蓄能小电流(<挣脱200，机体留原位)
+    const float    SPIN_TGT  = 2800.0f;        // B蓄能目标转速(放开旧1400；冲击能量∝ω²)
+    const uint32_t SPIN_TO   = 3500;           // B蓄能超时
+    const float    BRAKE_MA  = MOTOR_MAX_MA;   // B急停全力制动
+    const uint32_t BRAKE_TO  = 500;            // B急停兜底上限(实际飞轮过零即停)
+    const uint32_t SETTLE    = 1800;
+    const int      dirs[2]   = {-1, +1};       // 先反向(-)再正向(+)
 
     bool recovered = false;
     for (int d = 0; d < 2 && !recovered; d++) {
         int kickSign = dirs[d];
         int spinSign = -kickSign;
-        Serial.printf("# 自救尝试%d：蓄能 %+.0fmA → 全力起跳 %+.0fmA\n", d + 1, spinSign * SPIN_MA, kickSign * KICK_MA);
 
-        M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));  // 蓄能
+        // —— A. 突然加速基线：飞轮从0、kickSign全力短脉冲，测机体冲击峰速 ——
+        Serial.printf("# [方向%+d] A.突然加速: 飞轮0→ %+.0fmA %ums\n", kickSign, kickSign * DIRECT_MA, DIRECT_TO);
+        float gyPkDirect = 0, spdPkDirect = 0;
+        M5.dis.fillpix(CRGB(0x00, 0x00, 0x30));  // 蓝：突然加速
+        motorSetCurrentmA((float)kickSign * DIRECT_MA);
+        uint32_t ta = millis();
+        while (millis() - ta < DIRECT_TO) {
+            delay(TICK_MS); sampleAndLog("RC_DIRECT"); if (recoverGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPkDirect)  gyPkDirect  = fabsf(g_lastGyRate);
+            if (fabsf(g_lastSpeed) > spdPkDirect)  spdPkDirect = fabsf(g_lastSpeed);
+        }
+        motorStop();
+        uint32_t tw = millis();   // 等飞轮停+机体略稳，与急停解耦
+        while (millis() - tw < 700) { delay(TICK_MS); sampleAndLog("RC_REST"); if (recoverGuard()) return; }
+        Serial.printf("# [方向%+d] A峰: 机体gy=%.0f°/s 飞轮=%.0frpm\n", kickSign, gyPkDirect, spdPkDirect);
+
+        // —— B. 蓄能急停：spinSign蓄到高速 → kickSign全力制动、飞轮过零即停 ——
+        Serial.printf("# [方向%+d] B.蓄能急停: 蓄能 %+.0fmA→%.0frpm 后 %+.0fmA急停\n",
+                      kickSign, spinSign * SPIN_MA, SPIN_TGT, kickSign * BRAKE_MA);
+        M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));  // 橙：蓄能
         motorSetCurrentmA((float)spinSign * SPIN_MA);
         uint32_t t0 = millis();
-        while (millis() - t0 < SPIN_TO) { delay(TICK_MS); sampleAndLog("RC_SPIN"); if (recoverGuard()) return; if (fabsf(g_lastSpeed) >= 1400) break; }
+        while (millis() - t0 < SPIN_TO) {
+            delay(TICK_MS); sampleAndLog("RC_SPIN"); if (recoverGuard()) return;
+            if (fabsf(g_lastSpeed) >= SPIN_TGT) break;
+        }
+        float spinPeak = g_lastSpeed;
 
-        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 起跳
-        motorSetCurrentmA((float)kickSign * KICK_MA);
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));  // 红：急停冲击
+        float gyPkBrake = 0;
+        motorSetCurrentmA((float)kickSign * BRAKE_MA);
         uint32_t t1 = millis();
-        while (millis() - t1 < KICK_TO) { delay(TICK_MS); sampleAndLog("RC_KICK"); if (recoverGuard()) return; }
+        while (millis() - t1 < BRAKE_TO) {
+            delay(TICK_MS); sampleAndLog("RC_BRAKE"); if (recoverGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPkBrake) gyPkBrake = fabsf(g_lastGyRate);
+            // 飞轮过零(动能已倾倒)→ 立即停，把冲击集中、避免无谓反向加速到高速
+            if (spinSign > 0 && g_lastSpeed <=  50.0f) break;   // 原正转，降到≈0
+            if (spinSign < 0 && g_lastSpeed >= -50.0f) break;   // 原反转，升到≈0
+        }
         motorStop();
+        Serial.printf("# [方向%+d] B峰: 机体gy=%.0f°/s (蓄能%.0frpm)\n", kickSign, gyPkBrake, spinPeak);
+        Serial.printf("# ★对照[方向%+d]: 突然加速 gy=%.0f°/s  vs  蓄能急停 gy=%.0f°/s  → 急停是加速的 %.2f 倍\n",
+                      kickSign, gyPkDirect, gyPkBrake, gyPkDirect > 1.0f ? gyPkBrake / gyPkDirect : 0.0f);
 
         uint32_t ts = millis();
         while (millis() - ts < SETTLE) { delay(TICK_MS); sampleAndLog("RC_SET"); if (recoverGuard()) return; }
 
         double pe = 0, re = 0; imuReadAttitude(&pe, &re);   // 静态原始 pitch 判落点
-        Serial.printf("# 尝试%d 落点: pitch=%.1f lat=%.1f\n", d + 1, pe, g_lastLateral);
-        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) recovered = true;  // 回到 A/B = 面内角进范围且垂直角小
+        Serial.printf("# 方向%+d 落点: pitch=%.1f lat=%.1f\n", kickSign, pe, g_lastLateral);
+        if (fabsf(pe) < 34.0f && fabsf(g_lastLateral) < 15.0f) recovered = true;
     }
 
     motorStop();
@@ -1648,6 +1686,133 @@ void recoverFlipTest() {
     double pf = 0, rf = 0; imuReadAttitude(&pf, &rf);
     if (recovered) { Serial.printf("# ★翻倒自救成功！机体回到范围内 pitch=%.1f\n", pf); M5.dis.fillpix(CRGB(0x00, 0x28, 0x00)); }
     else           { Serial.printf("# 自救未成功，仍在范围外 pitch=%.1f，需人工复位。\n", pf); M5.dis.fillpix(CRGB(0x28, 0x00, 0x00)); }
+}
+
+// ===== 起跳扭矩特征扫描（命令 d/k）：逐档增大参数，采"输入→机体响应"特征曲线 =====
+// 用途：为后续精细前馈(如"刚好起跳到平衡点且 θ̇=0")提供标定数据。两种起跳各一个命令、姿态无关
+//   (在静止态A/B跑=测起跳特征；在第三面跑=测急救特征)。机体越中线/迁移到新稳态即停(已采到临界区)。
+// 记录(供 tools 离线拟合)：每档 输入参数 → 机体起跳初速 gy峰(°/s) + 朝平衡推进最远角 Δθ(°) + 飞轮峰速。
+
+// 扫描专用守护(宽松，像急救)：只在过压/飞轮超速/严重出平面时停；**不查超平衡40°**——
+//   扫描要在第三面(>40°)采急救特征、也要采 A/B 起跳越过平衡的数据，超平衡不是危险。
+static bool sweepGuard() {
+    if (g_lastErr == 1) { Serial.println("# 过压(E:1) → 停。"); motorStop(); motorPowerOff(); return true; }
+    if (fabsf(g_lastSpeed)   > SPEED_LIMIT_RPM) { Serial.println("# 飞轮超速 → 停。"); motorStop(); motorPowerOff(); return true; }
+    if (fabsf(g_lastLateral) > 30.0f)           { Serial.println("# 横向严重出平面 → 停。"); motorStop(); motorPowerOff(); return true; }
+    return false;
+}
+
+// 通用档间回稳(姿态无关)：|θ-target|<band 且 |θ̇|<gyStop 且 |lat|<latMax 持续 holdMs 即认为稳。
+static bool sweepSettle(float target, const char *phase, uint32_t capMs = 4500) {
+    const float    BAND = 6.0f, GY_STOP = 10.0f, LAT_MAX = 12.0f;
+    const uint32_t HOLD = 400;
+    uint32_t t0 = millis(), holdStart = 0;
+    while (millis() - t0 < capMs) {
+        delay(TICK_MS); float p = sampleAndLog(phase);
+        if (sweepGuard()) return false;
+        bool ok = fabsf(p - target) < BAND && fabsf(g_lastGyRate) < GY_STOP && fabsf(g_lastLateral) < LAT_MAX;
+        if (ok) { if (holdStart == 0) holdStart = millis(); else if (millis() - holdStart >= HOLD) return true; }
+        else holdStart = 0;
+    }
+    return false;
+}
+
+// 命令 d：突然加速 扭矩特征扫描。固定脉冲时长，电流从小到大逐档，朝平衡方向。
+void directSweepTest() {
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
+    double p0d = 0, r0 = 0; imuReadAttitude(&p0d, &r0);
+    float pStart = (float)p0d;
+    int   sign   = (pStart > 0) ? -1 : +1;             // 朝平衡(0°)方向电流符号
+    const float    PULSE_MA[] = {200, 300, 400, 500, 600, 700, 850, 1000, 1200};
+    const uint32_t PULSE_TO   = 120;                   // 固定脉冲时长
+    const uint32_t FREE_TO    = 1200;                  // 脉冲后记机体惯性冲到的最远点
+    Serial.printf("# [突然加速扫描] 起始态θ=%.1f° 朝平衡sign=%+d；电流档(mA)×固定%ums脉冲；phase=DS_KICK/DS_FREE。\n",
+                  pStart, sign, PULSE_TO);
+    Serial.println("# 档,cmd_mA → gy峰(°/s) | Δθ朝平衡(°) | 最近θ(°) | 飞轮峰(rpm) | 备注");
+    for (unsigned i = 0; i < sizeof(PULSE_MA) / sizeof(PULSE_MA[0]); i++) {
+        if (!sweepSettle(pStart, "DS_SETL")) { Serial.println("# 未能稳回起始态 → 终止扫描。"); break; }
+        float c = PULSE_MA[i], gyPk = 0, spdPk = 0, nearTheta = pStart;
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+        motorSetCurrentmA((float)sign * c);
+        uint32_t t0 = millis();
+        while (millis() - t0 < PULSE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("DS_KICK"); if (sweepGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPk)  gyPk  = fabsf(g_lastGyRate);
+            if (fabsf(g_lastSpeed)  > spdPk) spdPk = fabsf(g_lastSpeed);
+            if (fabsf(p) < fabsf(nearTheta)) nearTheta = p;
+        }
+        motorStop();
+        uint32_t t1 = millis();
+        while (millis() - t1 < FREE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("DS_FREE"); if (sweepGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPk) gyPk = fabsf(g_lastGyRate);
+            if (fabsf(p) < fabsf(nearTheta)) nearTheta = p;
+        }
+        float dTheta  = fabsf(nearTheta - pStart);
+        bool  crossed = fabsf(nearTheta) < 5.0f || (pStart > 0 && nearTheta < 0) || (pStart < 0 && nearTheta > 0);
+        Serial.printf("# D档 cmd=%.0f → gy峰=%.0f | Δθ=%.1f | 最近θ=%.1f | 飞轮=%.0f | %s\n",
+                      c, gyPk, dTheta, nearTheta, spdPk, crossed ? "★越中线/起跳显著" : "");
+        if (crossed) { Serial.println("# 该档已越中线 → 停止(已采到临界区)。"); break; }
+    }
+    motorStop(); motorPowerOff();
+    Serial.println("# ★突然加速扫描完成：DS_KICK/DS_FREE 已记录，供 tools 拟合 gy峰=f(cmd) 特征。");
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
+}
+
+// 命令 k：蓄能急停 扭矩特征扫描。蓄能目标转速从小到大逐档，急停全力、飞轮过零即停，朝平衡方向。
+void brakeSweepTest() {
+    if (motorMode() != MOTOR_MODE_CUR && !motorInit()) { motorPowerOff(); return; }
+    double p0d = 0, r0 = 0; imuReadAttitude(&p0d, &r0);
+    float pStart   = (float)p0d;
+    int   kickSign = (pStart > 0) ? -1 : +1;           // 急停朝平衡方向
+    int   spinSign = -kickSign;                        // 蓄能反向(机体留原位)
+    const float    SPIN_TGT[] = {600, 900, 1200, 1500, 1800, 2100};   // 蓄能目标转速逐档
+    const float    SPIN_MA    = 180.0f;                // 蓄能电流(略放大加速，仍<挣脱让机体不动)
+    const uint32_t SPIN_CAP   = 4000;                  // 单档蓄能超时
+    const float    BRAKE_MA   = MOTOR_MAX_MA;          // 急停全力
+    const uint32_t BRAKE_TO   = 500;                   // 急停兜底(过零即停)
+    const uint32_t FREE_TO    = 1200;
+    Serial.printf("# [蓄能急停扫描] 起始态θ=%.1f° 蓄能sign=%+d→急停sign=%+d；蓄能转速档(rpm)；phase=KS_SPIN/KS_BRAKE/KS_FREE。\n",
+                  pStart, spinSign, kickSign);
+    Serial.println("# 档,蓄能rpm → gy峰(°/s) | Δθ朝平衡(°) | 最近θ(°) | 实际蓄能(rpm) | 备注");
+    for (unsigned i = 0; i < sizeof(SPIN_TGT) / sizeof(SPIN_TGT[0]); i++) {
+        if (!sweepSettle(pStart, "KS_SETL")) { Serial.println("# 未能稳回起始态 → 终止扫描。"); break; }
+        float tgt = SPIN_TGT[i];
+        M5.dis.fillpix(CRGB(0x20, 0x10, 0x00));
+        motorSetCurrentmA((float)spinSign * SPIN_MA);
+        uint32_t t0 = millis();
+        while (millis() - t0 < SPIN_CAP) {
+            delay(TICK_MS); float p = sampleAndLog("KS_SPIN"); if (sweepGuard()) return;
+            if (fabsf(g_lastSpeed) >= tgt) break;
+        }
+        float spinPeak = g_lastSpeed;
+        M5.dis.fillpix(CRGB(0x30, 0x00, 0x00));
+        float gyPk = 0, nearTheta = pStart;
+        motorSetCurrentmA((float)kickSign * BRAKE_MA);
+        uint32_t t1 = millis();
+        while (millis() - t1 < BRAKE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("KS_BRAKE"); if (sweepGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPk) gyPk = fabsf(g_lastGyRate);
+            if (fabsf(p) < fabsf(nearTheta)) nearTheta = p;
+            if (spinSign > 0 && g_lastSpeed <=  50.0f) break;
+            if (spinSign < 0 && g_lastSpeed >= -50.0f) break;
+        }
+        motorStop();
+        uint32_t t2 = millis();
+        while (millis() - t2 < FREE_TO) {
+            delay(TICK_MS); float p = sampleAndLog("KS_FREE"); if (sweepGuard()) return;
+            if (fabsf(g_lastGyRate) > gyPk) gyPk = fabsf(g_lastGyRate);
+            if (fabsf(p) < fabsf(nearTheta)) nearTheta = p;
+        }
+        float dTheta  = fabsf(nearTheta - pStart);
+        bool  crossed = fabsf(nearTheta) < 5.0f || (pStart > 0 && nearTheta < 0) || (pStart < 0 && nearTheta > 0);
+        Serial.printf("# K档 蓄能目标=%.0f(实际%.0f) → gy峰=%.0f | Δθ=%.1f | 最近θ=%.1f | %s\n",
+                      tgt, spinPeak, gyPk, dTheta, nearTheta, crossed ? "★越中线/起跳显著" : "");
+        if (crossed) { Serial.println("# 该档已越中线 → 停止(已采到临界区)。"); break; }
+    }
+    motorStop(); motorPowerOff();
+    Serial.println("# ★蓄能急停扫描完成：KS_SPIN/KS_BRAKE/KS_FREE 已记录，供 tools 拟合 gy峰=g(蓄能rpm) 特征。");
+    M5.dis.fillpix(CRGB(0x00, 0x28, 0x00));
 }
 
 // ===== 供电充足性探测（缓升小电流测飞轮顶速，区分 5V/12V，机体姿态无关）=====

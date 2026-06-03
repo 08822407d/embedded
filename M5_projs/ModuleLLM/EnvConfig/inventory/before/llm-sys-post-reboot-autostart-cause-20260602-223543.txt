@@ -1,0 +1,79 @@
+## adb devices -l
+List of devices attached
+axera-ax620e           device usb:1-3 product:occam model:Nexus_4 device:mako transport_id:3
+
+
+## llm-sys dependency/autostart analysis
+### unit status
+[0;1;32m●[0m llm-sys.service - llm-sys Service
+     Loaded: loaded (]8;;file://m5stack-LLM/lib/systemd/system/llm-sys.service/lib/systemd/system/llm-sys.service]8;;; disabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Tue 2023-08-22 05:11:42 CST; 1min 1s ago
+   Main PID: 1728 (llm_sys)
+      Tasks: 11 (limit: 1149)
+     Memory: 3.9M
+        CPU: 57.779s
+     CGroup: /system.slice/llm-sys.service
+             └─1728 /opt/m5stack/bin/llm_sys
+
+Aug 22 05:11:42 m5stack-LLM systemd[1]: Started llm-sys Service.
+### unit properties
+Id=llm-sys.service
+Names=llm-sys.service
+Requires=ubus.service system.slice -.mount sysinit.target
+Wants=
+PartOf=
+RequiredBy=llm-melotts.service llm-tts.service llm-camera.service llm-vlm.service llm-yolo.service llm-llm.service llm-kws.service llm-asr.service llm-audio.service llm-skel.service
+WantedBy=
+TriggeredBy=
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/llm-sys.service
+UnitFileState=disabled
+### reverse dependencies
+llm-sys.service
+  llm-asr.service
+  llm-audio.service
+  llm-camera.service
+  llm-kws.service
+  llm-llm.service
+  llm-melotts.service
+  llm-skel.service
+  llm-tts.service
+  llm-vlm.service
+  llm-yolo.service
+### wants/requires symlinks
+### all llm unit states
+[0m[0;4mUNIT               [0m[0m[0;4m LOAD  [0m[0m[0;4m ACTIVE[0m[0m[0;4m SUB    [0m[0m[0;4m DESCRIPTION        [0m
+llm-asr.service     loaded active running llm-asr Service
+llm-audio.service   loaded active running llm-audio Service
+llm-camera.service  loaded active running llm-camera Service
+llm-kws.service     loaded active running llm-kws Service
+llm-llm.service     loaded active running llm-llm Service
+llm-melotts.service loaded active running llm-melotts Service
+llm-skel.service    loaded active running llm-skel Service
+llm-sys.service     loaded active running llm-sys Service
+llm-tts.service     loaded active running llm-tts Service
+llm-vlm.service     loaded active running llm-vlm Service
+llm-yolo.service    loaded active running llm-yolo Service
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+[0;1;39m11 loaded units listed.[0m
+To show all installed unit files use 'systemctl list-unit-files'.
+### all llm unit files
+[0m[0;4mUNIT FILE          [0m[0m[0;4m STATE   [0m[0m[0;4m VENDOR PRESET[0m
+llm-asr.service     [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-audio.service   [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-camera.service  [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-kws.service     [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-llm.service     [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-melotts.service [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-skel.service    [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-sys.service     [0;1;31mdisabled[0m[0;1;31m [0m[0;1;32menabled      [0m
+llm-tts.service     [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-vlm.service     [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+llm-yolo.service    [0;1;32menabled [0m[0;1;32m [0m[0;1;32menabled      [0m
+
+11 unit files listed.

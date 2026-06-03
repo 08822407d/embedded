@@ -45,6 +45,11 @@ bool powerDetectTest();
 //   放宽保底(仅过压/超速)。需在 imuInit/motorInit(电流模式) 后调用。
 void recoverFlipTest();
 
+// 起跳扭矩特征扫描：逐档增大参数，采"输入→机体响应(gy峰/Δθ)"曲线，供后续精细前馈标定。
+//   directSweepTest(命令d)=突然加速(电流递增)；brakeSweepTest(命令k)=蓄能急停(蓄能转速递增)。姿态无关。
+void directSweepTest();
+void brakeSweepTest();
+
 // 危险边界渐进探测：当前静止态 st(+1=B/-1=A)，朝外棱方向渐进加流找逼近翻倒的临界电流(带符号)。
 //   速度钳+小偏移即停，绝不真翻。需在 imuInit/motorInit(电流模式) 后调用。
 float dangerBoundaryProbe(int st);

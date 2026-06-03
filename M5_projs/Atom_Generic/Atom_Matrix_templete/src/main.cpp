@@ -17,6 +17,7 @@
 static void printMenu() {
     Serial.println("# === 命令待命(发 字符+换行) ===");
     Serial.println("#   r=急救(大力矩磕回A/B)  i=系统辨识  b=探扭矩  c=起跳+缓冲  g=起跳→平衡  s=姿态  h=菜单");
+    Serial.println("#   d=突然加速扫描(电流逐档↑)  k=蓄能急停扫描(蓄能转速逐档↑)  ← 采起跳扭矩特征曲线");
     Serial.println("#   loop 持续监视(紧凑日志)；命令跑完回监视。");
 }
 
@@ -24,13 +25,15 @@ static void dispatchCommand(const String &cmd) {
     char c = cmd.length() ? cmd[0] : 'h';
     Serial.printf("# >>> CMD '%c'\n", c);
     // 驱动类命令：先重新使能电流输出（上个流程/待命时输出是断的；不重 begin，避免双 I²C 挂死）
-    if (c == 'r' || c == 'i' || c == 'b' || c == 'c' || c == 'g') motorReenable();
+    if (c == 'r' || c == 'i' || c == 'b' || c == 'c' || c == 'g' || c == 'd' || c == 'k') motorReenable();
     switch (c) {
         case 'r': recoverFlipTest();       break;   // 急救：面内翻越(第三面)且横向小 → 蓄能+全力急刹磕回 A/B
         case 'i': sysIdExperiment();       break;   // 系统辨识激励
         case 'b': probeBreakawayTorque();  break;   // 探能起跳的扭矩 τ_break
         case 'c': swingUpCushionTest();    break;   // 起跳 + 回落缓冲
         case 'g': swingUpToBalance();      break;   // 起跳 → 平衡
+        case 'd': directSweepTest();       break;   // 突然加速 扭矩特征扫描(电流逐档↑)
+        case 'k': brakeSweepTest();        break;   // 蓄能急停 扭矩特征扫描(蓄能转速逐档↑)
         case 's': { double p = 0, r = 0; imuReadAttitude(&p, &r); Serial.printf("# 姿态 pitch=%.1f roll=%.1f\n", p, r); break; }
         case 'h':
         default:  printMenu();             break;

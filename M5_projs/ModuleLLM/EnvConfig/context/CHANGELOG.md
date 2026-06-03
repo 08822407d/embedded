@@ -1,5 +1,96 @@
 # CHANGELOG
 
+## 2026-06-02 — 启用 M5-Bus UART 实体终端登录
+
+- 用户决定后续不再关注从 LLM 控制 Fan 模块，转而要求让外部带屏/键盘嵌入式开发板作为实体串口终端，通过 M5-Bus UART 登录 Module LLM 并进行 shell 交互。
+- 本轮保留默认 `ttyS0` / `DBG_TXD/DBG_RXD` 系统 Log/调试登录路径，不迁移 kernel console 或 earlycon。
+- ADB preflight 成功，当前唯一 `device` 状态设备为 `axera-ax620e`。
+- 只读确认：`ttyS1` 映射到 `/soc/ax_uart@4881000` / `serial1`，是 M5-Bus `TRM_TXD/TRM_RXD` 的候选 Linux UART；`ttyS0` 仍为 kernel console。
+- 只读确认：`/opt/m5stack/bin/llm_sys` 默认持有 `/dev/ttyS1`，对应 `llm-sys.service`。因此把 M5-Bus UART 改作登录口必须牺牲 StackFlow/JSON 主控通信。
+- 新增脚本 `scripts/enable_m5bus_uart_login_adb.sh`，支持 dry-run、实际启用和 rollback。
+- 已执行实际启用：停用/禁用 `llm-sys.service`，写入 `/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf`，启用并启动 `serial-getty@ttyS1.service`。
+- 后验验证：`llm-sys.service` 为 inactive/dead 且 disabled；`serial-getty@ttyS1.service` 为 active/running 且 enabled；`/dev/ttyS1` 为 115200 baud、8N1、无硬件流控。
+- 登录认证确认：当前 `ttyS1` 使用 `--autologin root`，进程为 `/bin/login -f` 和 `-bash`；外部实体终端接入后不需要输入账号/密码即可获得 root shell。
+- 用户随后要求重启 Module LLM。第一次重启后发现：`serial-getty@ttyS1` 自动恢复，但 `llm-sys.service` 虽 disabled 仍被其他 `llm-*` 服务依赖拉起，并重新打开 `/dev/ttyS1`。
+- 进一步确认 `llm-sys.service` 的 `RequiredBy` 包括 `llm-asr`、`llm-audio`、`llm-camera`、`llm-kws`、`llm-llm`、`llm-melotts`、`llm-skel`、`llm-tts`、`llm-vlm`、`llm-yolo`。单纯 disable 不足以阻止开机依赖启动。
+- 已修正为 mask `llm-sys.service`。第二次重启验证通过：`llm-sys.service` 为 masked/inactive，`serial-getty@ttyS1.service` 为 active/running，`/dev/ttyS1` 只由 `/bin/login -f` 和 `-bash` 占用，配置永久且开机自动生效。
+- 设备侧备份目录：`/root/m5bus-uart-login-backup-20260602-221439`。
+- 回滚命令：`MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>`。
+- 输出保存：
+  - `inventory/before/m5bus-uart-login-preflight-20260602-220954.txt`
+  - `inventory/before/m5bus-uart-login-readonly-20260602-221041.txt`
+  - `inventory/before/m5bus-uart-login-llm-services-20260602-221203.txt`
+  - `inventory/before/m5bus-uart-login-dryrun-20260602-221426.txt`
+  - `inventory/after/m5bus-uart-login-apply-20260602-221439.txt`
+  - `inventory/after/m5bus-uart-login-verify-20260602-221559.txt`
+  - `inventory/after/m5bus-uart-login-auth-check-20260602-221842.txt`
+  - `inventory/after/llm-reboot-for-lcd-terminal-20260602-223436.txt`
+  - `inventory/before/llm-sys-post-reboot-autostart-cause-20260602-223543.txt`
+  - `inventory/after/m5bus-uart-login-mask-llm-sys-20260602-223610.txt`
+  - `inventory/after/llm-reboot-after-mask-verify-20260602-223640.txt`
+
+## 2026-06-02 — 查阅 Fan Module v1.1 控制与 M5-Bus 引脚冲突
+
+- 用户说明已在 Module LLM 上叠插 M5Stack Fan Module v1.1，要求先查资料确认如何控制转速，以及所需引脚是否与 M5-Bus UART 引脚重叠。
+- 查阅资料和本地上下文后，进一步通过 ADB 对设备 I2C adapter 做只读探测。
+- 官方资料结论：Fan Module v1.1 内置 STM32F030F4P6，通过 I2C `0x18` 控制；M5-Bus 使用 pin 17 `SDA`、pin 18 `SCL`。
+- I2C 协议结论：`0x00` 控制启停，`0x10` 控制 PWM 频率，`0x20` 控制 PWM 占空比，`0x30` 可读 RPM。
+- 修正对照结论：标准 M5-Bus / CoreS3 / Fan v1.1 为 pin 17 `SDA`、pin 18 `SCL`；Module LLM Kit 页面显示 Module LLM / Module13.2 LLM Mate 为 pin 17 `SCL`、pin 18 `SDA`，疑似正好相反。
+- 因此当前问题不是 UART 脚冲突，而是 I2C 的 SDA/SCL 位置疑似相反。未改焊盘/未做交叉转接时，Fan v1.1 默认叠插很可能无法通过 M5-Bus I2C 被 LLM 控制。
+- 实机只读探测：当前 Linux 有 `/dev/i2c-0`、`/dev/i2c-2`、`/dev/i2c-4`；Fan 默认地址 `0x18` 在三条总线上均未应答。
+- 读模式全地址扫描只看到 `i2c-4` 上 `0x30 lp5562` 和 `0x47 sgm7220`，未发现 Fan 模块。
+- 新增 `scripts/fan_temp_control_adb.sh`，按近似 Raspberry Pi 5 风扇曲线设计：`<50C=0%`、`50C=30%`、`60C=50%`、`67.5C=70%`、`75C=100%`，5C 回差。
+- 运行短测时脚本未检测到 `0x18`，按设计退出，未写 Fan `0x00/0x10/0x20` 控制寄存器。
+- 更新 `DOCS_INDEX.md` 和 `CONFIG_REGISTRY.md`，新增 Fan Module v1.1 资料和实机探测结论。
+- 输出保存：
+  - `inventory/before/m5bus-i2c-fan-scan-20260602-215510.txt`
+  - `inventory/before/fan-temp-control-attempt-20260602-215650.txt`
+
+## 2026-06-02 — 新增 5 秒间隔 SoC 温度读取脚本
+
+- 按用户要求尝试在 Module LLM 上持续读取 SoC 温度；本轮仅执行 ADB 只读命令，未修改设备配置。
+- ADB preflight 成功，当前唯一 `device` 状态设备为 `axera-ax620e`。
+- 设备侧发现温度接口：`/sys/class/thermal/thermal_zone0/type=soc_thm`，`/sys/class/thermal/thermal_zone0/temp` 为毫摄氏度。
+- 新增 Host 侧脚本 `scripts/read_soc_temp_adb.sh`，默认 `INTERVAL=5`、`COUNT=0`，通过 ADB 每 5 秒持续读取一次 SoC 温度。
+- 验证命令：`COUNT=3 INTERVAL=5 bash scripts/read_soc_temp_adb.sh axera-ax620e`。
+- 验证输出显示每 5 秒输出一次，例如 `raw=42350 temp=42.350 C`。
+- 观察到输出时间戳来自设备侧，当前显示为 `2023-08-22`，与 Host 当前日期不一致；已登记为现场事实，本轮不修改设备时间。
+- 输出保存：
+  - `inventory/before/soc-temp-interface-scan-20260602-192732.txt`
+  - `inventory/before/soc-temp-read-20260602-192730.txt`
+
+## 2026-06-02 — Linux Host ADB 权限修复后连接成功
+
+- 用户已在本机终端授权执行建议的 Host 侧 udev 修复命令。
+- 复查 `/etc/udev/rules.d/51-m5stack-axera-adb.rules`：规则已写入，匹配 `32c9:2003`，设置 `MODE="0660"`、`GROUP="plugdev"`、`TAG+="uaccess"`。
+- 当前 USB 节点 `/dev/bus/usb/001/015` 已变为 `root:plugdev 0660`。
+- 重新执行 ADB preflight：`adb version`、`adb start-server`、`adb devices -l` 均成功；`adb devices -l` 显示唯一 `device` 状态设备 `axera-ax620e`。
+- 使用显式 serial 执行只读 shell 验证成功：`whoami=root`，hostname `m5stack-LLM`，Ubuntu 22.04 LTS，kernel `4.19.125` aarch64。
+- 本轮只修复 Host 侧 ADB USB 权限，未修改 Module LLM 设备配置。
+- 输出保存：`inventory/before/adb-reconnect-success-20260602-192018.txt`。
+- 下一步：执行 `tasks/03_device_baseline_backup.md` 做只读 baseline 和 `/etc/apt` 备份。
+
+## 2026-06-02 — 尝试恢复当前 Linux Host ADB 连接
+
+- 按用户要求尝试重新连接并排查无法连接原因；本轮只处理 Host 侧连接，不修改 Module LLM 设备配置。
+- 重新启动 ADB server 后，`adb devices -l` 仍显示 `axera-ax620e no permissions`，排除单纯 ADB server 卡住。
+- 已确认 Host 侧 `adb` 可用，用户 `cheyh` 已在 `plugdev` 组，`~/.android/adbkey` 存在，登录会话为 active seat。
+- 已确认 USB 物理枚举正常：kernel 和 `lsusb` 均识别 `32c9:2003 axera ax620e-adb`，serial `axera-ax620e`。
+- 已定位直接原因：当前 USB 节点 `/dev/bus/usb/001/015` 为 `root:root 0664`；现有 udev 规则未覆盖 M5Stack/AXERA vendor/product `32c9:2003`。
+- 新增 Host 修复脚本 `scripts/fix_m5stack_adb_udev.sh`：默认 dry-run；`APPLY=1` 时写入 `/etc/udev/rules.d/51-m5stack-axera-adb.rules` 并修正当前 USB 节点权限。
+- 尝试应用脚本时被 sudo 交互密码阻止：`sudo: a terminal is required to read the password`；因此尚未写入 Host udev 规则。
+- 输出保存：`inventory/before/adb-linux-permission-diagnosis-20260602-190543.txt`。
+
+## 2026-06-02 — 读取项目上下文并执行当前 Linux Host 门禁
+
+- 按项目启动规则读取 `PROJECT_STATE.md`、`PLAN_CURRENT.md`、`CONFIG_REGISTRY.md`、`DOCS_INDEX.md`、`RUNBOOK.md`、`SESSION_HANDOFF.md` 和 `tasks/*.md`。
+- 当前任务脉络确认：项目目标是通过 ADB/UART/SSH 对 M5Stack Module LLM Kit（AX630C）做安全、可恢复、可审计的 Linux/apt/网络/SSH 配置；当前入口仍是 `tasks/03_device_baseline_backup.md`。
+- 当前 Linux Host 观察：Ubuntu 24.04.4 LTS + zsh；`adb` 位于 `/usr/bin/adb`，版本 `34.0.4-debian`；`ssh` 可用。
+- 当前 USB/ADB 观察：`lsusb` 识别 `32c9:2003 axera ax620e-adb`；`adb devices -l` 显示 `axera-ax620e no permissions`，不是可操作的 `device` 状态。
+- 按 ADB 硬规则，本轮未执行 `adb shell/push/pull`，未接触设备配置，未执行 baseline。
+- 输出保存：`inventory/before/host-tools-20260602-184723.txt`。
+- 下一步：用户确认后处理 Linux Host 侧 ADB USB 权限，或换到能显示 `device` 状态的主机；随后再执行 `tasks/03_device_baseline_backup.md`。
+
 ## 2026-06-02 — 下班前跨开发机保存准备
 
 - 用户明确要求：当前开发机上的任务需要保存，回家后在家中开发机继续当前工作。

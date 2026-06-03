@@ -43,7 +43,8 @@
 - M5-Bus 上 Module LLM 的 RX/TX 是主控与模块通信 UART，面向 StackFlow/JSON API；默认 115200bps 8N1。
 - Linux 登录终端 / 系统 Log 调试路径不是这组 M5-Bus 通信 UART，而是调试板或 Module13.2 LLM Mate 提供的系统 Log/调试串口路径。
 - ADB 实测当前 Linux 登录终端为 `ttyS0`，kernel bootargs 为 `console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000`，systemd `serial-getty@ttyS0.service` 正在运行；该路径对应 `DBG_TXD/DBG_RXD` 系统 Log/调试串口。
-- 当前不建议把登录终端重配置到 M5-Bus `TRM_TXD/TRM_RXD`；如需第二串口登录，只能另开任务验证 `ttyS1` 物理连线、服务占用和回滚路径。
+- 已按用户明确目标把 M5-Bus `TRM_TXD/TRM_RXD` 对应的 `/dev/ttyS1` 改作额外运行期登录口；默认 `ttyS0` / `DBG_TXD/DBG_RXD` 仍保留为 kernel console 和系统 Log/调试登录路径。
+- `ttyS1` 登录口当前使用 `--autologin root`，不需要账号/密码；代价是 `llm-sys.service` 已 mask/inactive，M5-Bus StackFlow/JSON 主控通信不可用。
 - 后续串口终端类任务按应用场景反推配置项：外部带屏幕/键盘的开发板通过 UART 登录 Module LLM 的 Linux shell，重点检查物理 UART、电气层、串口参数、kernel console、systemd getty、认证、shell 和业务串口占用，而不是要求用户先给出准确 `tty` 术语。
 
 ## 阶段 1.5：配置登记审计
@@ -74,6 +75,13 @@
 - 2026-06-02 16:34 追加观察：已从 Android 官方 `https://dl.google.com/android/repository/platform-tools-latest-windows.zip` 下载并安装 Platform Tools 到当前用户目录；`adb.exe` 签名为 Google LLC 且验证有效；ADB 版本 `37.0.0-14910828`。
 - 2026-06-02 16:36 追加观察：`adb devices -l` 显示唯一 `device` 状态设备 `axera-ax620e`；通过显式 `-s axera-ax620e` 执行只读 shell 命令成功，设备为 Ubuntu 22.04 LTS，hostname `m5stack-LLM`。
 - 2026-06-02 16:47 追加观察：重新执行 ADB preflight，唯一在线设备仍为 `axera-ax620e`；显式 `-s axera-ax620e` 只读 shell 连接成功。
+- 2026-06-02 18:47 追加观察：当前主机为 Ubuntu 24.04.4 LTS + zsh；`adb` 位于 `/usr/bin/adb`，版本 `34.0.4-debian`；`ssh` 可用；`lsusb` 识别 `32c9:2003 axera ax620e-adb`，但 `adb devices -l` 显示 `axera-ax620e no permissions`。当前 Linux Host 尚未满足 ADB 目标选择门禁，不能执行 `adb shell/push/pull`。
+- 2026-06-02 19:05 追加观察：已定位 Linux `no permissions` 为 Host USB 权限规则问题。用户在 `plugdev` 组，ADB server 重启无效，设备节点为 `root:root 0664`，现有 udev 规则未覆盖 `32c9:2003`。已新增 `scripts/fix_m5stack_adb_udev.sh`，应用需 sudo。
+- 2026-06-02 19:20 追加观察：用户已授权应用 Host udev 修复；`/etc/udev/rules.d/51-m5stack-axera-adb.rules` 已落地，设备节点为 `root:plugdev 0660`；`adb devices -l` 显示唯一 `device` 状态设备 `axera-ax620e`；显式 serial 只读 shell 验证成功。
+- 2026-06-02 19:27 追加观察：当前 SoC 温度节点为 `/sys/class/thermal/thermal_zone0/temp`，类型 `soc_thm`，单位毫摄氏度；已新增 `scripts/read_soc_temp_adb.sh`，默认每 5 秒持续读取。
+- 2026-06-02 追加观察：用户叠插 M5Stack Fan Module v1.1；资料复核显示其通过 I2C `0x18` 控制，M5-Bus 使用 pin 17/18 `SDA/SCL`，不与 Module LLM M5-Bus `TRM_TXD/TRM_RXD` UART 通信脚重叠。后续若实机控制，先只读确认 `/dev/i2c-*` 和 `0x18` 应答。
+- 2026-06-02 追加观察：Module LLM Linux 当前有 `/dev/i2c-0/2/4`，对应 device-tree I2C 控制器为 `okay`；但 Fan 默认地址 `0x18` 在三条总线上均未应答。已新增 `scripts/fan_temp_control_adb.sh`，脚本在未检测到 `0x18` 时退出且不写寄存器。
+- 2026-06-02 追加观察：用户已决定不再关注从 LLM 控制 Fan 模块；已将 M5-Bus UART `/dev/ttyS1` 改作外部实体终端登录口。重启验证后 `serial-getty@ttyS1.service` active/running，`llm-sys.service` masked/inactive，当前不需要账号/密码即可 autologin root。
 
 只读命令范围：
 

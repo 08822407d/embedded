@@ -9,20 +9,22 @@
 
 ## 2. 当前状态总览
 
-- 阶段：2 / Host 工具与 ADB 连接确认完成；下一步设备 baseline 备份
+- 阶段：2 / 当前 Linux 主机 ADB 权限已修复；M5-Bus UART 登录已按用户目标启用；下一步设备 baseline 备份
 - 当前任务文件：`tasks/03_device_baseline_backup.md`
 - 当前交接：2026-06-02 下班前触发跨开发机保存；本项目目录将通过 GitHub 保存，回家后在新开发机拉取继续
-- 设备连接：ADB 已重新连接成功，本次 serial 为 `axera-ax620e`；Host USB/PnP 层识别 `ax620e-adb`，实例 `USB\VID_32C9&PID_2003\AXERA-AX620E`
-- 主机环境：本次观察为 Windows 10 + PowerShell 7.5.5；必须兼容 Windows 10 与 Linux 发行版
-- 设备系统版本：Ubuntu 22.04 LTS；hostname `m5stack-LLM`；kernel `Linux 4.19.125` aarch64（本次 ADB 只读观察）
-- ADB：已安装官方 Android SDK Platform Tools 到 `C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe`；未改全局 PATH；通过 `ADB_BIN`/完整路径执行成功
-- UART：Linux 默认登录终端已确认在 `ttyS0`，参数 `115200n8`；运行时映射为 `serial0` / `/soc/ax_uart@4880000` / MMIO `0x04880000`，对应系统 Log/调试串口 `DBG_TXD/DBG_RXD` 路径；M5-Bus `TRM_TXD/TRM_RXD` 仍视为 StackFlow/JSON 通信 UART，不作为默认登录终端
+- 设备连接：当前 Linux Host USB 识别 `32c9:2003 axera ax620e-adb`；已新增 Host udev 规则 `/etc/udev/rules.d/51-m5stack-axera-adb.rules`；`adb devices -l` 显示唯一 `device` 状态 serial `axera-ax620e`
+- 主机环境：本次观察为 Ubuntu 24.04.4 LTS + zsh；必须兼容 Windows 10 与 Linux 发行版
+- 设备系统版本：Ubuntu 22.04 LTS；hostname `m5stack-LLM`；kernel `Linux 4.19.125` aarch64（当前 Linux Host ADB 只读验证）
+- ADB：当前 Linux Host 已有 `/usr/bin/adb`，版本 `34.0.4-debian`；Host udev 权限已修复，设备节点为 `root:plugdev 0660`；通过显式 `-s axera-ax620e` 执行只读 shell 成功
+- UART：Linux 默认系统 Log/调试登录终端仍为 `ttyS0`，参数 `115200n8`；已按用户目标把 M5-Bus UART `/dev/ttyS1`（`serial1` / `/soc/ax_uart@4881000`，对应 `TRM_TXD/TRM_RXD`）改作额外运行期 root 登录 shell，`serial-getty@ttyS1.service` active/running，`llm-sys.service` 已 mask/inactive 以释放该 UART并阻止被其他 `llm-*` 服务依赖拉起；当前 ttyS1 使用 `--autologin root`，不需要账号/密码
 - SSH：未知
 - 网络：当前无可用外网路由；`eth0` 存在但 `DOWN/NO-CARRIER`，无 `wlan*`，无 `usb0/rndis/ecm/ncm` USB 网络接口；USB gadget 仅配置 `ffs.adb`（2026-06-02 ADB 只读观察）
 - apt 源：未知
 - 已安装 llm 包：未知
 - C/C++ 工具链：已确认 `build-essential`、`binutils`、`gcc/g++`、`make`、`libc6-dev`、`dpkg-dev` 存在；`gdb` 可执行文件存在但不是 dpkg 管理的 `gdb` 包；`gdbserver` 未安装（2026-06-02 ADB 只读观察）
-- 当前风险：未备份现场状态前，不做任何会修改设备的操作
+- SoC 温度读取：已确认 `/sys/class/thermal/thermal_zone0/type=soc_thm`，`temp` 为毫摄氏度；已新增 `scripts/read_soc_temp_adb.sh`，默认每 5 秒持续读取
+- Fan Module v1.1：用户已决定后续不再关注从 LLM 控制 Fan 模块；历史结论保留为 I2C 17/18 疑似反向和 `0x18` 未应答
+- 当前风险：M5-Bus UART 已不再用于 StackFlow/JSON API 通信；物理接入 M5-Bus UART 的外部终端可免账号密码获得 root shell；未完成完整 baseline，下一步仍需做只读 baseline 和低风险备份；温度读取输出显示设备侧时间为 `2023-08-22`，后续 baseline 需复核系统时间
 
 ## 3. 已确认需求
 
@@ -48,7 +50,8 @@
 - 2026-06-02 官方文档与原理图复核：M5-Bus 上的 Module LLM RX/TX 是模块与 M5 主控通信用 UART，走 StackFlow/JSON API，默认 115200bps 8N1；不是默认 Linux 登录终端。
 - 2026-06-02 官方原理图复核：Module LLM 原理图中 `TRM_TXD/TRM_RXD` 与 `DBG_TXD/DBG_RXD` 是两组不同信号；`DBG_TXD/DBG_RXD` 对应系统 Log/调试串口路径。
 - 2026-06-02 ADB 只读复核：当前 Linux 登录串口为 `ttyS0`。证据：`/proc/cmdline` 为 `console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000`；`/proc/consoles` 显示 `ttyS0`；`serial-getty@ttyS0.service` active/running；`/sys/class/tty/ttyS0/device` 指向 `4880000.ax_uart`；设备树 `serial0=/soc/ax_uart@4880000`。
-- 2026-06-02 ADB 只读复核：当前启用的 SoC UART 只有 `ax_uart@4880000` 和 `ax_uart@4881000`；`ttyS1` 对应 `4881000.ax_uart` 但未作为 console/getty。把登录终端移动到其他 UART 或 M5-Bus `TRM_TXD/TRM_RXD` 涉及 bootargs、systemd、设备树/pinmux 或硬件 Net-Tie，默认不实施。
+- 2026-06-02 ADB 只读复核：当前启用的 SoC UART 只有 `ax_uart@4880000` 和 `ax_uart@4881000`；`ttyS1` 对应 `4881000.ax_uart`。首次复核时 `ttyS1` 未作为 console/getty，后续已按用户目标新增 `serial-getty@ttyS1.service`，但仍不迁移 kernel console/earlycon。
+- 2026-06-02 用户明确要求：让外部带屏/键盘嵌入式开发板作为实体终端，通过 M5-Bus UART 与 Module LLM 登录和 shell 交互。已确认 `/dev/ttyS1` 被 `/opt/m5stack/bin/llm_sys` 占用；随后 mask `llm-sys.service`，启用 `serial-getty@ttyS1.service`，为 ttyS1 写入 115200 autologin root 的实例级 drop-in。当前登录不需要账号/密码；注意：这会牺牲 M5-Bus StackFlow/JSON 通信，不提供 early boot log。
 - 2026-06-02 用户意图澄清：串口登录相关任务按“外部实体终端设备通过 UART 获得 Module LLM Linux 登录 shell”的应用场景理解，不按 Linux `tty1` 虚拟控制台术语字面处理。
 - 2026-06-02 ADB 只读复核：设备内置 Ubuntu 22.04 LTS 上已安装 C/C++ 基础构建链：`build-essential 12.9ubuntu3`、`binutils 2.38-4ubuntu2.6`、`binutils-aarch64-linux-gnu 2.38-4ubuntu2.6`、`gcc/g++` 元包 `4:11.2.0-1ubuntu1`，实际 `gcc/g++ 11.4.0`，目标 `aarch64-linux-gnu`。
 - 2026-06-02 ADB 只读复核：`/usr/bin/gdb` 存在，版本 `GNU gdb 9.2`，但 `dpkg-query gdb` 显示 `unknown ok not-installed` 且 `dpkg -S /usr/bin/gdb` 无归属；`gdbserver` 未安装。
@@ -59,14 +62,15 @@
 每次会话都重新填写或更新为“本次观察值”，不要作为永久事实跨机器套用。
 
 ```text
-OS: Microsoft Windows 10 专业版 10.0.19045, 64 位（本次观察）
-Shell: PowerShell 7.5.5（本次观察）；脚本调用 Windows PowerShell 5.1
+OS: Ubuntu 24.04.4 LTS, Linux 6.8.0-117-generic x86_64（本次观察）
+Shell: /usr/bin/zsh（本次观察）；脚本调用 Bash
 Codex version:
-adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe（官方 ZIP 安装；未改全局 PATH）
-adb version: Android Debug Bridge version 1.0.41, Version 37.0.0-14910828
-adb devices -l output file: inventory/before/host-tools-20260602-164709.txt
-USB permissions / driver state: Host PnP 已识别 ax620e-adb，WinUSB 驱动，见 inventory/before/usb-adb-device-20260602-163018.txt
-ssh client: C:\Windows\System32\OpenSSH\ssh.exe, OpenSSH_for_Windows_9.5p1（本次观察）
+adb path: /usr/bin/adb（Linux distro package；实际安装路径 /usr/lib/android-sdk/platform-tools/adb）
+adb version: Android Debug Bridge version 1.0.41, Version 34.0.4-debian
+adb devices -l output file: inventory/before/adb-reconnect-success-20260602-192018.txt
+ADB permission diagnosis output file: inventory/before/adb-linux-permission-diagnosis-20260602-190543.txt
+USB permissions / driver state: `32c9:2003 axera ax620e-adb` 已被 lsusb 识别；Host udev 规则 `/etc/udev/rules.d/51-m5stack-axera-adb.rules` 已落地；设备节点 `/dev/bus/usb/001/015` 为 `root:plugdev 0660`
+ssh client: OpenSSH_9.6p1 Ubuntu-3ubuntu13.16（本次观察）
 serial tool:
 network access:
 ```
@@ -77,8 +81,8 @@ network access:
 ADB serial 和 USB 端口只记录为本次会话观察值；换线、换口、重启、换主机后必须重新扫描。
 
 ```text
-连接方式: USB-C / ADB（本次观察）
-本次 ADB serial: axera-ax620e（本次观察；换线/重启后必须重新扫描）
+连接方式: USB-C / ADB（本次观察；当前 Linux Host 已可用）
+本次 ADB serial: axera-ax620e（本次观察；当前状态 `device`，换线/重启后必须重新扫描）
 本次 UART port:
 本次 SSH IP:
 SSH user:
@@ -94,11 +98,15 @@ SSH user:
 - [ ] 建立任务目录
 - [ ] 初始化 git
 - [x] 阅读官方文档（已复核 M5-Bus UART / 调试串口用途）
-- [x] 主机 OS 检查（本次观察：Windows 10 + PowerShell 7.5.5）
-- [x] ADB 安装/版本检查（官方 Platform Tools 已安装，版本 37.0.0-14910828）
-- [x] 当前 USB 设备扫描（Windows PnP 已识别 ax620e-adb）
-- [x] 当前 ADB 设备扫描（唯一 `device` 状态设备：`axera-ax620e`）
-- [x] ADB 连接确认（只读 shell 验证成功）
+- [x] 主机 OS 检查（本次观察：Ubuntu 24.04.4 LTS + zsh；早前观察为 Windows 10 + PowerShell 7.5.5）
+- [x] ADB 安装/版本检查（当前 Linux `/usr/bin/adb` 可用，版本 34.0.4-debian；早前 Windows 官方 Platform Tools 版本 37.0.0-14910828）
+- [x] 当前 USB 设备扫描（当前 Linux `lsusb` 已识别 `32c9:2003 axera ax620e-adb`；早前 Windows PnP 已识别 ax620e-adb）
+- [x] 当前 ADB 设备扫描可用性（当前 Linux 显示唯一 `device` 状态设备：`axera-ax620e`）
+- [x] ADB 连接确认（当前 Linux 通过显式 `-s axera-ax620e` 只读 shell 验证成功）
+- [x] SoC 温度只读读取脚本（`scripts/read_soc_temp_adb.sh`，5 秒间隔）
+- [x] Fan Module v1.1 控制资料复核（I2C `0x18`，pin 17/18；不与 M5-Bus UART 通信脚重叠）
+- [x] Fan Module v1.1 I2C 实机探测（I2C adapter 启用，但 `0x18` 未应答；温控脚本已准备，未执行寄存器写入）
+- [x] M5-Bus UART 实体终端登录（`ttyS1`/`TRM_TXD/TRM_RXD` 已启用 `serial-getty@ttyS1`；`llm-sys` 已禁用）
 - [ ] 设备只读探测
 - [ ] baseline 备份
 - [ ] 网络/SSH 确认
@@ -109,7 +117,7 @@ SSH user:
 
 ## 9. 当前卡点
 
-ADB 已通过官方 Android SDK Platform Tools 安装并可用；本次仅通过完整路径/`ADB_BIN` 使用，未改全局 PATH。已确认唯一 ADB 设备 `axera-ax620e` 可进入 root shell。下一步是执行 `tasks/03_device_baseline_backup.md`，做只读 baseline 探测和 `/etc/apt` 备份；不要直接进入 apt/SSH 修改。回家后换开发机继续时，必须重新确认 Host OS、`adb`、`ssh` 和 `adb devices -l`，不能沿用本机路径或本次 serial。
+当前 Linux Host 的 ADB 权限问题已修复。用户已授权执行 `scripts/fix_m5stack_adb_udev.sh`，Host 侧规则 `/etc/udev/rules.d/51-m5stack-axera-adb.rules` 已写入，设备节点变为 `root:plugdev 0660`。`adb devices -l` 显示唯一 `device` 状态设备 `axera-ax620e`，显式 serial 的只读 shell 验证成功。下一步是执行 `tasks/03_device_baseline_backup.md`，做只读 baseline 探测和 `/etc/apt` 备份；不要直接进入 apt/SSH 修改。
 
 ## 10. 关键文件与输出
 
@@ -140,7 +148,30 @@ ADB 已通过官方 Android SDK Platform Tools 安装并可用；本次仅通过
 - `inventory/before/serial-login-config-adb-20260602-174529.txt`：Linux console/getty/tty 只读检查。
 - `inventory/before/serial-login-devicetree-adb-20260602-174558.txt`：设备树 UART alias 和 `ttyS0/ttyS1` 映射只读检查。
 - `inventory/before/serial-uart-status-adb-20260602-174644.txt`：SoC UART 节点启用状态只读检查。
+- `inventory/before/host-tools-20260602-184723.txt`：当前 Linux Host 工具与 USB/ADB 预检；`adb` 可用，设备 `axera-ax620e` 为 `no permissions`。
+- `inventory/before/adb-linux-permission-diagnosis-20260602-190543.txt`：当前 Linux Host ADB 权限诊断；确认缺少 `32c9:2003` udev 规则。
+- `scripts/fix_m5stack_adb_udev.sh`：Host 侧 M5Stack/AXERA ADB udev 修复脚本，默认 dry-run，`APPLY=1` 时需要 sudo。
+- `/etc/udev/rules.d/51-m5stack-axera-adb.rules`：当前 Linux Host 已应用的 Host 侧 udev 规则（不在仓库内）。
+- `inventory/before/adb-reconnect-success-20260602-192018.txt`：当前 Linux Host ADB 权限修复后的 preflight 与只读 shell 验证输出。
+- `scripts/read_soc_temp_adb.sh`：Host 侧通过 ADB 每 5 秒读取 Module LLM SoC 温度的只读脚本。
+- `inventory/before/soc-temp-interface-scan-20260602-192732.txt`：SoC thermal zone 扫描输出。
+- `inventory/before/soc-temp-read-20260602-192730.txt`：`COUNT=3 INTERVAL=5` 温度读取验证输出。
+- `scripts/fan_temp_control_adb.sh`：Host 侧通过 ADB/I2C 按 SoC 温度控制 Fan Module v1.1 的脚本；未检测到 `0x18` 时不写寄存器；当前已不作为后续目标。
+- `inventory/before/m5bus-i2c-fan-scan-20260602-215510.txt`：I2C adapter、Fan `0x18` 目标探测和读模式扫描输出。
+- `inventory/before/fan-temp-control-attempt-20260602-215650.txt`：温控脚本短测输出；因 Fan `0x18` 未检测到，未写风扇寄存器。
+- `scripts/enable_m5bus_uart_login_adb.sh`：Host 侧通过 ADB 启用/回滚 M5-Bus UART `/dev/ttyS1` 登录的脚本。
+- `inventory/before/m5bus-uart-login-preflight-20260602-220954.txt`：M5-Bus UART 登录任务前 ADB preflight。
+- `inventory/before/m5bus-uart-login-readonly-20260602-221041.txt`：UART、getty、进程和 `/dev/ttyS1` 占用只读探测。
+- `inventory/before/m5bus-uart-login-llm-services-20260602-221203.txt`：`llm-sys.service` 与 `/dev/ttyS1` 占用证据。
+- `inventory/before/m5bus-uart-login-dryrun-20260602-221426.txt`：M5-Bus UART 登录脚本 dry-run。
+- `inventory/after/m5bus-uart-login-apply-20260602-221439.txt`：实际应用输出；设备侧备份目录 `/root/m5bus-uart-login-backup-20260602-221439`。
+- `inventory/after/m5bus-uart-login-verify-20260602-221559.txt`：初次后验验证输出；`serial-getty@ttyS1` active/running，`llm-sys` disabled/inactive，`ttyS1` 为 115200。
+- `inventory/after/m5bus-uart-login-auth-check-20260602-221842.txt`：登录认证确认；ttyS1 使用 `--autologin root`，当前 `/dev/ttyS1` 上为 `/bin/login -f` 和 `-bash`，不需要账号/密码。
+- `inventory/after/llm-reboot-for-lcd-terminal-20260602-223436.txt`：用户要求重启后的首次验证；发现 `llm-sys.service` 虽 disabled 仍被其他 `llm-*` 服务依赖拉起并重新占用 `/dev/ttyS1`。
+- `inventory/before/llm-sys-post-reboot-autostart-cause-20260602-223543.txt`：确认其他 `llm-*` 服务 `RequiredBy=llm-sys.service`，单纯 disable 不足。
+- `inventory/after/m5bus-uart-login-mask-llm-sys-20260602-223610.txt`：补充 mask `llm-sys.service` 后，`ttyS1` 只剩 login/bash 占用。
+- `inventory/after/llm-reboot-after-mask-verify-20260602-223640.txt`：第二次重启验证；`llm-sys.service` masked/inactive，`serial-getty@ttyS1` active/running，持久化生效。
 
 ## 11. 下一步
 
-在新开发机上继续时，先从 GitHub 拉取仓库并进入 `M5_projs/ModuleLLM/EnvConfig/`，读取 `AGENTS.md` 和 `context/SESSION_HANDOFF.md`。随后识别 Host OS/shell，检查 `adb` 与 `ssh`，执行 `adb version`、`adb start-server`、`adb devices -l`；若只有一个 `device` 状态设备，再执行 `tasks/03_device_baseline_backup.md` 做只读探测与备份。设备侧仍只读，不修改配置。
+继续时先读取 `AGENTS.md` 和 `context/SESSION_HANDOFF.md`。随后重新执行 `adb version`、`adb start-server`、`adb devices -l`；若仍只有一个 `device` 状态设备 `axera-ax620e`，执行 `tasks/03_device_baseline_backup.md` 做只读探测与备份。若要恢复 M5-Bus StackFlow/JSON 通信，执行 `MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>`。若换线/重启/换主机后再次出现 `no permissions`，再按 `scripts/fix_m5stack_adb_udev.sh` 的 Host 侧 udev 规则处理。

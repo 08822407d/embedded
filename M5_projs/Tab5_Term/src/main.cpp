@@ -11,6 +11,7 @@ constexpr uint16_t kStatusBackgroundColor = TFT_DARKGREEN;
 constexpr uint16_t kStatusTextColor = TFT_WHITE;
 constexpr uint16_t kTerminalTextColor = TFT_GREEN;
 constexpr size_t kMaxBytesPerLoop = 96;
+constexpr size_t kMaxUsbBridgeBytesPerLoop = 64;
 constexpr uint32_t kM5UpdateIntervalMs = 20;
 
 uint32_t lastM5UpdateMs = 0;
@@ -23,7 +24,14 @@ void drawStatusBar()
     M5.Display.setTextColor(kStatusTextColor, kStatusBackgroundColor);
     M5.Display.setTextSize(1);
     M5.Display.setCursor(4, 10);
-    M5.Display.print("Tab5 UART Viewer 115200 8N1 RX=G38");
+#if ENABLE_USB_LOGIN_UART_BRIDGE
+    M5.Display.printf(
+        "Tab5 UART Bridge 115200 8N1 RX=G%d TX=G%d",
+        LOGIN_UART_RX_PIN,
+        LOGIN_UART_TX_PIN);
+#else
+    M5.Display.printf("Tab5 UART Viewer 115200 8N1 RX=G%d", LOGIN_UART_RX_PIN);
+#endif
 }
 
 void setupDisplay()
@@ -71,6 +79,46 @@ void writeToDebug(uint8_t byte)
 {
     Serial.write(byte);
 }
+
+void readLoginUartToDisplayAndDebug()
+{
+    size_t processed = 0;
+
+    while (LoginSerial.available() > 0 && processed < kMaxBytesPerLoop) {
+        const int value = LoginSerial.read();
+        if (value < 0) {
+            break;
+        }
+
+        const auto byte = static_cast<uint8_t>(value);
+        writeToDisplay(byte);
+        writeToDebug(byte);
+        ++processed;
+    }
+}
+
+void bridgeUsbToLoginUart()
+{
+#if ENABLE_USB_LOGIN_UART_BRIDGE
+    size_t processed = 0;
+
+    while (Serial.available() > 0 && processed < kMaxUsbBridgeBytesPerLoop) {
+        const int value = Serial.read();
+        if (value < 0) {
+            break;
+        }
+
+        LoginSerial.write(static_cast<uint8_t>(value));
+        ++processed;
+    }
+
+#if ENABLE_USB_BRIDGE_DEBUG_LOG
+    if (processed > 0) {
+        Serial.printf("\r\n[usb->login %u bytes]\r\n", static_cast<unsigned>(processed));
+    }
+#endif
+#endif
+}
 } // namespace
 
 void setup()
@@ -87,6 +135,9 @@ void setup()
 
     Serial.println();
     Serial.println("Tab5 minimal UART viewer started");
+#if ENABLE_USB_LOGIN_UART_BRIDGE
+    Serial.println("USB to login UART bridge enabled");
+#endif
     Serial.printf(
         "Login UART: baud=%u 8N1 RX=G%d TX=G%d\r\n",
         LOGIN_UART_BAUD,
@@ -96,19 +147,8 @@ void setup()
 
 void loop()
 {
-    size_t processed = 0;
-
-    while (LoginSerial.available() > 0 && processed < kMaxBytesPerLoop) {
-        const int value = LoginSerial.read();
-        if (value < 0) {
-            break;
-        }
-
-        const auto byte = static_cast<uint8_t>(value);
-        writeToDisplay(byte);
-        writeToDebug(byte);
-        ++processed;
-    }
+    readLoginUartToDisplayAndDebug();
+    bridgeUsbToLoginUart();
 
     const uint32_t now = millis();
     if (now - lastM5UpdateMs >= kM5UpdateIntervalMs) {
