@@ -50,6 +50,21 @@ void recoverFlipTest();
 void directSweepTest();
 void brakeSweepTest();
 
+// ===== 独立"起跳/急救"动作（2026-06-03，可从串口直接调用）=====
+//   起跳=从静止态A/B朝平衡踢；急救=从第三面朝平衡踢回A/B。两机构：突然加速(direct)/蓄能急停(brake)。
+//   都用 prepStill(姿态无关标定+滤波播种) + sweepGuard(宽松守护)。需在 imuInit/motorInit(电流模式) 后调用。
+void confirmKickDirection();   // 命令m：方向确认(★起跳/急救前必做)——温和蓄能急停，陀螺积分+干净加速度判定朝平衡/朝外
+void diffDirectionVerify();    // 命令v：差分方向验证——同机动两向各一次，对比抵消共模(融合pitch)污染、放大真值
+void directSwingUpAction();    // 命令1：突然加速·起跳（A/B→朝平衡）
+void directRescueAction();     // 命令2：突然加速·急救（第三面→朝平衡回A/B）
+void brakeSwingUpAction();     // 命令3：蓄能急停·起跳（A/B→朝平衡）
+void brakeRescueAction();      // 命令4：蓄能急停·急救（第三面→朝平衡回A/B）
+void driveToThirdFaceAction(); // 命令e：导向第三面（A/B→朝外踢到危险态/第三面）
+
+// ②急救参数探测实验：检测姿态→若不在第三面则先导向第三面→逐档上探蓄能急停急救把机体磕回A/B，记录响应。
+//   需在 imuInit/motorInit(电流模式) 后调用。
+void recoverExperiment();
+
 // 危险边界渐进探测：当前静止态 st(+1=B/-1=A)，朝外棱方向渐进加流找逼近翻倒的临界电流(带符号)。
 //   速度钳+小偏移即停，绝不真翻。需在 imuInit/motorInit(电流模式) 后调用。
 float dangerBoundaryProbe(int st);
@@ -93,3 +108,12 @@ void swingUpStepwiseTest();
 // 起跳直接到平衡 + 保持平衡（decision 006）：识别A/B→实测起跳方向→起跳冲量送机体到平衡附近→
 //   接管平衡控制器(balance.*，PID主用/LQR备用)钳 θ≈0。危险即断电、仅监视。需 motorInitSpeed 后调用。
 void swingUpToBalance();
+
+// 起跳蓄能转速微调（命令 [ 减小 / ] 加大 ±40rpm）：swingUpToBalance 用蓄能急停起跳，从低 ramp 避免冲穿。
+void swingUpSpinNudge(int d);
+
+// 纯平衡保持(命令 p)：隔离起跳，手扶机体到近直立扶稳→标定→松手→PID 上电(软钳)，验证控制器恢复性。
+void pureBalanceHold();
+
+// 方向净测(命令 n)：低速干净探(飞轮钳<500rpm)，读飞轮加速方向(编码器)+机体推向(干净陀螺)，钉死作用量符号(decision 007)。
+void directionProbe();

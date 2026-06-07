@@ -22,6 +22,7 @@
 - [004 电机供电与控制方式](decisions/004-motor-power-and-mode.md) — Grove 5V 供电不足致推不动；速度模式无改善(同~600rpm)；查证 XT30 接 12-16V 可得 3× 力矩
 - [005 启动自动表征序列](decisions/005-startup-characterization-sequence.md) — 开机固定流程：供电探测→识别A/B→逐侧两方向渐进探临界(朝平衡/朝外棱)，就近探测、禁跨边、不对称
 - [006 固定流程契约：全速度模式 初始化→监视→探测→起跳落地](decisions/006-fixed-speedmode-pipeline.md) — ★**锁定基线**：四阶段+硬保底；危险=横向轴、面内交消能/自救；探测多轮一次性递增、起跳一次性、回落/越平衡反向消能
+- [007 作用量符号(编码器重厘清)+动量预算墙](decisions/007-actuation-sign-and-momentum-wall.md) — ★信号可靠性分级(高速只信飞轮编码器)；机体推向=飞轮角加速度反向；**+电流=从B朝平衡(推翻"负电流朝平衡")**；蓄能急停调用方符号全反(致每次倒第三面)；平衡授权被~1900rpm动量预算墙限死
 
 ## protocols/
 - [RollerCAN I²C 控制](protocols/rollercan-i2c.md) — 接线/地址0x64/官方库 UnitRollerI2C API/定标/帧协议
@@ -35,3 +36,4 @@
 - [2026-05-30 滤波加固/速度模式/12V升级/playbook（总交接）](sessions/2026-05-30-filter-power-playbook.md) — ★当天总入口：校准加固、速度模式无改善、供电诊断、XT30接12V转速×3、起摆playbook、待办与下一步
 - [2026-05-31 启动序列/起跳落地受阻/翻倒兜底恢复](sessions/2026-05-31-startup-seq-swingup-recovery.md) — 启动表征序列(已提交)；起跳落地受阻(反作用轮刹车搬动量非耗能)；面内翻越可击杀自救；待决策提交方式
 - [2026-06-01 回归电流模式/命令架构/系统辨识](sessions/2026-06-01-current-mode-cmd-arch-sysid.md) — ★电流模式回归+命令常驻(烧一次串口发命令,r=急救磕回A/B)+83Hz紧凑日志+辨识方案B(温和参数已烧待采,bridge多实例坑)
+- [2026-06-04 ②急救动作系统/第三面硬阱定论/差分方向验证](sessions/2026-06-04-third-face-trap-differential.md) — ★独立动作命令(m/1/2/3/4/e/x/v)+sendcmd/logtail工具+差分验证(两向真值±25°反对称,单发倾倒到棱边即回弹,第三面无法脱阱=任务②负结论)
