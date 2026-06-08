@@ -1,0 +1,82 @@
+## override
+
+[Service]
+
+ExecStart=
+
+ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I vt102
+
+
+
+## unit
+
+ExecStart={ path=/sbin/agetty ; argv[]=/sbin/agetty -L --autologin root --noclear 921600 ttyS1 vt102 ; ignore_errors=yes ; start_time=[Tue 2023-08-22 09:17:45 CST] ; stop_time=[n/a] ; pid=460388 ; code=(null) ; status=0/0 }
+
+LoadState=loaded
+
+ActiveState=active
+
+SubState=running
+
+FragmentPath=/lib/systemd/system/serial-getty@.service
+
+DropInPaths=/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
+
+UnitFileState=enabled
+
+
+
+## llm-sys
+
+LoadState=masked
+
+ActiveState=inactive
+
+SubState=dead
+
+FragmentPath=/etc/systemd/system/llm-sys.service
+
+UnitFileState=masked
+
+
+
+## line settings
+
+speed 921600 baud; rows 24; columns 80; line = 0;
+
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+werase = ^W; lnext = <undef>; discard = <undef>; min = 1; time = 0;
+
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl ixon ixoff
+
+-iuclc -ixany imaxbel iutf8
+
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+
+isig -icanon -iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+
+echoctl echoke -flusho -extproc
+
+
+
+## ttyS1 owners
+
+pid=460388 fd=0 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=460388 fd=1 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=460388 fd=2 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=460406 fd=0 target=/dev/ttyS1 cmd=-bash
+
+pid=460406 fd=1 target=/dev/ttyS1 cmd=-bash
+
+pid=460406 fd=2 target=/dev/ttyS1 cmd=-bash
+
+pid=460406 fd=255 target=/dev/ttyS1 cmd=-bash
+

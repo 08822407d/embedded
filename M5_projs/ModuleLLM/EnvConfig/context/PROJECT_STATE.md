@@ -1,6 +1,6 @@
 # PROJECT_STATE — M5Stack Module LLM Kit（AX630C）
 
-最后更新：2026-06-02  
+最后更新：2026-06-08
 维护者：用户 + Codex
 
 ## 1. 项目目标
@@ -9,14 +9,14 @@
 
 ## 2. 当前状态总览
 
-- 阶段：2 / 当前 Linux 主机 ADB 权限已修复；M5-Bus UART 登录已按用户目标启用；下一步设备 baseline 备份
+- 阶段：2 / 当前 Windows 主机 ADB 已连接；M5-Bus UART 登录已改为 921600 8N1 并通过重启验证；下一步设备 baseline 备份
 - 当前任务文件：`tasks/03_device_baseline_backup.md`
-- 当前交接：2026-06-02 下班前触发跨开发机保存；本项目目录将通过 GitHub 保存，回家后在新开发机拉取继续
-- 设备连接：当前 Linux Host USB 识别 `32c9:2003 axera ax620e-adb`；已新增 Host udev 规则 `/etc/udev/rules.d/51-m5stack-axera-adb.rules`；`adb devices -l` 显示唯一 `device` 状态 serial `axera-ax620e`
-- 主机环境：本次观察为 Ubuntu 24.04.4 LTS + zsh；必须兼容 Windows 10 与 Linux 发行版
+- 最近一次跨机交接：2026-06-02 已保存交接上下文；每次换机仍按 `SESSION_HANDOFF.md` 重新做 Host/ADB 检查
+- 设备连接：当前 Windows Host 的 `adb devices -l` 显示唯一 `device` 状态 serial `axera-ax620e`；该 serial 仅为本次观察值
+- 主机环境：本次观察为 Windows 10 专业版 10.0.19045 + PowerShell 7.5.5；必须兼容 Windows 10 与 Linux 发行版
 - 设备系统版本：Ubuntu 22.04 LTS；hostname `m5stack-LLM`；kernel `Linux 4.19.125` aarch64（当前 Linux Host ADB 只读验证）
-- ADB：当前 Linux Host 已有 `/usr/bin/adb`，版本 `34.0.4-debian`；Host udev 权限已修复，设备节点为 `root:plugdev 0660`；通过显式 `-s axera-ax620e` 执行只读 shell 成功
-- UART：Linux 默认系统 Log/调试登录终端仍为 `ttyS0`，参数 `115200n8`；已按用户目标把 M5-Bus UART `/dev/ttyS1`（`serial1` / `/soc/ax_uart@4881000`，对应 `TRM_TXD/TRM_RXD`）改作额外运行期 root 登录 shell，`serial-getty@ttyS1.service` active/running，`llm-sys.service` 已 mask/inactive 以释放该 UART并阻止被其他 `llm-*` 服务依赖拉起；当前 ttyS1 使用 `--autologin root`，不需要账号/密码
+- ADB：当前 Windows Host 使用 `C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe`，版本 `37.0.0-14910828`；通过显式 `-s axera-ax620e` 执行 shell 成功
+- UART：Linux 默认系统 Log/调试登录终端仍为 `ttyS0`，参数 `115200n8`；M5-Bus UART `/dev/ttyS1`（`serial1` / `/soc/ax_uart@4881000`，对应 `TRM_TXD/TRM_RXD`）已改作额外运行期 root 登录 shell，当前参数为 `921600 8N1`、无硬件流控；`serial-getty@ttyS1.service` enabled/active，`llm-sys.service` masked/inactive；ttyS1 使用 `--autologin root`
 - SSH：未知
 - 网络：当前无可用外网路由；`eth0` 存在但 `DOWN/NO-CARRIER`，无 `wlan*`，无 `usb0/rndis/ecm/ncm` USB 网络接口；USB gadget 仅配置 `ffs.adb`（2026-06-02 ADB 只读观察）
 - apt 源：未知
@@ -51,7 +51,8 @@
 - 2026-06-02 官方原理图复核：Module LLM 原理图中 `TRM_TXD/TRM_RXD` 与 `DBG_TXD/DBG_RXD` 是两组不同信号；`DBG_TXD/DBG_RXD` 对应系统 Log/调试串口路径。
 - 2026-06-02 ADB 只读复核：当前 Linux 登录串口为 `ttyS0`。证据：`/proc/cmdline` 为 `console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000`；`/proc/consoles` 显示 `ttyS0`；`serial-getty@ttyS0.service` active/running；`/sys/class/tty/ttyS0/device` 指向 `4880000.ax_uart`；设备树 `serial0=/soc/ax_uart@4880000`。
 - 2026-06-02 ADB 只读复核：当前启用的 SoC UART 只有 `ax_uart@4880000` 和 `ax_uart@4881000`；`ttyS1` 对应 `4881000.ax_uart`。首次复核时 `ttyS1` 未作为 console/getty，后续已按用户目标新增 `serial-getty@ttyS1.service`，但仍不迁移 kernel console/earlycon。
-- 2026-06-02 用户明确要求：让外部带屏/键盘嵌入式开发板作为实体终端，通过 M5-Bus UART 与 Module LLM 登录和 shell 交互。已确认 `/dev/ttyS1` 被 `/opt/m5stack/bin/llm_sys` 占用；随后 mask `llm-sys.service`，启用 `serial-getty@ttyS1.service`，为 ttyS1 写入 115200 autologin root 的实例级 drop-in。当前登录不需要账号/密码；注意：这会牺牲 M5-Bus StackFlow/JSON 通信，不提供 early boot log。
+- 2026-06-02 用户明确要求：让外部带屏/键盘嵌入式开发板作为实体终端，通过 M5-Bus UART 与 Module LLM 登录和 shell 交互。已确认 `/dev/ttyS1` 被 `/opt/m5stack/bin/llm_sys` 占用；随后 mask `llm-sys.service`，启用 `serial-getty@ttyS1.service`。当前登录不需要账号/密码；注意：这会牺牲 M5-Bus StackFlow/JSON 通信，不提供 early boot log。
+- 2026-06-08 已把 ttyS1 实例级 drop-in 从 115200 改为 `921600 8N1`；重启后复核 `ExecStart`、`stty`、getty 和 `llm-sys` 状态全部通过，未修改 ttyS0、bootargs、DTB、分区或认证方式。
 - 2026-06-02 用户意图澄清：串口登录相关任务按“外部实体终端设备通过 UART 获得 Module LLM Linux 登录 shell”的应用场景理解，不按 Linux `tty1` 虚拟控制台术语字面处理。
 - 2026-06-02 ADB 只读复核：设备内置 Ubuntu 22.04 LTS 上已安装 C/C++ 基础构建链：`build-essential 12.9ubuntu3`、`binutils 2.38-4ubuntu2.6`、`binutils-aarch64-linux-gnu 2.38-4ubuntu2.6`、`gcc/g++` 元包 `4:11.2.0-1ubuntu1`，实际 `gcc/g++ 11.4.0`，目标 `aarch64-linux-gnu`。
 - 2026-06-02 ADB 只读复核：`/usr/bin/gdb` 存在，版本 `GNU gdb 9.2`，但 `dpkg-query gdb` 显示 `unknown ok not-installed` 且 `dpkg -S /usr/bin/gdb` 无归属；`gdbserver` 未安装。
@@ -171,6 +172,12 @@ SSH user:
 - `inventory/before/llm-sys-post-reboot-autostart-cause-20260602-223543.txt`：确认其他 `llm-*` 服务 `RequiredBy=llm-sys.service`，单纯 disable 不足。
 - `inventory/after/m5bus-uart-login-mask-llm-sys-20260602-223610.txt`：补充 mask `llm-sys.service` 后，`ttyS1` 只剩 login/bash 占用。
 - `inventory/after/llm-reboot-after-mask-verify-20260602-223640.txt`：第二次重启验证；`llm-sys.service` masked/inactive，`serial-getty@ttyS1` active/running，持久化生效。
+- `inventory/before/m5bus-uart-921600-preflight-20260608-142242.txt`：本轮 Windows Host ADB preflight。
+- `inventory/before/m5bus-uart-921600-readonly-20260608-142430.txt`：改动前 ttyS1、getty、llm-sys、串口参数和占用进程快照。
+- `backups/m5bus-uart-login-backup-20260608-142700/`：改动前 drop-in、systemd、stty 和 cmdline 的 Host 侧备份；设备侧对应 `/root/m5bus-uart-login-backup-20260608-142700`。
+- `inventory/after/m5bus-uart-921600-apply-20260608-142718.txt`：实时应用 921600 后的验证。
+- `inventory/after/m5bus-uart-921600-reboot-preflight-20260608-142754.txt`：重启后重新扫描 ADB 设备的记录。
+- `inventory/after/m5bus-uart-921600-reboot-verify-20260608-142828.txt`：重启后 921600 8N1 持久化强校验，结果 `VERIFY=PASS`。
 
 ## 11. 下一步
 

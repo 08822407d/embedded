@@ -226,7 +226,7 @@ for p in /proc/device-tree/chosen/bootargs /proc/device-tree/aliases/serial0 /pr
 目标场景：
 
 - 外部带屏/键盘的嵌入式开发板作为实体串口终端，通过 M5-Bus UART 与 Module LLM 的 Linux shell 交互。
-- 外部开发板侧需要运行串口终端程序，参数 `115200 8N1`，无硬件流控，3.3V TTL，TX/RX 交叉，公共 GND。
+- 外部开发板侧需要运行串口终端程序，参数 `921600 8N1`，无硬件流控，3.3V TTL，TX/RX 交叉，公共 GND。
 
 采纳配置：
 
@@ -241,7 +241,7 @@ for p in /proc/device-tree/chosen/bootargs /proc/device-tree/aliases/serial0 /pr
 ```ini
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I vt102
 ```
 
 重要边界：
@@ -249,7 +249,7 @@ ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
 - `ttyS1` 不是 kernel console，也没有 earlycon；通过 M5-Bus UART 只能获得运行期登录 shell，看不到早期 boot log。
 - `ttyS0` / `DBG_TXD/DBG_RXD` 仍保留为系统 Log/调试登录路径。
 - 当前 `serial-getty@.service` 模板本身带 `--autologin root`；本次 ttyS1 drop-in 也沿用 autologin root。物理接触到 M5-Bus UART 的设备可直接获得 root shell，属于安全取舍。
-- 若需要账号/密码登录，可把 ttyS1 drop-in 改为不带 `--autologin root` 的 `agetty` 命令，例如 `ExecStart=-/sbin/agetty -L --noclear 115200 %I vt102`，然后 `systemctl daemon-reload && systemctl restart serial-getty@ttyS1.service`。执行前应确认 root 密码策略和恢复路径，不把密码写入仓库。
+- 若需要账号/密码登录，可把 ttyS1 drop-in 改为不带 `--autologin root` 的 `agetty` 命令，例如 `ExecStart=-/sbin/agetty -L --noclear 921600 %I vt102`，然后 `systemctl daemon-reload && systemctl restart serial-getty@ttyS1.service`。执行前应确认 root 密码策略和恢复路径，不把密码写入仓库。
 
 检测命令：
 
@@ -265,12 +265,18 @@ cat /etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
 - `llm-sys.service` 为 `inactive/dead` 且 `masked`。
 - `serial-getty@ttyS1.service` 为 `active/running` 且 `enabled`。
 - `/dev/ttyS1` 当前由 `/bin/login -f` / `-bash` 占用，而不是 `/opt/m5stack/bin/llm_sys`。
-- `stty -F /dev/ttyS1 -a` 显示 `speed 115200 baud`、`cs8`、`-cstopb`、`-parenb`、`-crtscts`。
+- `stty -F /dev/ttyS1 -a` 显示 `speed 921600 baud`、`cs8`、`-cstopb`、`-parenb`、`-crtscts`。
 
 执行脚本：
 
 ```bash
-APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+BAUD=921600 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+```
+
+脚本当前默认 `BAUD=921600`。若只想保留 ttyS1 登录但回退到旧波特率，执行：
+
+```bash
+BAUD=115200 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 ```
 
 回滚脚本：
@@ -298,6 +304,13 @@ MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 - `inventory/before/llm-sys-post-reboot-autostart-cause-20260602-223543.txt`
 - `inventory/after/m5bus-uart-login-mask-llm-sys-20260602-223610.txt`
 - `inventory/after/llm-reboot-after-mask-verify-20260602-223640.txt`
+- `inventory/before/m5bus-uart-921600-preflight-20260608-142242.txt`
+- `inventory/before/m5bus-uart-921600-readonly-20260608-142430.txt`
+- `inventory/before/m5bus-uart-921600-backup-20260608-142700.txt`
+- `backups/m5bus-uart-login-backup-20260608-142700/`
+- `inventory/after/m5bus-uart-921600-apply-20260608-142718.txt`
+- `inventory/after/m5bus-uart-921600-reboot-preflight-20260608-142754.txt`
+- `inventory/after/m5bus-uart-921600-reboot-verify-20260608-142828.txt`
 
 ### CFG-DEVICE-NET-001 — 设备联网路径
 
@@ -550,14 +563,14 @@ Host 侧脚本：
 
 ## 6. 当前整体最佳方案
 
-生成时间：2026-06-02
+生成时间：2026-06-08
 
 在当前采纳配置和已知约束下，整体最佳实施顺序为：
 
 1. Host 使用官方 Android Platform Tools，通过 `ADB_BIN` 指向 `adb.exe`。
 2. 每次会话先执行 Host ADB 工具检查和 `adb devices -l`。
 3. 通过 ADB 完成完整 baseline：系统、磁盘、网络、apt、包、服务状态。
-4. 串口登录保留默认 `ttyS0` / `DBG_TXD/DBG_RXD` / 系统 Log 调试路径，同时按用户当前目标把 M5-Bus UART `/dev/ttyS1` 改作额外运行期 root 登录 shell。
+4. 串口登录保留默认 `ttyS0` / `DBG_TXD/DBG_RXD` / 系统 Log 调试路径，同时按用户当前目标把 M5-Bus UART `/dev/ttyS1` 改作 `921600 8N1` 的额外运行期 root 登录 shell。
 5. 若需要恢复 M5-Bus StackFlow/JSON 通信，先回滚 `CFG-M5BUS-UART-LOGIN-001`。
 6. 使用扩展底座 RJ45 建立设备网络。
 7. 网络可用后备份 `/etc/apt`。

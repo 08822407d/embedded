@@ -1,7 +1,7 @@
 # PLAN_CURRENT — 当前实施方案
 
-版本：v0.3  
-最后更新：2026-06-02
+版本：v0.4
+最后更新：2026-06-08
 
 ## 总原则
 
@@ -44,7 +44,7 @@
 - Linux 登录终端 / 系统 Log 调试路径不是这组 M5-Bus 通信 UART，而是调试板或 Module13.2 LLM Mate 提供的系统 Log/调试串口路径。
 - ADB 实测当前 Linux 登录终端为 `ttyS0`，kernel bootargs 为 `console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x4880000`，systemd `serial-getty@ttyS0.service` 正在运行；该路径对应 `DBG_TXD/DBG_RXD` 系统 Log/调试串口。
 - 已按用户明确目标把 M5-Bus `TRM_TXD/TRM_RXD` 对应的 `/dev/ttyS1` 改作额外运行期登录口；默认 `ttyS0` / `DBG_TXD/DBG_RXD` 仍保留为 kernel console 和系统 Log/调试登录路径。
-- `ttyS1` 登录口当前使用 `--autologin root`，不需要账号/密码；代价是 `llm-sys.service` 已 mask/inactive，M5-Bus StackFlow/JSON 主控通信不可用。
+- `ttyS1` 登录口当前使用 `921600 8N1`、无硬件流控和 `--autologin root`，不需要账号/密码；代价是 `llm-sys.service` 已 mask/inactive，M5-Bus StackFlow/JSON 主控通信不可用。
 - 后续串口终端类任务按应用场景反推配置项：外部带屏幕/键盘的开发板通过 UART 登录 Module LLM 的 Linux shell，重点检查物理 UART、电气层、串口参数、kernel console、systemd getty、认证、shell 和业务串口占用，而不是要求用户先给出准确 `tty` 术语。
 
 ## 阶段 1.5：配置登记审计
@@ -82,6 +82,7 @@
 - 2026-06-02 追加观察：用户叠插 M5Stack Fan Module v1.1；资料复核显示其通过 I2C `0x18` 控制，M5-Bus 使用 pin 17/18 `SDA/SCL`，不与 Module LLM M5-Bus `TRM_TXD/TRM_RXD` UART 通信脚重叠。后续若实机控制，先只读确认 `/dev/i2c-*` 和 `0x18` 应答。
 - 2026-06-02 追加观察：Module LLM Linux 当前有 `/dev/i2c-0/2/4`，对应 device-tree I2C 控制器为 `okay`；但 Fan 默认地址 `0x18` 在三条总线上均未应答。已新增 `scripts/fan_temp_control_adb.sh`，脚本在未检测到 `0x18` 时退出且不写寄存器。
 - 2026-06-02 追加观察：用户已决定不再关注从 LLM 控制 Fan 模块；已将 M5-Bus UART `/dev/ttyS1` 改作外部实体终端登录口。重启验证后 `serial-getty@ttyS1.service` active/running，`llm-sys.service` masked/inactive，当前不需要账号/密码即可 autologin root。
+- 2026-06-08 追加观察：当前 Windows 10 Host 使用 Android Platform Tools `37.0.0-14910828`，唯一在线设备为本次观察值 `axera-ax620e`。已把 ttyS1 登录口改为 `921600 8N1`，并在模块重启后验证 drop-in、实际 `stty` 参数、getty enabled/active 和 `llm-sys` masked/inactive 全部符合预期。
 
 只读命令范围：
 

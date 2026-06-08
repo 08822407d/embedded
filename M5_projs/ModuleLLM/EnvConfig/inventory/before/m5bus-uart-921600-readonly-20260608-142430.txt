@@ -1,0 +1,154 @@
+## timestamp
+
+Tue Aug 22 09:14:56 CST 2023
+
+
+
+## identity
+
+m5stack-LLM
+
+Linux m5stack-LLM 4.19.125 #1 SMP PREEMPT Wed Nov 20 14:43:36 CST 2024 aarch64 aarch64 aarch64 GNU/Linux
+
+
+
+## ttyS1 device
+
+crw------- 1 root tty 4, 65 Aug 22 09:00 /dev/ttyS1
+
+/sys/devices/platform/soc/4881000.ax_uart
+
+
+
+## override
+
+[Service]
+
+ExecStart=
+
+ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
+
+
+
+## unit
+
+ExecStart={ path=/sbin/agetty ; argv[]=/sbin/agetty -L --autologin root --noclear 115200 ttyS1 vt102 ; ignore_errors=yes ; start_time=[Tue 2023-08-22 05:11:46 CST] ; stop_time=[n/a] ; pid=2374 ; code=(null) ; status=0/0 }
+
+LoadState=loaded
+
+ActiveState=active
+
+SubState=running
+
+FragmentPath=/lib/systemd/system/serial-getty@.service
+
+DropInPaths=/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
+
+UnitFileState=enabled
+
+
+
+## llm-sys
+
+LoadState=masked
+
+ActiveState=inactive
+
+SubState=dead
+
+FragmentPath=/etc/systemd/system/llm-sys.service
+
+UnitFileState=masked
+
+
+
+## line settings
+
+speed 115200 baud; rows 24; columns 80; line = 0;
+
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+werase = ^W; lnext = <undef>; discard = <undef>; min = 1; time = 0;
+
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl ixon ixoff
+
+-iuclc -ixany imaxbel iutf8
+
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+
+isig -icanon -iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+
+echoctl echoke -flusho -extproc
+
+
+
+## agetty version
+
+agetty from util-linux 2.37.2 (flow control, hints, issue, issue.d, keyboard mode, plymouth, reload, syslog, widechar)
+
+
+
+## stty supported speeds
+
+   raw           same as -ignbrk -brkint -ignpar -parmrk -inpck -istrip
+
+                 -inlcr -igncr -icrnl -ixon -ixoff -icanon -opost
+
+                 -isig -iuclc -ixany -imaxbel -xcase min 1 time 0
+
+   -raw          same as cooked
+
+   sane          same as cread -ignbrk brkint -inlcr -igncr icrnl
+
+                 icanon iexten echo echoe echok -echonl -noflsh
+
+                 -ixoff -iutf8 -iuclc -ixany imaxbel -xcase -olcuc -ocrnl
+
+                 opost -ofill onlcr -onocr -onlret nl0 cr0 tab0 bs0 vt0 ff0
+
+                 isig -tostop -ofdel -echoprt echoctl echoke -extproc -flusho,
+
+                 all special characters to their default values
+
+
+
+Handle the tty line connected to standard input.  Without arguments,
+
+prints baud rate, line discipline, and deviations from stty sane.  In
+
+settings, CHAR is taken literally, or coded as in ^c, 0x37, 0177 or
+
+127; special values ^- or undef used to disable special characters.
+
+
+
+GNU coreutils online help: <https://www.gnu.org/software/coreutils/>
+
+Report any translation bugs to <https://translationproject.org/team/>
+
+Full documentation <https://www.gnu.org/software/coreutils/stty>
+
+or available locally via: info '(coreutils) stty invocation'
+
+
+
+## ttyS1 owners
+
+pid=2374 fd=0 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=2374 fd=1 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=2374 fd=2 target=/dev/ttyS1 cmd=/bin/login -f
+
+pid=2454 fd=0 target=/dev/ttyS1 cmd=bash -l
+
+pid=2454 fd=1 target=/dev/ttyS1 cmd=bash -l
+
+pid=2454 fd=2 target=/dev/ttyS1 cmd=bash -l
+
+pid=2454 fd=255 target=/dev/ttyS1 cmd=bash -l
+

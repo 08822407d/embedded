@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 2026-06-08 — M5-Bus ttyS1 登录口改为 921600 8N1
+
+- 当前 Windows Host ADB preflight 成功，Platform Tools 版本 `37.0.0-14910828`，唯一在线设备为本次观察值 `axera-ax620e`。
+- 改动前确认 ttyS1 使用 115200 8N1、`serial-getty@ttyS1.service` enabled/active、`llm-sys.service` masked/inactive。
+- 使用伪终端只读验证设备 `stty` 支持 921600。
+- 改动前设备备份：`/root/m5bus-uart-login-backup-20260608-142700`；已拉回 `backups/m5bus-uart-login-backup-20260608-142700/`。
+- 将 `/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf` 的 `agetty` 波特率改为 921600，保留 8N1、无硬件流控和 `--autologin root`。
+- 实时验证和模块重启后的强校验均通过：`stty` 为 `speed 921600 baud`、`cs8`、`-cstopb`、`-parenb`、`-crtscts`；getty enabled/active；`llm-sys` masked/inactive；结果 `VERIFY=PASS`。
+- 未修改 `ttyS0`、kernel bootargs、earlycon、DTB、分区、网络、SSH、密码或 apt 配置。
+- 更新 `scripts/enable_m5bus_uart_login_adb.sh`：支持 `BAUD` 参数，当前默认 921600，状态快照包含 ttyS1 的 `stty` 参数；保留 ttyS1 登录但回退旧速率可用 `BAUD=115200 APPLY=1`。
+- 新增 `.gitattributes`，强制本脚本使用 LF；已修复 Windows 工作树中的 CRLF，并通过 Git Bash `bash -n` 语法检查。
+- 证据：`inventory/before/m5bus-uart-921600-preflight-20260608-142242.txt`、`inventory/before/m5bus-uart-921600-readonly-20260608-142430.txt`、`inventory/before/m5bus-uart-921600-backup-20260608-142700.txt`、`inventory/after/m5bus-uart-921600-apply-20260608-142718.txt`、`inventory/after/m5bus-uart-921600-reboot-preflight-20260608-142754.txt`、`inventory/after/m5bus-uart-921600-reboot-verify-20260608-142828.txt`。
+
 ## 2026-06-02 — 启用 M5-Bus UART 实体终端登录
 
 - 用户决定后续不再关注从 LLM 控制 Fan 模块，转而要求让外部带屏/键盘嵌入式开发板作为实体串口终端，通过 M5-Bus UART 登录 Module LLM 并进行 shell 交互。

@@ -5,11 +5,12 @@ usage() {
   cat <<'EOF'
 Usage:
   bash scripts/enable_m5bus_uart_login_adb.sh [serial]
-  APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh [serial]
+  BAUD=921600 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh [serial]
   MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh [serial]
 
 Default mode is dry-run. This script reclaims Module LLM M5-Bus UART
-(/dev/ttyS1) from llm-sys and enables serial login on ttyS1 at 115200 8N1.
+(/dev/ttyS1) from llm-sys and enables serial login on ttyS1 at BAUD 8N1.
+BAUD defaults to 921600.
 EOF
 }
 
@@ -21,7 +22,16 @@ fi
 ADB_BIN=${ADB_BIN:-adb}
 MODE=${MODE:-enable}
 APPLY=${APPLY:-0}
+BAUD=${BAUD:-921600}
 SERIAL=${1:-${ADB_SERIAL:-}}
+
+case "$BAUD" in
+  9600|19200|38400|57600|115200|230400|460800|500000|576000|921600|1000000|1152000|1500000|2000000|2500000|3000000|3500000|4000000) ;;
+  *)
+    echo "ERROR: unsupported BAUD value: $BAUD" >&2
+    exit 1
+    ;;
+esac
 
 if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
   echo "ERROR: adb not found. Set ADB_BIN or install Android Platform Tools." >&2
@@ -52,10 +62,10 @@ esac
 HOST_TS=$(date +%Y%m%d-%H%M%S)
 
 echo "ADB serial: $SERIAL"
-echo "MODE=$MODE APPLY=$APPLY"
+echo "MODE=$MODE APPLY=$APPLY BAUD=$BAUD"
 
 "$ADB_BIN" -s "$SERIAL" shell \
-  "MODE='$MODE' APPLY='$APPLY' HOST_TS='$HOST_TS' sh -s" <<'EOS'
+  "MODE='$MODE' APPLY='$APPLY' BAUD='$BAUD' HOST_TS='$HOST_TS' sh -s" <<'EOS'
 set -eu
 
 backup_dir="/root/m5bus-uart-login-backup-${HOST_TS}"
@@ -77,6 +87,9 @@ snapshot() {
     systemctl show llm-sys.service serial-getty@ttyS1.service \
       -p LoadState -p ActiveState -p SubState -p UnitFileState -p FragmentPath \
       --no-pager 2>/dev/null || true
+    echo
+    echo "## ttyS1 line settings"
+    stty -F /dev/ttyS1 -a 2>/dev/null || true
     echo
     echo "## ttyS1 users"
     for fd in /proc/[0-9]*/fd/*; do
@@ -105,7 +118,7 @@ if [ "$APPLY" != "1" ]; then
   echo "DRY-RUN: would save snapshot to $backup_dir"
   if [ "$MODE" = "enable" ]; then
     echo "DRY-RUN: would stop, disable, and mask llm-sys.service"
-    echo "DRY-RUN: would write $override_file for 115200 ttyS1 autologin root"
+    echo "DRY-RUN: would write $override_file for $BAUD ttyS1 autologin root"
     echo "DRY-RUN: would enable and restart serial-getty@ttyS1.service"
   else
     echo "DRY-RUN: would disable serial-getty@ttyS1.service"
@@ -128,11 +141,11 @@ if [ "$MODE" = "enable" ]; then
   systemctl mask llm-sys.service
 
   mkdir -p "$override_dir"
-  cat > "$override_file" <<'EOF'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty -L --autologin root --noclear 115200 %I vt102
-EOF
+  printf '%s\n' \
+    '[Service]' \
+    'ExecStart=' \
+    "ExecStart=-/sbin/agetty -L --autologin root --noclear $BAUD %I vt102" \
+    > "$override_file"
 
   systemctl daemon-reload
   systemctl enable serial-getty@ttyS1.service
