@@ -1,78 +1,107 @@
 #include <Arduino.h>
 #include <M5Unified.h>
+#include <stdio.h>
 
 #include "app_config.h"
-
-HardwareSerial LoginSerial(1);
+#include "display_orientation.h"
+#include "input_event_queue.h"
+#include "input_mapper.h"
+#include "login_uart.h"
+#include "status_bar.h"
+#include "tab5_keyboard_input.h"
+#include "terminal_core.h"
+#include "terminal_debug_input.h"
+#include "ui_theme.h"
+#include "usb_management.h"
+#include "usb_keyboard_probe.h"
 
 namespace {
-constexpr uint16_t kBackgroundColor = TFT_BLACK;
-constexpr uint16_t kStatusBackgroundColor = TFT_DARKGREEN;
-constexpr uint16_t kStatusTextColor = TFT_WHITE;
-constexpr uint16_t kTerminalTextColor = TFT_GREEN;
 constexpr size_t kMaxBytesPerLoop = 96;
-constexpr size_t kMaxUsbBridgeBytesPerLoop = 64;
+constexpr size_t kMaxKeyboardBytesPerLoop = 64;
+constexpr size_t kMaxInputEventsPerLoop = 64;
 constexpr uint32_t kM5UpdateIntervalMs = 20;
 
 uint32_t lastM5UpdateMs = 0;
 
-void drawStatusBar()
+void formatStatusTitle(char *buffer, size_t buffer_size)
 {
-    const int32_t width = M5.Display.width();
-
-    M5.Display.fillRect(0, 0, width, STATUS_BAR_HEIGHT, kStatusBackgroundColor);
-    M5.Display.setTextColor(kStatusTextColor, kStatusBackgroundColor);
-    M5.Display.setTextSize(1);
-    M5.Display.setCursor(4, 10);
-#if ENABLE_USB_LOGIN_UART_BRIDGE
-    M5.Display.printf(
-        "Tab5 UART Bridge 115200 8N1 RX=G%d TX=G%d",
+#if ENABLE_TERMINAL_CDC_INJECTION
+    snprintf(buffer, buffer_size, "Tab5 Terminal CDC Inject 115200");
+#elif ENABLE_USB_LOGIN_UART_BRIDGE
+    snprintf(
+        buffer,
+        buffer_size,
+        "Tab5 UART Bridge %lu 8N1 RX=G%d TX=G%d",
+        static_cast<unsigned long>(login_uart::state().active_baud),
         LOGIN_UART_RX_PIN,
         LOGIN_UART_TX_PIN);
 #else
-    M5.Display.printf("Tab5 UART Viewer 115200 8N1 RX=G%d", LOGIN_UART_RX_PIN);
+    snprintf(
+        buffer,
+        buffer_size,
+        "Tab5 UART Viewer %lu 8N1 RX=G%d",
+        static_cast<unsigned long>(login_uart::state().active_baud),
+        LOGIN_UART_RX_PIN);
+#endif
+}
+
+void refreshStatusTitle()
+{
+    char title[64];
+    formatStatusTitle(title, sizeof(title));
+    ui::drawStatusBar(title);
+}
+
+void writeTerminalResponse(const uint8_t *data, size_t length)
+{
+    if (data == nullptr || length == 0) {
+        return;
+    }
+
+#if ENABLE_TERMINAL_CDC_INJECTION
+    Serial.write(data, length);
+#else
+    login_uart::serial().write(data, length);
 #endif
 }
 
 void setupDisplay()
 {
-    M5.Display.setRotation(SCREEN_ROTATION);
-    M5.Display.fillScreen(kBackgroundColor);
-    drawStatusBar();
+    const auto& theme = ui::terminalTheme();
+    char title[64];
+    formatStatusTitle(title, sizeof(title));
 
-    M5.Display.setTextColor(kTerminalTextColor, kBackgroundColor);
-    M5.Display.setTextSize(TERMINAL_TEXT_SIZE);
-    M5.Display.setTextScroll(true);
-    M5.Display.setScrollRect(
-        0,
-        STATUS_BAR_HEIGHT,
-        M5.Display.width(),
-        M5.Display.height() - STATUS_BAR_HEIGHT,
-        kBackgroundColor);
-    M5.Display.setCursor(0, STATUS_BAR_HEIGHT);
+    ui::applyConfiguredDisplayOrientation();
+    const int32_t availableTerminalHeight =
+        M5.Display.height() - STATUS_BAR_HEIGHT;
+    const int32_t terminalHeight =
+        TERMINAL_ROWS * TERMINAL_CELL_HEIGHT;
+    const int32_t centeredMargin =
+        (availableTerminalHeight - terminalHeight) / 2;
+    const int32_t minimumMargin =
+        TERMINAL_VERTICAL_MARGIN_ROWS * TERMINAL_CELL_HEIGHT;
+    const int32_t terminalMargin =
+        centeredMargin > minimumMargin ? centeredMargin : minimumMargin;
+    const int32_t terminalY = STATUS_BAR_HEIGHT + terminalMargin;
+    ui::beginStatusBar(theme);
+    M5.Display.fillScreen(theme.screen_background);
+    ui::drawStatusBar(title);
+    terminal::begin({
+        .x = 0,
+        .y = terminalY,
+        .width = M5.Display.width(),
+        .height = terminalHeight,
+        .max_columns = TERMINAL_COLUMNS,
+        .max_rows = TERMINAL_ROWS,
+        .text_size = TERMINAL_TEXT_SIZE,
+        .theme = &theme,
+        .response_writer = writeTerminalResponse,
+    });
 }
 
 void writeToDisplay(uint8_t byte)
 {
-    switch (byte) {
-    case '\r':
-        M5.Display.setCursor(0, M5.Display.getCursorY());
-        break;
-    case '\n':
-        M5.Display.write('\n');
-        break;
-    case '\b':
-    case 0x7f:
-        break;
-    case '\t':
-        M5.Display.print("    ");
-        break;
-    default:
-        if (byte >= 0x20 && byte <= 0x7e) {
-            M5.Display.write(byte);
-        }
-        break;
-    }
+    terminal::writeByte(byte);
 }
 
 void writeToDebug(uint8_t byte)
@@ -82,10 +111,12 @@ void writeToDebug(uint8_t byte)
 
 void readLoginUartToDisplayAndDebug()
 {
+#if !ENABLE_TERMINAL_CDC_INJECTION
     size_t processed = 0;
+    HardwareSerial& serial = login_uart::serial();
 
-    while (LoginSerial.available() > 0 && processed < kMaxBytesPerLoop) {
-        const int value = LoginSerial.read();
+    while (serial.available() > 0 && processed < kMaxBytesPerLoop) {
+        const int value = serial.read();
         if (value < 0) {
             break;
         }
@@ -95,28 +126,46 @@ void readLoginUartToDisplayAndDebug()
         writeToDebug(byte);
         ++processed;
     }
+#endif
 }
 
 void bridgeUsbToLoginUart()
 {
-#if ENABLE_USB_LOGIN_UART_BRIDGE
+#if ENABLE_USB_LOGIN_UART_BRIDGE && !ENABLE_TERMINAL_CDC_INJECTION
+    usb_management::update();
+#endif
+}
+
+void bridgeKeyboardToLoginUart()
+{
+#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION
+    uint8_t byte = 0;
     size_t processed = 0;
 
-    while (Serial.available() > 0 && processed < kMaxUsbBridgeBytesPerLoop) {
-        const int value = Serial.read();
-        if (value < 0) {
-            break;
-        }
-
-        LoginSerial.write(static_cast<uint8_t>(value));
+    while (processed < kMaxKeyboardBytesPerLoop && usbKeyboardProbeReadByte(&byte)) {
+        login_uart::serial().write(byte);
         ++processed;
     }
-
-#if ENABLE_USB_BRIDGE_DEBUG_LOG
-    if (processed > 0) {
-        Serial.printf("\r\n[usb->login %u bytes]\r\n", static_cast<unsigned>(processed));
-    }
 #endif
+}
+
+void bridgeInputEventsToLoginUart()
+{
+#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION
+    input::KeyEvent event;
+    size_t processed = 0;
+
+    while (processed < kMaxInputEventsPerLoop && input::readKeyEvent(&event)) {
+        const input::TerminalModes modes = {
+            .application_cursor = terminal::applicationCursorMode(),
+            .application_keypad = terminal::applicationKeypadMode(),
+        };
+        const input::EncodedInput encoded = input::mapKeyEvent(event, modes);
+        if (encoded.length > 0) {
+            login_uart::serial().write(encoded.bytes, encoded.length);
+        }
+        ++processed;
+    }
 #endif
 }
 } // namespace
@@ -128,27 +177,68 @@ void setup()
 
     auto cfg = M5.config();
     M5.begin(cfg);
-    setupDisplay();
+#if ENABLE_USB_KEYBOARD_PROBE
+    M5.Power.setExtOutput(true, m5::ext_USB);
+#endif
 
-    LoginSerial.setRxBufferSize(8192);
-    LoginSerial.begin(LOGIN_UART_BAUD, SERIAL_8N1, LOGIN_UART_RX_PIN, LOGIN_UART_TX_PIN);
+#if !ENABLE_TERMINAL_CDC_INJECTION
+    login_uart::begin();
+#endif
+    setupDisplay();
 
     Serial.println();
     Serial.println("Tab5 minimal UART viewer started");
-#if ENABLE_USB_LOGIN_UART_BRIDGE
+#if ENABLE_USB_LOGIN_UART_BRIDGE && !ENABLE_TERMINAL_CDC_INJECTION
     Serial.println("USB to login UART bridge enabled");
 #endif
+#if ENABLE_TERMINAL_CDC_INJECTION
+    terminal_debug::beginCdcInjection();
+#endif
+#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION
+    Serial.println("USB keyboard probe enabled");
+    usbKeyboardProbeBegin();
+#endif
+#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION
+    if (!input::beginEventQueue()) {
+        Serial.println("[tab5-kbd] input event queue allocation failed");
+    } else {
+        tab5KeyboardInputBegin();
+    }
+#endif
+#if !ENABLE_TERMINAL_CDC_INJECTION
+    const login_uart::State uartState = login_uart::state();
     Serial.printf(
-        "Login UART: baud=%u 8N1 RX=G%d TX=G%d\r\n",
-        LOGIN_UART_BAUD,
+        "Login UART: baud=%lu persisted=%s 8N1 RX=G%d TX=G%d\r\n",
+        static_cast<unsigned long>(uartState.active_baud),
+        uartState.persisted_baud == 0 ? "default" : "saved",
         LOGIN_UART_RX_PIN,
         LOGIN_UART_TX_PIN);
+#endif
 }
 
 void loop()
 {
+#if !ENABLE_TERMINAL_CDC_INJECTION
+    const login_uart::ApplyResult baudResult = login_uart::update();
+    if (baudResult != login_uart::ApplyResult::None) {
+        refreshStatusTitle();
+        const login_uart::State state = login_uart::state();
+        Serial.printf(
+            "TAB5CFG OK active=%lu persisted=%s%s\r\n",
+            static_cast<unsigned long>(state.active_baud),
+            state.persisted_baud == 0 ? "default" : "saved",
+            baudResult == login_uart::ApplyResult::AppliedPersistenceFailed
+                ? " persistence-error"
+                : "");
+    }
+#endif
     readLoginUartToDisplayAndDebug();
+    terminal_debug::drainCdcInjection();
     bridgeUsbToLoginUart();
+    bridgeKeyboardToLoginUart();
+    tab5KeyboardInputUpdate();
+    bridgeInputEventsToLoginUart();
+    ui::refreshBatteryStatus(false);
 
     const uint32_t now = millis();
     if (now - lastM5UpdateMs >= kM5UpdateIntervalMs) {

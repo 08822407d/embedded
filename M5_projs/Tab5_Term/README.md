@@ -1,12 +1,28 @@
-# Tab5 Minimal UART Viewer
+# Tab5 UART Terminal
 
-This PlatformIO project is a minimal UART viewer for M5Stack Tab5 / ESP32-P4.
-It displays printable bytes received from an external Linux board login UART on
-the Tab5 screen. It is not a full terminal emulator.
+This PlatformIO project turns M5Stack Tab5 / ESP32-P4 into a small physical
+terminal for an external Linux board login UART. It is moving from a UART
+viewer toward a practical terminal emulator in staged compatibility layers.
 
-The first version intentionally does not implement ANSI / VT100 escape
-sequences, keyboard input, reverse transmit, colors from the remote side, cursor
-movement, or a complex UI.
+Current firmware includes a character-cell terminal core with C0 handling,
+ESC/CSI parsing, cursor movement, clear screen/line, DEC Special Graphics,
+VT102-style insert/delete operations, scroll regions, origin mode, delayed
+autowrap, basic terminal query replies, SGR attributes, 16-color/256-color/
+truecolor foreground/background colors, and background-color erase behavior. It
+is not yet a complete `xterm-256color` implementation.
+
+See [docs/terminal_implementation_plan.md](docs/terminal_implementation_plan.md)
+and [docs/terminal_validation.md](docs/terminal_validation.md) before extending
+terminal compatibility.
+
+Current mainline stage and checkpoint are recorded in
+[docs/current_work.md](docs/current_work.md). Read it before continuing
+implementation so completed work is not repeated or lost.
+
+The default display orientation is rotated 180 degrees from the original
+landscape direction to match the official companion keyboard installation.
+Change `SCREEN_ORIENTATION` in `include/app_config.h` to restore the standard
+landscape direction.
 
 ## Hardware
 
@@ -38,6 +54,8 @@ external login UART.
 ## Current Verified Status
 
 - PlatformIO env: `tab5_min_uart_terminal`
+- Terminal CDC injection debug env: `tab5_terminal_cdc_inject`
+- Optional keyboard probe env: `tab5_usb_keyboard_probe`
 - Current login UART pins: `RX=G7`, `TX=G6`
 - Current login UART baud: `115200 8N1`
 - USB debug/flash port on the first development machine was `/dev/ttyACM0`
@@ -48,12 +66,74 @@ external login UART.
   the monitor and rendered on the Tab5 display.
 - The Module LLM login shell was verified by sending `id` through the Tab5
   bridge and receiving a root shell response.
+- Terminal output now flows through `src/terminal_core.cpp`, not directly
+  through M5GFX print calls. The first-stage core is intended for basic shell
+  output, `clear`, simple cursor movement, and early ANSI compatibility tests.
+- The experimental USB-A keyboard probe builds successfully. Runtime validation
+  with a physical USB keyboard is still pending.
+- The formal firmware now enables the official A164 Tab5 Keyboard through
+  Ext.Port1 (`SDA=G0`, `SCL=G1`, `INT=G50`) using the official
+  `M5Unit-KEYBOARD` 0.1.0 library in HID mode. The tested keyboard reports I2C
+  address `0x6D` and firmware `0x01`.
+- The top status bar shows a themed battery area at the right edge. On Tab5 this
+  uses M5Unified's INA226-backed 2S Li-Po battery estimate and IP2326 charge
+  status. The battery icon fill uses green/yellow/red level bands and shows a
+  lightning mark while charging.
 
 ## Build
+
+For routine work on Windows, use the local wrapper. Detailed compiler output is
+saved under `.logs/`, while the console only shows a short result summary:
+
+```powershell
+.\tools\tab5.ps1 build tab5_min_uart_terminal
+```
+
+Long builds run in a detached worker with direct log files. If the caller stops
+waiting, inspect or rejoin the same build without starting a duplicate:
+
+```powershell
+.\tools\tab5.ps1 build-status tab5_min_uart_terminal
+.\tools\tab5.ps1 build-wait tab5_min_uart_terminal
+```
+
+See `docs/build_troubleshooting.md` for the persistent incident log and
+evidence-based triage procedure.
+
+The equivalent direct PlatformIO command is:
 
 ```sh
 pio run -e tab5_min_uart_terminal
 ```
+
+Experimental USB-A keyboard input build:
+
+```sh
+pio run -e tab5_usb_keyboard_probe
+```
+
+Terminal parser validation build. In this mode USB CDC input is rendered
+directly by the terminal core and is not forwarded to the external login UART:
+
+```sh
+pio run -e tab5_terminal_cdc_inject
+```
+
+## Login UART Baud
+
+The installed formal firmware can coordinate the Tab5 login UART and Module LLM
+`/dev/ttyS1` without rebuilding:
+
+```powershell
+.\tools\tab5.ps1 baud -Port COM3
+.\tools\tab5.ps1 baud -Port COM3 -Baud 921600
+.\tools\tab5.ps1 baud -Port COM3 -DefaultBaud
+```
+
+Supported rates are 115200, 230400, 460800, and 921600. Runtime 460800 and
+921600 shell round trips are hardware-validated. Persistence is optional and
+must be coordinated with the Linux boot-time TTY configuration. See
+`docs/login_uart_baud.md`.
 
 ## List Ports
 
@@ -64,12 +144,25 @@ python -m serial.tools.list_ports -v
 
 ## Upload
 
+The local wrapper checks that the selected COM port and build artifacts exist,
+then records the complete esptool output under `.logs/`:
+
+```powershell
+.\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
+```
+
 Do not permanently hard-code `upload_port` in `platformio.ini`. Pick the Tab5
 USB debug port from the port list and upload with:
 
 ```sh
 pio run -e tab5_min_uart_terminal -t upload --upload-port <PORT>
 ```
+
+For the experimental USB keyboard probe, use the same upload command with
+`-e tab5_usb_keyboard_probe`.
+
+For terminal parser validation, use the same upload command with
+`-e tab5_terminal_cdc_inject`.
 
 If upload fails, put the Tab5 into download mode and retry. Do not assume upload
 succeeded unless PlatformIO reports success.
@@ -93,10 +186,77 @@ pio device monitor --port <PORT> --baud 115200
 After opening the monitor, type a shell command such as `id` and press Enter.
 The command is forwarded from USB debug CDC to the Module LLM login UART.
 
+With the `tab5_terminal_cdc_inject` debug build, USB CDC input is instead sent
+directly to the Tab5 terminal renderer. This is for replaying exact terminal
+byte streams; command text is not executed by the external Linux board in that
+mode.
+
+For a fixed parser smoke test against that debug build:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage1-smoke
+```
+
+For the VT102 screen-model smoke test:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage2-screen --chunk-size 16 --chunk-delay 0.08
+```
+
+For the color/attribute smoke test:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage3-color --chunk-size 16 --chunk-delay 0.08
+```
+
+For the xterm/DEC essentials smoke test:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage4-xterm --chunk-size 16 --chunk-delay 0.08 --read-response-window 0.8
+```
+
+For a real login-shell SGR demo through the formal UART bridge:
+
+```sh
+python tools/send_login_shell_demo.py --port COM3 --demo sgr
+```
+
+For the short login-shell connectivity probe:
+
+```powershell
+.\tools\tab5.ps1 probe -Port COM3
+```
+
+To capture concise startup diagnostics, including official keyboard detection:
+
+```powershell
+.\tools\tab5.ps1 boot-log -Port COM3
+```
+
+For Stage 4 real app smoke through the formal UART bridge:
+
+```sh
+python tools/send_login_shell_app_smoke.py --port COM3 --apps clear,reset,tput,less,nano,vim,htop --rows 32 --cols 64 --chunk-size 32 --chunk-delay 0.08
+```
+
+The same test can be run with concise logging:
+
+```powershell
+.\tools\tab5.ps1 app-smoke -Port COM3
+```
+
+The normal `tab5_min_uart_terminal` now uses fixed 18x20 cells to avoid
+whole-row redraws for every received character. It keeps the approved
+M5GFX `DejaVu18` font face; only character positioning changes. Use
+`tab5_terminal_font_prop_preview` when the retained true-proportional renderer
+must be inspected.
+
 ## Continue On Another Machine
 
-See [HANDOFF.md](HANDOFF.md) for the handoff checklist, known local toolchain
-notes, tested hardware wiring, and next planned work on USB-A keyboard input.
+See [HANDOFF.md](HANDOFF.md) first. It is the canonical project memory for
+future Codex sessions and machine handoffs, including confirmed design
+decisions, known local toolchain traps, tested hardware wiring, UI details, and
+next planned work.
 
 When committing from this checkout, note that this project lives inside a larger
 git working tree. Scope commits to this directory unless intentionally syncing
