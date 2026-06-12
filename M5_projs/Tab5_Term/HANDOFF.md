@@ -83,6 +83,9 @@ changes are intentionally part of the same sync.
   scrolling, erase operations, and basic SGR colors.
 - `include/terminal_debug_input.h` / `src/terminal_debug_input.cpp`: debug-only
   USB CDC direct-injection input path for terminal parser validation.
+- `include/screen_capture.h` / `src/screen_capture.cpp`: debug-only logical
+  framebuffer readback. It streams the existing MIPI DSI RGB565 framebuffer
+  one row at a time and does not allocate a second full-screen buffer.
 - `include/input_mapper.h` / `src/input_mapper.cpp`: transport-independent key
   events and VT/xterm sequence mapping, including application cursor/keypad
   modes. Representative mappings are compile-time tested.
@@ -108,6 +111,8 @@ changes are intentionally part of the same sync.
   current milestones. Read this before continuing implementation.
 - `docs/build_troubleshooting.md`: persistent Windows build incident log,
   stall criteria, evidence checklist, and recovery procedure.
+- `docs/screen_capture.md`: final-pixel capture protocol, host commands,
+  comparison outputs, limitations, and validation record.
 - `docs/login_uart_baud.md`: runtime login-UART management commands, endpoint
   coordination, persistence safety, recovery, and validated rates.
 - `tools/send_terminal_test.py`: host-side helper that sends deterministic test
@@ -122,18 +127,29 @@ Expected future split:
 - Input mapping should stay separate from transport so USB monitor, USB-A
   keyboard, and any future BLE/network input can share terminal semantics.
 
-## Active Mainline Stage
+## Mainline Stage
 
-The mainline is currently at Stage 5, Input And Integration. The canonical,
-compact stage state and milestones are in `docs/current_work.md`.
+Stages 1 through 6 are complete. Stage 6, Test And Regression Harness, was
+accepted on 2026-06-12 after its automated workflow passed and the user
+reported no problem in the final physical checks. Stage 7 U1/U2 Unicode width
+and cell integrity are complete; later Stage 7 work is not yet approved. The
+canonical stage state is in `docs/current_work.md`.
 
-The 180-degree keyboard-mounted display orientation is a Stage 5 mainline
-requirement. It is part of physical keyboard integration and must be included
-in Stage 5 validation and completion tracking.
+Stage 5 completed on 2026-06-12 after the user reported no problem in the
+remaining physical A164 and integration tests. Its accepted baseline includes
+the 180-degree keyboard-mounted display orientation, `64x32` geometry,
+official A164 input, and 921600 login UART.
 
-Current Stage 5 priority is the official I2C keyboard. USB keyboard work is
-paused by explicit user request and its existing probe should remain untouched
-until official-keyboard validation is complete.
+USB keyboard support was
+deferred indefinitely by explicit user request on 2026-06-12; its existing
+probe should remain untouched unless the user explicitly resumes that work.
+USB support is not a Stage 6 requirement.
+
+Module LLM ttyS1 terminal-environment integration was completed on 2026-06-12.
+The ttyS1-only login profile now survives reboot with
+`TERM=xterm-256color`, `COLORTERM=truecolor`, and `stty rows 32 cols 64`;
+`tput colors` reports 256 and the user visually confirmed colored `htop` on
+Tab5. This is no longer a Stage 5 blocker.
 
 Official Tab5 Keyboard facts confirmed on 2026-06-08:
 
@@ -151,7 +167,11 @@ Official Tab5 Keyboard facts confirmed on 2026-06-08:
   `printf 'tab5-keyboard-ok\n'` on the A164, and the Module LLM shell displayed
   `tab5-keyboard-ok` on a separate line. This verifies printable characters,
   Enter, I2C event delivery, mapping, UART transmission, and shell execution.
-  Ctrl/Alt/navigation/function/application-mode validation is still pending.
+  The user later reported no problem in the remaining practical input tests.
+- The current A164 HID path tracks one non-modifier key through
+  `last_hid_keycode`. Since the keyboard advertises simultaneous key presses,
+  full non-modifier rollover remains a documented limitation and may need a
+  pressed-key-state refactor in future input work.
 
 The completed checkpoint before Stage 5 includes:
 
@@ -160,8 +180,33 @@ The completed checkpoint before Stage 5 includes:
 - acceptance of the DejaVu18 true-proportional release renderer;
 - restoration and verification of the formal UART firmware on the board.
 
-After the Stage 5 completion condition is met, continue directly to Stage 6
-regression infrastructure and remaining compatibility-gap review.
+Stage 6 must reuse the existing deterministic corpora and real-shell smoke
+scripts. Its main missing capability is a diagnostic-only machine-readable
+screen-state summary plus host assertions, followed by a unified local
+regression command and explicit known-gap record.
+
+Stage 6 R1-R4 automated work was completed on 2026-06-12:
+
+- `tab5_terminal_regression` provides diagnostic-only OSC 777 state queries.
+- `tools/run_terminal_regression.py` and
+  `tests/terminal_regression_manifest.json` passed all Stage 1-4 corpora on the
+  physical Tab5.
+- The formal image was restored and passed the Module LLM shell probe.
+- Real-app smoke passed every installed target; `nano` remains absent.
+- `tools/run_stage6_regression.ps1` repeats the complete diagnostic, restore,
+  probe, and app-smoke workflow. Its cached-artifact path was exercised
+  successfully on physical hardware and left the formal image installed.
+- The final restored-firmware integration check passed by user observation.
+- Charging-state detection remains explicitly deferred and was not a Stage 6
+  completion requirement.
+- A later Stage 6 test-infrastructure extension added private OSC 777
+  framebuffer capture. `tab5_terminal_regression` captures deterministic
+  injected screens, while `tab5_screen_capture` preserves the real login-UART
+  path. The host generates PNG, raw RGB565, metadata, and optional pixel diffs.
+  The ordinary formal firmware keeps the feature disabled.
+- The first host implementation opened the USB port before disabling DTR/RTS,
+  which reset Tab5 and captured a startup screen. Configure DTR/RTS on a closed
+  pyserial object before opening it, as `tools/capture_screen.py` now does.
 
 ## Terminal Compatibility Target
 
@@ -944,7 +989,8 @@ Build verification completed on the Windows checkout:
 & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e tab5_usb_keyboard_probe
 ```
 
-Runtime validation with an actual USB keyboard on Tab5 USB-A is still pending.
+Runtime validation with an actual USB keyboard on Tab5 USB-A is deferred and
+does not block the current mainline stage.
 Test the probe before treating it as the default terminal input path.
 
 This probe is now part of Stage 5 described in `docs/current_work.md`. It must
@@ -1106,3 +1152,16 @@ id
 
 Expected result: the Module LLM shell responds, and the response is visible in
 both the USB monitor and on the Tab5 display.
+
+## Stage 7 Unicode Checkpoint
+
+U1/U2 were completed on 2026-06-12. The terminal cell model now distinguishes
+single cells, wide leads, and wide continuations. Unicode width follows fixed
+Unicode 15.0.0 tables; combining marks attach without advancing the cursor,
+and malformed UTF-8 is validated before entering the screen model.
+
+The physical `stage7-unicode` regression passed together with Stage 1-4 at
+5/5. Formal firmware was then restored and passed the login-shell and
+full-screen application smoke checks. See `docs/current_work.md` for the
+milestone contract and `docs/terminal_validation.md` for exact reproduction
+commands. Font coverage remains narrower than the now-correct column model.

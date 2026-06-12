@@ -19,6 +19,15 @@ Current mainline stage and checkpoint are recorded in
 [docs/current_work.md](docs/current_work.md). Read it before continuing
 implementation so completed work is not repeated or lost.
 
+Stages 1 through 6 are complete. Stage 7 U1/U2 Unicode width and cell integrity
+are complete; later Stage 7 font coverage and grapheme work are not yet scoped.
+Stage 5 official A164 keyboard and integration work and Stage 6 regression
+infrastructure were accepted on 2026-06-12.
+The deterministic Stage 1-4 machine assertions and real-shell application
+smoke are now automated; see [docs/stage6_regression.md](docs/stage6_regression.md).
+Exact final display pixels can also be captured and compared through a
+debug-only USB CDC path; see [docs/screen_capture.md](docs/screen_capture.md).
+
 The default display orientation is rotated 180 degrees from the original
 landscape direction to match the official companion keyboard installation.
 Change `SCREEN_ORIENTATION` in `include/app_config.h` to restore the standard
@@ -57,7 +66,7 @@ external login UART.
 - Terminal CDC injection debug env: `tab5_terminal_cdc_inject`
 - Optional keyboard probe env: `tab5_usb_keyboard_probe`
 - Current login UART pins: `RX=G7`, `TX=G6`
-- Current login UART baud: `115200 8N1`
+- Current installed login UART baud: `921600 8N1`
 - USB debug/flash port on the first development machine was `/dev/ttyACM0`
   (`VID:PID 303A:1001`, Espressif USB JTAG/serial). Treat this as a local
   observation, not a fixed upload port.
@@ -69,16 +78,17 @@ external login UART.
 - Terminal output now flows through `src/terminal_core.cpp`, not directly
   through M5GFX print calls. The first-stage core is intended for basic shell
   output, `clear`, simple cursor movement, and early ANSI compatibility tests.
-- The experimental USB-A keyboard probe builds successfully. Runtime validation
-  with a physical USB keyboard is still pending.
+- The experimental USB-A keyboard probe builds successfully, but USB keyboard
+  support is deferred and is not part of the current stage.
 - The formal firmware now enables the official A164 Tab5 Keyboard through
   Ext.Port1 (`SDA=G0`, `SCL=G1`, `INT=G50`) using the official
   `M5Unit-KEYBOARD` 0.1.0 library in HID mode. The tested keyboard reports I2C
   address `0x6D` and firmware `0x01`.
 - The top status bar shows a themed battery area at the right edge. On Tab5 this
-  uses M5Unified's INA226-backed 2S Li-Po battery estimate and IP2326 charge
-  status. The battery icon fill uses green/yellow/red level bands and shows a
-  lightning mark while charging.
+  uses M5Unified's INA226-backed 2S Li-Po battery estimate. The battery icon
+  fill uses green/yellow/red level bands. Lightning-mark rendering exists, but
+  dynamic charging-state detection is currently deferred because the observed
+  IP2326 status path did not reliably follow cable insertion and removal.
 
 ## Build
 
@@ -214,6 +224,29 @@ For the xterm/DEC essentials smoke test:
 ```sh
 python tools/send_terminal_test.py --port COM3 --test stage4-xterm --chunk-size 16 --chunk-delay 0.08 --read-response-window 0.8
 ```
+
+For the Unicode width/cell-integrity smoke test:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage7-unicode
+```
+
+To capture the exact final framebuffer from `tab5_terminal_regression` or
+`tab5_screen_capture`:
+
+```powershell
+.\tools\tab5.ps1 screenshot -Port COM3 `
+  -OutputPath .logs\screenshots\current.png
+```
+
+Add `-Baseline .logs\screenshots\accepted.rgb565` for an automatic pixel
+comparison. The normal `tab5_min_uart_terminal` firmware keeps this private
+debug command disabled.
+
+The current core uses fixed Unicode 15.0.0 column-width data, stores CJK-wide
+glyphs as lead/continuation pairs, and attaches common combining marks without
+advancing the cursor. Comprehensive glyph coverage and complex text shaping
+remain separate future work.
 
 For a real login-shell SGR demo through the formal UART bridge:
 

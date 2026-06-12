@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "app_config.h"
 #include "login_uart.h"
+#include "screen_capture.h"
 
 namespace usb_management {
 namespace {
@@ -80,6 +82,13 @@ void handleFrame()
         printState();
         return;
     }
+
+#if ENABLE_SCREEN_CAPTURE_DIAGNOSTICS
+    if (strcmp(command, "screen-capture?") == 0) {
+        screen_capture::streamDisplay();
+        return;
+    }
+#endif
 
     constexpr char kSetPrefix[] = "login-uart=";
     if (strncmp(command, kSetPrefix, sizeof(kSetPrefix) - 1) != 0) {

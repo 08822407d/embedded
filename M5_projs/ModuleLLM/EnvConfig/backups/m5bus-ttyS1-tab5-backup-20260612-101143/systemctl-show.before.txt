@@ -1,0 +1,25 @@
+ExecStart={ path=/sbin/agetty ; argv[]=/sbin/agetty --autologin root --noclear ttyS0 $TERM ; ignore_errors=yes ; start_time=[Tue 2023-08-22 05:11:46 CST] ; stop_time=[n/a] ; pid=2380 ; code=(null) ; status=0/0 }
+Environment=
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+DropInPaths=
+UnitFileState=enabled-runtime
+
+ExecStart={ path=/sbin/agetty ; argv[]=/sbin/agetty -L --autologin root --noclear 921600 ttyS1 vt102 ; ignore_errors=yes ; start_time=[Tue 2023-08-22 05:11:46 CST] ; stop_time=[n/a] ; pid=2381 ; code=(null) ; status=0/0 }
+Environment=
+LoadState=loaded
+ActiveState=active
+SubState=running
+FragmentPath=/lib/systemd/system/serial-getty@.service
+DropInPaths=/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
+UnitFileState=enabled
+
+Environment=
+LoadState=masked
+ActiveState=inactive
+SubState=dead
+FragmentPath=/etc/systemd/system/llm-sys.service
+DropInPaths=
+UnitFileState=masked

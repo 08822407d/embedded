@@ -1,0 +1,3 @@
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I vt102

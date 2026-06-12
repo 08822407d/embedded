@@ -1,0 +1,112 @@
+## override and profile
+
+ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I xterm-256color
+
+# Managed by enable_m5bus_uart_login_adb.sh.
+
+# Apply Tab5 terminal settings only to login shells attached to /dev/ttyS1.
+
+if _m5bus_tty=$(tty 2>/dev/null) && [ "$_m5bus_tty" = /dev/ttyS1 ]; then
+
+  export TERM=xterm-256color
+
+  export COLORTERM=truecolor
+
+  stty rows 32 cols 64 2>/dev/null || true
+
+fi
+
+unset _m5bus_tty
+
+## service state
+
+ExecStart={ path=/sbin/agetty ; argv[]=/sbin/agetty -L --autologin root --noclear 921600 ttyS1 xterm-256color ; ignore_errors=yes ; start_time=[Tue 2023-08-22 05:21:12 CST] ; stop_time=[n/a] ; pid=20090 ; code=(null) ; status=0/0 }
+
+ActiveState=active
+
+SubState=running
+
+DropInPaths=/etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
+
+UnitFileState=enabled
+
+ActiveState=inactive
+
+SubState=dead
+
+UnitFileState=masked
+
+## ttyS1 line state
+
+speed 921600 baud; rows 32; columns 64; line = 0;
+
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+werase = ^W; lnext = <undef>; discard = <undef>; min = 1; time = 0;
+
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl ixon ixoff
+
+-iuclc -ixany imaxbel iutf8
+
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+
+isig -icanon -iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+
+echoctl echoke -flusho -extproc
+
+size=32 64
+
+## actual ttyS1 login shell check
+
+TERM=xterm-256color
+
+COLORTERM=truecolor
+
+SIZE=32 64
+
+COLORS=256
+
+## terminfo and htop
+
+xterm-256color terminfo=PRESENT
+
+htop 3.0.5
+
+htop_capture_bytes=4015
+
+HTOP_SMOKE=PASS
+
+## isolation checks
+
+speed 115200 baud; rows 24; columns 80; line = 0;
+
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+werase = ^W; lnext = <undef>; discard = <undef>; min = 1; time = 0;
+
+-parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl ixon ixoff
+
+-iuclc -ixany imaxbel iutf8
+
+opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+
+isig -icanon -iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+
+echoctl echoke -flusho -extproc
+
+ttyS0 size=24 80
+
+/bin/sh: line 74: printf: write error: Broken pipe
+
+NON_TTYS1_ISOLATION=PASS
+
+CURRENT_VERIFY=PASS
+

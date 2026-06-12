@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "firmware_environment": "tab5_terminal_regression",
+  "baseline": {
+    "columns": 64,
+    "rows": 32,
+    "font": "DejaVu18",
+    "rendering": "fixed-cell",
+    "login_uart_baud": 921600,
+    "term": "xterm-256color",
+    "orientation": "keyboard-mounted-landscape"
+  },
+  "cases": {
+    "stage1-smoke": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "CDC injection render test",
+        "1": "hello",
+        "2": "world",
+        "3": "CR+EL: XYZ",
+        "4": "Backspace: 13",
+        "5": "Tabs: A B",
+        "6": "OSC skip: beforeafter",
+        "7": "Cursor left: sta!!",
+        "8": "Colors: red green yellow256",
+        "9": "DEC graphics:",
+        "17": "End of CDC injection test"
+      },
+      "cells": [
+        {
+          "row": 10,
+          "col": 0,
+          "text": "l",
+          "dec": 1
+        }
+      ]
+    },
+    "stage2-screen": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "VT102 screen model test",
+        "13": "Origin mode row 14",
+        "17": "Tab stop: A     B",
+        "21": "End of VT102 screen test"
+      },
+      "cells": []
+    },
+    "stage3-color": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "SGR attributes and color test",
+        "2": "16 fg: 30 31 32 33 34 35 36 37",
+        "4": "256 fg: 016 021 046 082 196 202 226 231",
+        "9": "End of SGR color test"
+      },
+      "cells": [
+        {
+          "row": 1,
+          "col": 14,
+          "text": "b",
+          "attrs": 1
+        },
+        {
+          "row": 2,
+          "col": 10,
+          "text": "3",
+          "fg": 43008
+        },
+        {
+          "row": 4,
+          "col": 12,
+          "text": "0",
+          "fg": 31
+        },
+        {
+          "row": 5,
+          "col": 11,
+          "text": "o",
+          "fg": 64512
+        }
+      ]
+    },
+    "stage4-xterm": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "appcursor": 0,
+        "appkeypad": 0,
+        "paste": 0,
+        "mouse": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "Stage4 xterm/DEC essentials test",
+        "1": "Primary buffer survives alternate screen.",
+        "3": "Alt screen restored: primary line above should remain",
+        "7": "UTF-8 path: cafe=é omega=Ω cjk=中",
+        "8": "Mouse mode off, no raw private-mode text leaked.",
+        "9": "End of Stage4 xterm/DEC essentials test"
+      },
+      "cells": []
+    },
+    "stage7-unicode": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "U1/U2 Unicode width test",
+        "1": "ASCII: A中B",
+        "2": "Combining: éX",
+        "3": "Boundary:",
+        "4": "中Z",
+        "5": "Erase: A  BC",
+        "6": "Insert: A 中BC",
+        "7": "Delete: A中BC",
+        "9": "Scroll: A中B",
+        "10": "bottom",
+        "14": "Invalid: ?OK",
+        "15": "End of U1/U2 Unicode width test"
+      },
+      "cells": [
+        {
+          "row": 1,
+          "col": 8,
+          "text": "中",
+          "width": 2
+        },
+        {
+          "row": 1,
+          "col": 9,
+          "text": "",
+          "width": 0
+        },
+        {
+          "row": 1,
+          "col": 10,
+          "text": "B",
+          "width": 1
+        },
+        {
+          "row": 2,
+          "col": 11,
+          "text": "é",
+          "width": 1
+        },
+        {
+          "row": 2,
+          "col": 12,
+          "text": "X",
+          "width": 1
+        },
+        {
+          "row": 4,
+          "col": 0,
+          "text": "中",
+          "width": 2
+        },
+        {
+          "row": 4,
+          "col": 1,
+          "text": "",
+          "width": 0
+        },
+        {
+          "row": 4,
+          "col": 2,
+          "text": "Z",
+          "width": 1
+        },
+        {
+          "row": 6,
+          "col": 10,
+          "text": "中",
+          "width": 2
+        },
+        {
+          "row": 6,
+          "col": 11,
+          "text": "",
+          "width": 0
+        },
+        {
+          "row": 7,
+          "col": 9,
+          "text": "中",
+          "width": 2
+        },
+        {
+          "row": 7,
+          "col": 10,
+          "text": "",
+          "width": 0
+        },
+        {
+          "row": 9,
+          "col": 9,
+          "text": "中",
+          "width": 2
+        },
+        {
+          "row": 9,
+          "col": 10,
+          "text": "",
+          "width": 0
+        }
+      ]
+    }
+  }
+}

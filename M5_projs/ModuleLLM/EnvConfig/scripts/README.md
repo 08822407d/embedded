@@ -37,7 +37,16 @@ bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 BAUD=921600 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 ```
 
-当前脚本默认 `BAUD=921600`。配置会 mask `llm-sys.service` 以释放 `/dev/ttyS1` 并阻止它开机被其他 `llm-*` 服务依赖拉起，然后启用 `serial-getty@ttyS1.service`。登录方式为 `--autologin root`，外部串口终端接入后不需要账号/密码。回滚到 M5-Bus StackFlow/JSON 通信：
+当前脚本默认 `BAUD=921600`、`TERM_TYPE=xterm-256color`、`COLORTERM_VALUE=truecolor`、`ROWS=32`、`COLS=64`。配置会 mask `llm-sys.service`，启用 `serial-getty@ttyS1.service`，并部署仅在控制终端为 `/dev/ttyS1` 时生效的 `/etc/profile.d/m5bus-ttyS1-tab5.sh`。登录方式为 `--autologin root`。
+
+自定义示例：
+
+```bash
+TERM_TYPE=xterm-256color ROWS=32 COLS=64 APPLY=1 \
+  bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+```
+
+回滚到 M5-Bus StackFlow/JSON 通信：
 
 ```bash
 MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>

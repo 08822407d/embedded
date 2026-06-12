@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 2026-06-12 — ttyS1 适配 Tab5 终端
+
+- Windows Host ADB/USB preflight 成功，唯一在线设备为本次观察值 `axera-ax620e`；当前 Platform Tools `37.0.0-14910828` 与 Android 官方截至 2026-06-04 的最新稳定版本一致。
+- 改动前确认 ttyS1 为 `921600 8N1`、`TERM=vt102`、`24x80`，未设置 `COLORTERM`；`xterm-256color` terminfo 存在，`tput colors=256`，`htop 3.0.5` 已安装。
+- 改动前备份已保存到设备 `/root/m5bus-ttyS1-tab5-backup-20260612-101143`，并拉回 `backups/m5bus-ttyS1-tab5-backup-20260612-101143/`。
+- 将 ttyS1 getty drop-in 改为 `ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I xterm-256color`。
+- 新增 `/etc/profile.d/m5bus-ttyS1-tab5.sh`；仅当控制终端精确为 `/dev/ttyS1` 时设置 `TERM=xterm-256color`、`COLORTERM=truecolor`、`stty rows 32 cols 64`。
+- 保持 `921600 8N1`、无硬件流控、`--autologin root`、`serial-getty@ttyS1` enabled/active 和 `llm-sys.service` masked/inactive 不变。
+- 当前 ttyS1 登录 shell 和设备重启后的真实 shell 自检均返回：`TERM=xterm-256color`、`COLORTERM=truecolor`、`SIZE=32 64`、`COLORS=256`。
+- `htop` 在相同参数的 32x64 伪终端中正常初始化并输出 ncurses 彩色控制序列；ttyS0 仍为 115200、24x80，非 ttyS1 会话隔离验证通过。
+- 更新 `scripts/enable_m5bus_uart_login_adb.sh` 和 `scripts/README.md`，默认部署 `xterm-256color/truecolor/32x64`，避免后续重新部署恢复成 `vt102`。
+- 证据：`inventory/before/tab5-ttyS1-preflight-20260612-100705.txt`、`inventory/before/tab5-ttyS1-readonly-20260612-100838.txt`、`inventory/before/tab5-ttyS1-backup-20260612-101143.txt`、`inventory/after/tab5-ttyS1-apply-20260612-101219.txt`、`inventory/after/tab5-ttyS1-current-verify-20260612-101533.txt`、`inventory/after/tab5-ttyS1-reboot-preflight-20260612-101641.txt`、`inventory/after/tab5-ttyS1-reboot-verify-20260612-101722.txt`。
+
 ## 2026-06-08 — M5-Bus ttyS1 登录口改为 921600 8N1
 
 - 当前 Windows Host ADB preflight 成功，Platform Tools 版本 `37.0.0-14910828`，唯一在线设备为本次观察值 `axera-ax620e`。

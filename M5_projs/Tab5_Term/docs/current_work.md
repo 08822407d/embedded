@@ -14,6 +14,12 @@ log capture, and result extraction should normally run through scripts such as
 Keep direct commands when the operation is short and one-off. Scripts are not a
 substitute for source inspection, architecture reasoning, or review.
 
+For display changes, use the debug framebuffer capture before requesting a
+camera photograph when exact final pixels are sufficient evidence. Keep manual
+or optical inspection for panel brightness, color cast, viewing angle, physical
+orientation, mounting, ghosting, and bad-pixel checks. The capture workflow is
+documented in `docs/screen_capture.md`.
+
 Long PlatformIO builds must use the detached worker in `tools/tab5.ps1`.
 Build incidents, evidence, and confirmed mitigations are maintained in
 `docs/build_troubleshooting.md`; extend that record when a new failure pattern
@@ -21,7 +27,7 @@ or discriminating test is found.
 
 ## Completed Checkpoint
 
-Completed before Stage 5:
+Completed through Stage 5:
 
 - Stages 1 through 4 of `terminal_implementation_plan.md`.
 - Deterministic CDC tests for the implemented parser/screen features.
@@ -31,21 +37,176 @@ Completed before Stage 5:
   retaining the DejaVu18 font face and the proportional preview environment.
 - Formal `tab5_min_uart_terminal` image rebuilt, flashed, and verified.
 - Login-shell probe returned `shell-path-ok: m5stack-LLM`.
+- Stage 5 shared input mapping, official A164 I2C keyboard support,
+  keyboard-mounted orientation, and 921600 login-UART integration.
+- The user completed the remaining practical A164 and integration checks on
+  2026-06-12 and reported no observed problem.
 
 Do not restart completed font selection or Stage 1-4 deterministic tests unless
-Stage 5 causes a regression.
+new work causes a regression.
 
-## Active Mainline Stage: Stage 5 Input And Integration
+## Completed Mainline Stage: Stage 6 Test And Regression Harness
 
-Goal: support both the official Tab5 companion keyboard and ordinary USB HID
-keyboards without coupling terminal key semantics to either transport.
+Goal: make terminal compatibility changes repeatably testable and prevent
+already accepted display, input, and Linux integration behavior from
+regressing.
 
-Status: active. Stage 5 planning checkpoint created on 2026-06-08.
+Status: completed on 2026-06-12. Automated regression passed, the formal
+firmware was restored, and the user reported no problem in the final physical
+checks. USB keyboard support remains deferred.
 
-Current milestone: official Tab5 Keyboard validation. The shared input contract
-and mapper are implemented, and the official I2C keyboard driver is now present
-in the formal firmware. USB keyboard work is explicitly paused to conserve the
-current development budget.
+Existing groundwork:
+
+- `tools/send_terminal_test.py` replays deterministic Stage 1-4 terminal byte
+  streams through the CDC injection build.
+- `tools/send_login_shell_demo.py` exercises the real login shell and validates
+  selected markers and replies.
+- `tools/send_login_shell_app_smoke.py` runs real terminal applications and
+  records return markers.
+- `tools/tab5.ps1` provides the common build, flash, serial, probe, and test
+  entry points.
+
+All R1-R5 milestones are complete. Charging-state detection remains an
+explicitly deferred known issue and was excluded from Stage 6 acceptance.
+
+### Milestone R1: Baseline And Manifest
+
+- Record the accepted `64x32`, DejaVu18 fixed-cell, 921600,
+  `xterm-256color`, A164, and keyboard-mounted-orientation baseline.
+- Inventory existing deterministic corpora and real-app smoke tests.
+- Define which checks are automatic, diagnostic-only, or require visual
+  confirmation.
+
+Exit condition: one manifest identifies every current regression check, its
+required firmware environment, and its pass criterion.
+
+Status: completed. `tests/terminal_regression_manifest.json` records the
+accepted baseline and Stage 1-4 assertions; `docs/stage6_regression.md`
+classifies automatic and manual checks.
+
+### Milestone R2: Machine-Readable Screen State
+
+- Add a diagnostic-only CDC request that cannot enter the production keyboard
+  path.
+- Report terminal dimensions, cursor position, margins, important modes, and
+  stable screen-buffer summaries or hashes.
+- Keep diagnostic reporting outside normal rendering and UART timing paths.
+
+Exit condition: a host script can inspect terminal state without relying on a
+screen photograph.
+
+Status: completed. The diagnostic-only `tab5_terminal_regression` environment
+implements private OSC 777 state, row, and cell queries. Formal firmware leaves
+the diagnostic macro disabled. A later Stage 6 infrastructure extension added
+diagnostic RGB565 framebuffer capture and host-side PNG/pixel comparison for
+checks that require final rendered pixels rather than only the screen model.
+
+### Milestone R3: Automated Assertions
+
+- Replay the existing escape-sequence corpora and compare resulting screen
+  state and terminal replies with checked-in expectations.
+- Cover wrapping, scrolling, erase/insert/delete, scroll regions, alternate
+  screen, SGR colors, UTF-8 fallback, and cursor/application modes.
+- Save concise pass/fail output and detailed logs locally.
+
+Exit condition: deterministic parser and screen regressions fail with a useful
+location and expected/actual summary.
+
+Status: completed. `tools/run_terminal_regression.py` passed all four existing
+Stage 1-4 corpora on physical Tab5 hardware. The first run correctly exposed
+one bad tab-stop expectation; after review and correction, the rerun passed
+4/4.
+
+### Milestone R4: Real-Application Regression
+
+- Run the available `clear`, `reset`, `tput`, `less`, `vim`, and `htop`
+  checks through the Module LLM login shell; include `nano` and `tmux` only
+  where installed.
+- Confirm the status bar is not damaged and the A164, UART receive, display,
+  and battery polling remain responsive.
+
+Exit condition: a single documented command runs the available real-shell
+smoke suite and preserves logs.
+
+Status: automated portion completed. The restored formal firmware passed the
+login-shell probe, and `clear`, `reset`, `tput`, `less`, `vim`, and `htop`
+returned `rc=0`; `nano` was explicitly skipped because it is not installed.
+`tools/run_stage6_regression.ps1` now performs the diagnostic run, restores the
+formal image, and runs the shell checks. The complete script was exercised with
+`-SkipBuild` on physical hardware and passed end to end.
+
+### Milestone R5: Known Gaps And Stage Exit
+
+- Record unsupported behavior instead of silently treating it as compatible.
+- Prioritize compatibility additions only when real applications expose them.
+- Keep current known gaps explicit, including CJK double-width/combining text
+  and deferred USB keyboard support.
+
+Status: completed. `docs/terminal_known_gaps.md` records the initial gap
+inventory. On 2026-06-12 the user reported no problem with status-bar
+placement, A164 input, battery-level refresh, or display responsiveness.
+Charging-state detection remains deferred because the available status signal
+did not reliably follow cable insertion and removal.
+
+Stage 6 completion condition: one local workflow runs deterministic assertions
+and real-shell smoke, produces machine-readable results, and documents any
+remaining manual checks and known gaps.
+
+Completion result: satisfied on 2026-06-12.
+
+## Active Mainline Stage: Stage 7 Unicode Width And Cell Integrity
+
+Goal: make UTF-8 text obey mainstream terminal column rules before expanding
+font coverage.
+
+Status: U1 and U2 completed on 2026-06-12. The diagnostic firmware passed all
+five deterministic corpora on physical Tab5 hardware, the formal firmware was
+restored, and the login-shell/application smoke suite passed.
+
+### Milestone U1: Width-Aware Cell Model
+
+- Each cell is explicitly `Single`, `Wide`, or `Continuation`.
+- A wide glyph owns a lead cell and one continuation cell.
+- Writing, backspace, erase, insert/delete character, redraw, alternate-screen
+  storage, and scrolling preserve or repair wide-cell pairs.
+- A width-2 glyph at the final column wraps as a unit instead of splitting
+  across rows.
+- Diagnostic cell snapshots expose width as `0` continuation, `1` single, and
+  `2` wide lead.
+
+Status: completed and hardware-regression tested.
+
+### Milestone U2: Fixed Unicode Column Width
+
+- Width classification is fixed to Unicode 15.0.0 using generated `wcwidth`
+  zero-width and East Asian wide intervals.
+- Combining characters append to the preceding cell without advancing the
+  cursor. Each cell stores up to eight UTF-8 bytes, enough for the base plus
+  common combining sequences and emoji modifiers.
+- UTF-8 validation rejects overlong encodings, surrogates, values above
+  `U+10FFFF`, and malformed continuation bytes without corrupting parser state.
+- Ambiguous-width characters remain one column, matching the common
+  non-CJK-locale terminal policy.
+- `tools/generate_unicode_width.py` regenerates the checked-in lookup table;
+  the firmware has no runtime Python or `wcwidth` dependency.
+
+Status: completed and hardware-regression tested.
+
+Further Stage 7 font coverage or grapheme-cluster work is not yet approved.
+Keep it separate from the completed U1/U2 column model.
+
+## Completed Mainline Stage: Stage 5 Input And Integration
+
+Goal: make the official Tab5 companion keyboard production-ready while keeping
+terminal key semantics transport-independent for future input devices.
+
+Status: completed on 2026-06-12 after user-reported physical keyboard and
+integration testing found no observed problem.
+
+The shared input contract and mapper are implemented, and the official I2C
+keyboard driver is present in the formal firmware. USB keyboard support is
+deferred indefinitely by user request and was not part of the Stage 5
+completion condition.
 
 Stage 5 display prerequisite:
 
@@ -63,7 +224,12 @@ Stage 5 display prerequisite:
 Terminal-size synchronization:
 
 - A raw UART login has no standard unsolicited equivalent of SSH PTY window
-  resizing. The Linux TTY currently needs `stty rows 32 cols 64`.
+  resizing. The Module LLM ttyS1 login now persistently applies
+  `stty rows 32 cols 64`.
+- The same ttyS1-only login profile persistently sets
+  `TERM=xterm-256color` and `COLORTERM=truecolor`. Module reboot verification
+  passed with `tput colors=256`, and the user visually confirmed colored
+  `htop` output on Tab5 on 2026-06-12.
 - Adding the xterm `CSI 18 t` query and `CSI 8;32;64t` response is small
   terminal-core work, but ordinary serial shells do not issue that query or
   apply its result automatically.
@@ -73,9 +239,9 @@ Terminal-size synchronization:
 
 Hardware paths:
 
-- USB keyboard: use the Tab5 USB-A host port. A low-level HID boot-keyboard
-  probe already builds, but runtime validation with a physical keyboard remains
-  pending and is not part of the current work.
+- USB keyboard: a low-level HID boot-keyboard probe for the Tab5 USB-A host
+  port remains in the repository. Its implementation and runtime validation are
+  deferred; do not resume them without a new user request.
 - Official companion keyboard: A164 Tab5 Keyboard on Ext.Port1, I2C address
   `0x6D`, `SDA=G0`, `SCL=G1`, active-low interrupt `G50`. The formal firmware
   uses official `M5Unit-KEYBOARD` 0.1.0 in HID mode.
@@ -121,8 +287,10 @@ Compile-time assertions validate representative byte sequences.
 Exit condition: USB keyboard works through reconnects and no longer depends on
 probe-only direct byte translation.
 
-Status: paused by user request. Do not modify or validate the USB keyboard path
-until the official I2C keyboard support is complete.
+Status: deferred indefinitely by user request on 2026-06-12. This milestone is
+removed from the Stage 5 completion condition. Preserve the existing probe but
+do not modify, flash, or validate it unless the user explicitly resumes USB
+keyboard support.
 
 ### Milestone I3: Official Companion Keyboard
 
@@ -135,18 +303,20 @@ Exit condition: the official keyboard can operate the login shell through the
 shared mapper. The paused USB path can adopt that mapper later without changing
 official-keyboard behavior.
 
-Status: driver implemented using official `M5Unit-KEYBOARD` 0.1.0 in HID mode.
+Status: completed using official `M5Unit-KEYBOARD` 0.1.0 in HID mode.
 The formal firmware detected address `0x6D`, firmware `0x01`, and configured the
 G50 falling-edge interrupt. Physical key-to-shell validation passed for
 printable text and Enter: typing `printf 'tab5-keyboard-ok\n'` on the A164
-produced `tab5-keyboard-ok` on its own output line. Modifier, navigation,
-function-key, and terminal application-mode checks remain pending.
+produced `tab5-keyboard-ok` on its own output line. On 2026-06-12 the user
+reported that the remaining practical keyboard tests showed no problem. The
+current HID driver still tracks one non-modifier key at a time through
+`last_hid_keycode`; full simultaneous non-modifier rollover is not guaranteed
+and remains a documented limitation for future input work.
 
 ### Milestone I4: Integration
 
-- Define behavior when both keyboards are present.
-- Confirm neither input path blocks UART receive, display refresh, or battery
-  status updates.
+- Confirm the official keyboard path does not block UART receive, display
+  refresh, or battery status updates.
 - Run the input section of `terminal_validation.md` and record known hardware
   limitations.
 
@@ -158,28 +328,52 @@ restoration were validated first at 460800. The Module LLM boot-time M5Bus
 login UART was later permanently set to 921600 8N1 and reboot-validated. Tab5
 was therefore saved at 921600, hard-reset, and strict shell-probed
 successfully. The installed hardware baseline is now 921600 on both endpoints.
-This work does not complete I4 because the remaining keyboard checks are still
-pending.
+The user reported no problem after the remaining practical integration tests
+on 2026-06-12, completing I4.
 
-Stage 5 completion condition: shared mapping is stable, both requested keyboard
-paths have reached their device-specific exit conditions, and integration
+Stage 5 completion condition: the shared mapping is stable, the official A164
+keyboard has reached its device-specific exit condition, and its integration
 validation has been recorded. The keyboard-mounted display direction must also
 be visually confirmed with the physical installation, including status-bar
 position, battery-area position, terminal geometry, and absence of mirroring.
-If unavailable hardware blocks physical validation, keep the affected
-milestone explicitly pending rather than silently declaring Stage 5 complete.
-
-## Next Mainline Stage
-
-After Stage 5 reaches its completion condition:
-
-1. Confirm the formal UART build still passes the concise shell probe.
-2. Start Stage 6 regression-harness work.
-3. Audit remaining Stage 4/xterm compatibility gaps and prioritize only those
-   exposed by real applications.
+USB keyboard support is explicitly excluded from this condition.
 
 ## Progress Log
 
+- 2026-06-12: Stage 7 U1/U2 completed. Added the explicit single/wide/
+  continuation cell model, Unicode 15.0.0 width tables, zero-width combining
+  attachment, strict UTF-8 validation, and wide-cell-safe editing. The new
+  `stage7-unicode` corpus and all Stage 1-4 corpora passed 5/5 on hardware.
+  Formal firmware was restored; shell probing and the installed full-screen
+  app smoke suite passed.
+- 2026-06-12: the user completed the final Stage 6 physical checks and reported
+  no observed problem. Stage 6 was closed. Battery-level refresh was accepted;
+  charging-state detection remains intentionally deferred and does not block
+  completion. Stage 7 scope remains undecided.
+- 2026-06-12: Stage 6 R1-R3 implemented. Added the
+  `tab5_terminal_regression` environment, read-only terminal snapshots, OSC 777
+  diagnostic queries, a structured regression manifest, and host assertions.
+  Physical deterministic replay passed Stage 1-4 at 4/4 after correcting one
+  reviewed tab-stop expectation.
+- 2026-06-12: Stage 6 R4 automated checks passed after restoring formal
+  firmware. The login shell probe returned `shell-path-ok: m5stack-LLM`;
+  `clear`, `reset`, `tput`, `less`, `vim`, and `htop` returned `rc=0`, while
+  missing `nano` was skipped. A one-command full regression/restoration script
+  and the initial known-gap inventory were added. The one-command script was
+  then run with cached artifacts and successfully flashed diagnostics, passed
+  4/4 deterministic cases, restored formal firmware, passed the shell probe,
+  and repeated the app smoke.
+- 2026-06-12: the user reported no problem after the remaining physical A164
+  and integration tests. Stage 5 was closed and the active mainline moved to
+  Stage 6, Test And Regression Harness. Full simultaneous non-modifier rollover
+  remains documented rather than claimed as supported.
+- 2026-06-12: Module LLM ttyS1 terminal settings were made persistent and
+  reboot-verified: `TERM=xterm-256color`, `COLORTERM=truecolor`, `32x64`, and
+  `tput colors=256`. The user confirmed that `htop` displays in color on Tab5.
+  This closed the host terminal-environment mismatch.
+- 2026-06-12: USB keyboard support was deferred indefinitely by user request.
+  Its existing experimental probe remains available, but it no longer blocks
+  Stage 5 completion or the transition to Stage 6.
 - 2026-06-08: formal terminal geometry changed from `64x34` to explicit
   `64x32`. The 640-pixel terminal content area is vertically centered below
   the 32-pixel status bar, leaving 24 pixels above and below on the current

@@ -9,6 +9,34 @@ CDC injection debug firmware. The bridge path executes shell commands on the
 external Linux board and then renders the board's output. The CDC injection path
 renders host-sent bytes directly and is better for exact parser tests.
 
+## Final-Pixel Validation
+
+When a test requires the final rendered image rather than only terminal cell
+state, use a capture-enabled debug environment:
+
+```powershell
+.\tools\tab5.ps1 build tab5_terminal_regression
+.\tools\tab5.ps1 flash tab5_terminal_regression -Port COM3
+.\tools\tab5.ps1 screenshot -Port COM3 `
+  -OutputPath .logs\screenshots\current.png
+```
+
+Use `tab5_terminal_regression` for deterministic CDC-injected screens. Use
+`tab5_screen_capture` when the displayed content must come from the real Linux
+login UART. The host writes a PNG, exact RGB565 bytes, and JSON metadata. It
+can also compare against a prior raw capture:
+
+```powershell
+.\tools\tab5.ps1 screenshot -Port COM3 `
+  -OutputPath .logs\screenshots\current.png `
+  -Baseline .logs\screenshots\accepted.rgb565
+```
+
+This replaces a camera photograph for glyph pixels, colors, clipping, overlap,
+layout, cursor, and stale-pixel checks. It does not replace physical inspection
+of brightness, panel color, viewing angle, orientation, mounting, ghosting, or
+bad pixels. See `screen_capture.md` for the full protocol and restore steps.
+
 ## Validation Input Paths
 
 Preferred low-friction path:
@@ -437,8 +465,8 @@ Expected:
   landscape geometry.
 - The image is rotated, not mirrored.
 
-With a USB keyboard attached to the Tab5 USB-A port, or with the verified
-official companion keyboard attached through its documented interface:
+With the verified official companion keyboard attached through its documented
+interface:
 
 ```sh
 cat -v
@@ -456,9 +484,16 @@ Expected:
   other input path.
 - Holding and releasing a key does not leave a stuck modifier or an unbounded
   repeat stream.
+- Multiple simultaneous non-modifier keys are either represented correctly or
+  recorded as a documented hardware/firmware limitation. The current A164 HID
+  driver stores only one `last_hid_keycode`, so this check is mandatory before
+  declaring official-keyboard support complete.
 
 Record device model, firmware environment, connection method, and unavailable
 keys for every physical validation pass.
+
+USB keyboard validation is deferred and is not part of the current Stage 5
+exit criteria.
 
 Official Tab5 Keyboard first-pass check:
 
@@ -478,7 +513,52 @@ Validation record:
 
 - 2026-06-08: step 2 passed on the installed A164 keyboard. The expected
   `tab5-keyboard-ok` output appeared on a separate line.
-- Steps 3 and 4 remain pending.
+- 2026-06-12: the user completed the remaining practical keyboard and
+  integration tests and reported no observed problem. Stage 5 was accepted as
+  complete.
+- Full simultaneous non-modifier rollover is not guaranteed by the current
+  single-key HID state tracker and remains a documented limitation.
+- 2026-06-12: the Module LLM ttyS1 login environment was persistently set to
+  `TERM=xterm-256color`, `COLORTERM=truecolor`, and `32x64`; reboot verification
+  passed and colored `htop` output was visually confirmed on Tab5.
+
+## Stage 6: Regression Harness
+
+Stage 6 converts the existing visual and marker-based checks into a repeatable
+regression workflow. Its primary new requirement is diagnostic-only,
+machine-readable terminal state; it must not alter the production input path.
+
+The regression manifest must include:
+
+- deterministic Stage 1-4 corpus replay;
+- terminal query/reply checks;
+- screen dimensions, cursor, margins, mode, and buffer-summary assertions;
+- real login-shell application smoke for every installed test application;
+- explicit visual-only checks and known unsupported behavior.
+
+Keep detailed output under the repository log directories and print only a
+concise pass/fail summary in the normal command path.
+
+Validation record:
+
+- 2026-06-12: `tab5_terminal_regression` built and flashed successfully.
+- The first deterministic run passed Stage 1, 3, and 4. Stage 2 exposed an
+  incorrect manifest expectation for a default tab stop; review confirmed the
+  implementation result and the expectation was corrected.
+- The second deterministic run passed all four cases.
+- Formal `tab5_min_uart_terminal` was rebuilt and restored with verified flash
+  hash.
+- The restored firmware passed `shell-path-ok: m5stack-LLM`.
+- Real-app smoke passed `clear`, `reset`, `tput`, `less`, `vim`, and `htop`;
+  `nano` was skipped because it is not installed.
+- `tools/run_stage6_regression.ps1 -Port COM3 -SkipBuild` then passed the
+  complete workflow and left `tab5_min_uart_terminal` installed.
+- 2026-06-12: the user reported no problem in the final manual check of
+  status-bar placement, A164 input, battery-level refresh, and display
+  responsiveness. Stage 6 was accepted as complete.
+- Charging-state detection was not accepted as working. It remains explicitly
+  deferred because the observed charger-status source did not reliably change
+  with cable insertion and removal.
 
 Runtime login-UART baud check:
 
@@ -527,3 +607,53 @@ Whenever a bug is found, add:
 - Expected screen behavior.
 - Observed screen behavior.
 - Whether the problem is parser, screen model, rendering, input, or transport.
+
+## Stage 7: Unicode Width And Cell Integrity
+
+Automated U1/U2 check:
+
+```powershell
+.\tools\tab5.ps1 build tab5_terminal_regression
+.\tools\tab5.ps1 flash tab5_terminal_regression -Port COM3
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" `
+  tools\run_terminal_regression.py --port COM3 --case stage7-unicode
+```
+
+Expected: `PASS stage7-unicode` and `1 passed, 0 failed`. The assertions cover
+wide lead/continuation state, right-margin wrapping, combining attachment,
+erase/insert/delete repair, scrolling, and malformed UTF-8.
+
+Visual check while the regression firmware is installed:
+
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" `
+  tools\send_terminal_test.py --port COM3 --test stage7-unicode
+```
+
+Expected:
+
+- `ASCII: A中B` has `中` occupying two logical columns with `B` aligned after
+  it.
+- `Combining: éX` keeps the acute mark on `e`; `X` immediately follows in the
+  next cell.
+- The boundary sample places `中Z` on the next row as a unit.
+- Erase, insert, delete, and scroll samples contain no half glyph or displaced
+  continuation cell.
+- `Invalid: ?OK` shows one deterministic replacement and parser recovery.
+
+Restore and verify the formal firmware after diagnostic testing:
+
+```powershell
+.\tools\tab5.ps1 build tab5_min_uart_terminal
+.\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
+.\tools\tab5.ps1 probe -Port COM3
+.\tools\tab5.ps1 app-smoke -Port COM3
+```
+
+Validation record:
+
+- 2026-06-12: Stage 1-4 plus `stage7-unicode` passed 5/5 on physical Tab5.
+- Formal firmware was restored with verified flash hashes.
+- Login-shell probe returned `shell-path-ok: m5stack-LLM`.
+- `clear`, `reset`, `tput`, `less`, `vim`, and `htop` returned `rc=0`;
+  `nano` was skipped because it is not installed.

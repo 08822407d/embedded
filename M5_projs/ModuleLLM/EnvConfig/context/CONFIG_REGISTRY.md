@@ -1,6 +1,6 @@
 # CONFIG_REGISTRY — 配置登记、检测与方案台账
 
-最后更新：2026-06-02  
+最后更新：2026-06-12
 用途：集中记录本项目已采纳配置、检测方法、配置依赖、修复步骤、替代方案和阶段性最佳方案，避免每轮任务重复联网查找原因和方案。
 
 ## 1. 使用规则
@@ -227,6 +227,7 @@ for p in /proc/device-tree/chosen/bootargs /proc/device-tree/aliases/serial0 /pr
 
 - 外部带屏/键盘的嵌入式开发板作为实体串口终端，通过 M5-Bus UART 与 Module LLM 的 Linux shell 交互。
 - 外部开发板侧需要运行串口终端程序，参数 `921600 8N1`，无硬件流控，3.3V TTL，TX/RX 交叉，公共 GND。
+- 当前 Tab5 终端契约：`TERM=xterm-256color`、`COLORTERM=truecolor`、终端尺寸 `32x64`、`tput colors=256`。
 
 采纳配置：
 
@@ -241,15 +242,27 @@ for p in /proc/device-tree/chosen/bootargs /proc/device-tree/aliases/serial0 /pr
 ```ini
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I vt102
+ExecStart=-/sbin/agetty -L --autologin root --noclear 921600 %I xterm-256color
+```
+
+- ttyS1 专属登录 shell 配置文件：`/etc/profile.d/m5bus-ttyS1-tab5.sh`。
+
+```sh
+if _m5bus_tty=$(tty 2>/dev/null) && [ "$_m5bus_tty" = /dev/ttyS1 ]; then
+  export TERM=xterm-256color
+  export COLORTERM=truecolor
+  stty rows 32 cols 64 2>/dev/null || true
+fi
+unset _m5bus_tty
 ```
 
 重要边界：
 
 - `ttyS1` 不是 kernel console，也没有 earlycon；通过 M5-Bus UART 只能获得运行期登录 shell，看不到早期 boot log。
 - `ttyS0` / `DBG_TXD/DBG_RXD` 仍保留为系统 Log/调试登录路径。
+- `/etc/profile.d/m5bus-ttyS1-tab5.sh` 以 `tty` 的精确结果 `/dev/ttyS1` 为条件；ttyS0、SSH、ADB shell 和其他 `/dev/pts/*` 会话不会设置这些变量或尺寸。
 - 当前 `serial-getty@.service` 模板本身带 `--autologin root`；本次 ttyS1 drop-in 也沿用 autologin root。物理接触到 M5-Bus UART 的设备可直接获得 root shell，属于安全取舍。
-- 若需要账号/密码登录，可把 ttyS1 drop-in 改为不带 `--autologin root` 的 `agetty` 命令，例如 `ExecStart=-/sbin/agetty -L --noclear 921600 %I vt102`，然后 `systemctl daemon-reload && systemctl restart serial-getty@ttyS1.service`。执行前应确认 root 密码策略和恢复路径，不把密码写入仓库。
+- 若需要账号/密码登录，可把 ttyS1 drop-in 改为不带 `--autologin root` 的 `agetty` 命令，例如 `ExecStart=-/sbin/agetty -L --noclear 921600 %I xterm-256color`，然后 `systemctl daemon-reload && systemctl restart serial-getty@ttyS1.service`。执行前应确认 root 密码策略和恢复路径，不把密码写入仓库。
 
 检测命令：
 
@@ -258,6 +271,9 @@ systemctl show llm-sys.service serial-getty@ttyS1.service -p LoadState -p Active
 for fd in /proc/[0-9]*/fd/*; do target=$(readlink "$fd" 2>/dev/null) || continue; [ "$target" = /dev/ttyS1 ] || continue; pid=${fd#/proc/}; pid=${pid%%/*}; cmd=$(tr "\000" " " < /proc/$pid/cmdline 2>/dev/null); echo pid=$pid fd=${fd##*/} target=$target cmd=$cmd; done
 stty -F /dev/ttyS1 -a
 cat /etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
+cat /etc/profile.d/m5bus-ttyS1-tab5.sh
+infocmp xterm-256color
+TERM=xterm-256color tput colors
 ```
 
 合规判定：
@@ -265,15 +281,21 @@ cat /etc/systemd/system/serial-getty@ttyS1.service.d/override.conf
 - `llm-sys.service` 为 `inactive/dead` 且 `masked`。
 - `serial-getty@ttyS1.service` 为 `active/running` 且 `enabled`。
 - `/dev/ttyS1` 当前由 `/bin/login -f` / `-bash` 占用，而不是 `/opt/m5stack/bin/llm_sys`。
-- `stty -F /dev/ttyS1 -a` 显示 `speed 921600 baud`、`cs8`、`-cstopb`、`-parenb`、`-crtscts`。
+- `agetty` 的最后一个参数为 `xterm-256color`。
+- ttyS1 实际登录 shell 中 `TERM=xterm-256color`、`COLORTERM=truecolor`。
+- `stty -F /dev/ttyS1 -a` 显示 `speed 921600 baud`、`rows 32`、`columns 64`、`cs8`、`-cstopb`、`-parenb`、`-crtscts`。
+- `infocmp xterm-256color` 成功，ttyS1 shell 中 `tput colors` 返回 `256`。
+- `htop` 能在 `xterm-256color`、`32x64` 伪终端中完成 ncurses 彩色界面初始化。
+- ttyS0 仍为 `115200`、`24x80`；非 ttyS1 会话 source 该 profile 后环境保持不变。
 
 执行脚本：
 
 ```bash
-BAUD=921600 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
+BAUD=921600 TERM_TYPE=xterm-256color COLORTERM_VALUE=truecolor ROWS=32 COLS=64 \
+  APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 ```
 
-脚本当前默认 `BAUD=921600`。若只想保留 ttyS1 登录但回退到旧波特率，执行：
+脚本当前默认值即为 `921600`、`xterm-256color`、`truecolor`、`32x64`。若只想保留 ttyS1 登录但回退到旧波特率，执行：
 
 ```bash
 BAUD=115200 APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
@@ -288,6 +310,7 @@ MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 回滚效果：
 
 - 停止并禁用 `serial-getty@ttyS1.service`。
+- 删除脚本管理的 `/etc/profile.d/m5bus-ttyS1-tab5.sh`。
 - 解除 mask、重新启用并启动 `llm-sys.service`。
 - 保留 ttyS1 drop-in 文件，便于以后再次启用；若要彻底清理，可另行删除 `/etc/systemd/system/serial-getty@ttyS1.service.d/` 并 `systemctl daemon-reload`。
 
@@ -311,6 +334,14 @@ MODE=rollback APPLY=1 bash scripts/enable_m5bus_uart_login_adb.sh <serial>
 - `inventory/after/m5bus-uart-921600-apply-20260608-142718.txt`
 - `inventory/after/m5bus-uart-921600-reboot-preflight-20260608-142754.txt`
 - `inventory/after/m5bus-uart-921600-reboot-verify-20260608-142828.txt`
+- `inventory/before/tab5-ttyS1-preflight-20260612-100705.txt`
+- `inventory/before/tab5-ttyS1-readonly-20260612-100838.txt`
+- `inventory/before/tab5-ttyS1-backup-20260612-101143.txt`
+- `backups/m5bus-ttyS1-tab5-backup-20260612-101143/`
+- `inventory/after/tab5-ttyS1-apply-20260612-101219.txt`
+- `inventory/after/tab5-ttyS1-current-verify-20260612-101533.txt`
+- `inventory/after/tab5-ttyS1-reboot-preflight-20260612-101641.txt`
+- `inventory/after/tab5-ttyS1-reboot-verify-20260612-101722.txt`
 
 ### CFG-DEVICE-NET-001 — 设备联网路径
 
@@ -558,19 +589,19 @@ Host 侧脚本：
 | 方案 | 状态 | 优点 | 代价/风险 | 当前建议 |
 | --- | --- | --- | --- | --- |
 | 使用 `DBG_TXD/DBG_RXD` / 系统 Log 调试串口 | 已采纳 | 官方登录路径；当前 `ttyS0`/getty 已就绪；不影响 StackFlow 通信 UART | 需要接到正确的调试接口/FPC/Mate 路径 | 当前最佳 |
-| 额外启用 `ttyS1` getty | 已采纳 | 满足外部实体终端通过 M5-Bus UART 登录 shell | 已 mask `llm-sys.service`，M5-Bus StackFlow/JSON 通信不可用；无 early boot log | 当前按用户目标实施 |
+| 额外启用 `ttyS1` getty | 已采纳 | 满足 Tab5 等外部实体终端通过 M5-Bus UART 登录 shell；当前支持 256 色和固定 32x64 | 已 mask `llm-sys.service`，M5-Bus StackFlow/JSON 通信不可用；无 early boot log | 当前按用户目标实施 |
 | 把 M5-Bus `TRM_TXD/TRM_RXD` 改成 Linux 登录串口 | 已采纳 | 可用 M5-Bus 位置接外部终端 | 破坏主控 JSON 通信；物理访问者可获得 root shell | 当前按用户目标实施，保留回滚脚本 |
 
 ## 6. 当前整体最佳方案
 
-生成时间：2026-06-08
+生成时间：2026-06-12
 
 在当前采纳配置和已知约束下，整体最佳实施顺序为：
 
 1. Host 使用官方 Android Platform Tools，通过 `ADB_BIN` 指向 `adb.exe`。
 2. 每次会话先执行 Host ADB 工具检查和 `adb devices -l`。
 3. 通过 ADB 完成完整 baseline：系统、磁盘、网络、apt、包、服务状态。
-4. 串口登录保留默认 `ttyS0` / `DBG_TXD/DBG_RXD` / 系统 Log 调试路径，同时按用户当前目标把 M5-Bus UART `/dev/ttyS1` 改作 `921600 8N1` 的额外运行期 root 登录 shell。
+4. 串口登录保留默认 `ttyS0` / `DBG_TXD/DBG_RXD` / 系统 Log 调试路径，同时把 M5-Bus UART `/dev/ttyS1` 作为 Tab5 适配的 `921600 8N1`、`xterm-256color`、`truecolor`、`32x64` 运行期 root 登录 shell。
 5. 若需要恢复 M5-Bus StackFlow/JSON 通信，先回滚 `CFG-M5BUS-UART-LOGIN-001`。
 6. 使用扩展底座 RJ45 建立设备网络。
 7. 网络可用后备份 `/etc/apt`。

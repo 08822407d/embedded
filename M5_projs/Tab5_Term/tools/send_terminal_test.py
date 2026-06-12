@@ -96,6 +96,23 @@ STAGE4_XTERM = (
     b"End of Stage4 xterm/DEC essentials test\r\n"
 )
 
+STAGE7_UNICODE = (
+    b"\x1b[2J\x1b[H"
+    b"U1/U2 Unicode width test\r\n"
+    b"ASCII: A\xe4\xb8\xadB\r\n"
+    b"Combining: e\xcc\x81X\r\n"
+    b"\x1b[4;1HBoundary:\x1b[4;64H\xe4\xb8\xadZ"
+    b"\x1b[6;1HErase: A\xe4\xb8\xadBC\x1b[6;10H\x1b[X"
+    b"\x1b[7;1HInsert: A\xe4\xb8\xadBC\x1b[7;10H\x1b[@"
+    b"\x1b[8;1HDelete: A \xe4\xb8\xadBC\x1b[8;10H\x1b[P"
+    b"\x1b[10;12r"
+    b"\x1b[11;1HScroll: A\xe4\xb8\xadB"
+    b"\x1b[12;1Hbottom\n"
+    b"\x1b[r"
+    b"\x1b[15;1HInvalid: \xe0\x80\xafOK"
+    b"\x1b[16;1HEnd of U1/U2 Unicode width test"
+)
+
 FONT_PREVIEW = (
     b"\x1b[2J\x1b[H"
     b"Font debug: DejaVu18 glyphs in fixed 18x20 cells\r\n"
@@ -157,6 +174,7 @@ TESTS = {
     "stage2-screen": STAGE2_SCREEN,
     "stage3-color": STAGE3_COLOR,
     "stage4-xterm": STAGE4_XTERM,
+    "stage7-unicode": STAGE7_UNICODE,
 }
 
 

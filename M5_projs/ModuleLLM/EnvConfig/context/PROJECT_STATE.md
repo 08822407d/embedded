@@ -1,6 +1,6 @@
 # PROJECT_STATE — M5Stack Module LLM Kit（AX630C）
 
-最后更新：2026-06-08
+最后更新：2026-06-12
 维护者：用户 + Codex
 
 ## 1. 项目目标
@@ -9,14 +9,14 @@
 
 ## 2. 当前状态总览
 
-- 阶段：2 / 当前 Windows 主机 ADB 已连接；M5-Bus UART 登录已改为 921600 8N1 并通过重启验证；下一步设备 baseline 备份
+- 阶段：2 / 当前 Windows 主机 ADB 已连接；M5-Bus UART 登录已适配 Tab5 并通过重启验证；下一步设备 baseline 备份
 - 当前任务文件：`tasks/03_device_baseline_backup.md`
 - 最近一次跨机交接：2026-06-02 已保存交接上下文；每次换机仍按 `SESSION_HANDOFF.md` 重新做 Host/ADB 检查
 - 设备连接：当前 Windows Host 的 `adb devices -l` 显示唯一 `device` 状态 serial `axera-ax620e`；该 serial 仅为本次观察值
 - 主机环境：本次观察为 Windows 10 专业版 10.0.19045 + PowerShell 7.5.5；必须兼容 Windows 10 与 Linux 发行版
 - 设备系统版本：Ubuntu 22.04 LTS；hostname `m5stack-LLM`；kernel `Linux 4.19.125` aarch64（当前 Linux Host ADB 只读验证）
 - ADB：当前 Windows Host 使用 `C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe`，版本 `37.0.0-14910828`；通过显式 `-s axera-ax620e` 执行 shell 成功
-- UART：Linux 默认系统 Log/调试登录终端仍为 `ttyS0`，参数 `115200n8`；M5-Bus UART `/dev/ttyS1`（`serial1` / `/soc/ax_uart@4881000`，对应 `TRM_TXD/TRM_RXD`）已改作额外运行期 root 登录 shell，当前参数为 `921600 8N1`、无硬件流控；`serial-getty@ttyS1.service` enabled/active，`llm-sys.service` masked/inactive；ttyS1 使用 `--autologin root`
+- UART：Linux 默认系统 Log/调试登录终端仍为 `ttyS0`，参数 `115200n8`；M5-Bus UART `/dev/ttyS1`（`serial1` / `/soc/ax_uart@4881000`，对应 `TRM_TXD/TRM_RXD`）已改作额外运行期 root 登录 shell，当前为 `921600 8N1`、无硬件流控、`xterm-256color`、`COLORTERM=truecolor`、`32x64`；`serial-getty@ttyS1.service` enabled/active，`llm-sys.service` masked/inactive；ttyS1 使用 `--autologin root`
 - SSH：未知
 - 网络：当前无可用外网路由；`eth0` 存在但 `DOWN/NO-CARRIER`，无 `wlan*`，无 `usb0/rndis/ecm/ncm` USB 网络接口；USB gadget 仅配置 `ffs.adb`（2026-06-02 ADB 只读观察）
 - apt 源：未知
@@ -53,6 +53,7 @@
 - 2026-06-02 ADB 只读复核：当前启用的 SoC UART 只有 `ax_uart@4880000` 和 `ax_uart@4881000`；`ttyS1` 对应 `4881000.ax_uart`。首次复核时 `ttyS1` 未作为 console/getty，后续已按用户目标新增 `serial-getty@ttyS1.service`，但仍不迁移 kernel console/earlycon。
 - 2026-06-02 用户明确要求：让外部带屏/键盘嵌入式开发板作为实体终端，通过 M5-Bus UART 与 Module LLM 登录和 shell 交互。已确认 `/dev/ttyS1` 被 `/opt/m5stack/bin/llm_sys` 占用；随后 mask `llm-sys.service`，启用 `serial-getty@ttyS1.service`。当前登录不需要账号/密码；注意：这会牺牲 M5-Bus StackFlow/JSON 通信，不提供 early boot log。
 - 2026-06-08 已把 ttyS1 实例级 drop-in 从 115200 改为 `921600 8N1`；重启后复核 `ExecStart`、`stty`、getty 和 `llm-sys` 状态全部通过，未修改 ttyS0、bootargs、DTB、分区或认证方式。
+- 2026-06-12 已将 ttyS1 的 `agetty` 终端类型从 `vt102` 改为 `xterm-256color`，新增 `/etc/profile.d/m5bus-ttyS1-tab5.sh`，仅在控制终端为 `/dev/ttyS1` 时设置 `TERM=xterm-256color`、`COLORTERM=truecolor` 和 `stty rows 32 cols 64`。当前会话及设备重启后均通过真实 ttyS1 shell 自检；ttyS0 和非 ttyS1 会话未受影响。
 - 2026-06-02 用户意图澄清：串口登录相关任务按“外部实体终端设备通过 UART 获得 Module LLM Linux 登录 shell”的应用场景理解，不按 Linux `tty1` 虚拟控制台术语字面处理。
 - 2026-06-02 ADB 只读复核：设备内置 Ubuntu 22.04 LTS 上已安装 C/C++ 基础构建链：`build-essential 12.9ubuntu3`、`binutils 2.38-4ubuntu2.6`、`binutils-aarch64-linux-gnu 2.38-4ubuntu2.6`、`gcc/g++` 元包 `4:11.2.0-1ubuntu1`，实际 `gcc/g++ 11.4.0`，目标 `aarch64-linux-gnu`。
 - 2026-06-02 ADB 只读复核：`/usr/bin/gdb` 存在，版本 `GNU gdb 9.2`，但 `dpkg-query gdb` 显示 `unknown ok not-installed` 且 `dpkg -S /usr/bin/gdb` 无归属；`gdbserver` 未安装。
@@ -63,15 +64,14 @@
 每次会话都重新填写或更新为“本次观察值”，不要作为永久事实跨机器套用。
 
 ```text
-OS: Ubuntu 24.04.4 LTS, Linux 6.8.0-117-generic x86_64（本次观察）
-Shell: /usr/bin/zsh（本次观察）；脚本调用 Bash
+OS: Windows 10 专业版 10.0.19045（本次观察）
+Shell: PowerShell 7.5.5；脚本语法检查使用 Git Bash
 Codex version:
-adb path: /usr/bin/adb（Linux distro package；实际安装路径 /usr/lib/android-sdk/platform-tools/adb）
-adb version: Android Debug Bridge version 1.0.41, Version 34.0.4-debian
-adb devices -l output file: inventory/before/adb-reconnect-success-20260602-192018.txt
-ADB permission diagnosis output file: inventory/before/adb-linux-permission-diagnosis-20260602-190543.txt
-USB permissions / driver state: `32c9:2003 axera ax620e-adb` 已被 lsusb 识别；Host udev 规则 `/etc/udev/rules.d/51-m5stack-axera-adb.rules` 已落地；设备节点 `/dev/bus/usb/001/015` 为 `root:plugdev 0660`
-ssh client: OpenSSH_9.6p1 Ubuntu-3ubuntu13.16（本次观察）
+adb path: C:\Users\cheyh\AppData\Local\Android\Sdk\platform-tools\adb.exe
+adb version: Android Debug Bridge version 1.0.41, Version 37.0.0-14910828
+adb devices -l output file: inventory/before/tab5-ttyS1-preflight-20260612-100705.txt
+USB permissions / driver state: Windows PnP `ax620e-adb`，Microsoft WinUSB
+ssh client:
 serial tool:
 network access:
 ```
@@ -82,7 +82,7 @@ network access:
 ADB serial 和 USB 端口只记录为本次会话观察值；换线、换口、重启、换主机后必须重新扫描。
 
 ```text
-连接方式: USB-C / ADB（本次观察；当前 Linux Host 已可用）
+连接方式: USB-C / ADB（本次观察；当前 Windows Host 已可用）
 本次 ADB serial: axera-ax620e（本次观察；当前状态 `device`，换线/重启后必须重新扫描）
 本次 UART port:
 本次 SSH IP:
@@ -178,6 +178,12 @@ SSH user:
 - `inventory/after/m5bus-uart-921600-apply-20260608-142718.txt`：实时应用 921600 后的验证。
 - `inventory/after/m5bus-uart-921600-reboot-preflight-20260608-142754.txt`：重启后重新扫描 ADB 设备的记录。
 - `inventory/after/m5bus-uart-921600-reboot-verify-20260608-142828.txt`：重启后 921600 8N1 持久化强校验，结果 `VERIFY=PASS`。
+- `inventory/before/tab5-ttyS1-preflight-20260612-100705.txt`：Tab5 适配任务的 Windows Host ADB/USB preflight。
+- `inventory/before/tab5-ttyS1-readonly-20260612-100838.txt`：改动前 getty、ttyS0/ttyS1、terminfo、htop 和 profile 启动链审计。
+- `backups/m5bus-ttyS1-tab5-backup-20260612-101143/`：改动前 Host 侧配置备份；设备侧对应 `/root/m5bus-ttyS1-tab5-backup-20260612-101143`。
+- `inventory/after/tab5-ttyS1-current-verify-20260612-101533.txt`：当前 ttyS1 真实登录 shell 与 htop 初始化验证，结果 `CURRENT_VERIFY=PASS`。
+- `inventory/after/tab5-ttyS1-reboot-preflight-20260612-101641.txt`：重启后重新执行 ADB 设备扫描与版本检查。
+- `inventory/after/tab5-ttyS1-reboot-verify-20260612-101722.txt`：重启后 ttyS1 Tab5 配置持久化验证，结果 `REBOOT_VERIFY=PASS`。
 
 ## 11. 下一步
 

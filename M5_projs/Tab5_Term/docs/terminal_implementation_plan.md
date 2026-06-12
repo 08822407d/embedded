@@ -128,9 +128,10 @@ Recommended identity after validation: `xterm-256color` subset.
 Goal: make Tab5 standalone rather than only a display/bridge, with display and
 input orientation matching the physical keyboard installation.
 
-Status on 2026-06-08: active mainline stage. Stage 4 and the accepted font
-stage form the completed checkpoint. Detailed milestones and architecture
-constraints are maintained in `current_work.md`.
+Status: completed on 2026-06-12. The shared mapper, official A164 keyboard,
+keyboard-mounted orientation, and login-UART integration passed the recorded
+physical acceptance checks. Full simultaneous non-modifier rollover remains a
+documented limitation rather than a supported guarantee.
 
 Deliverables:
 
@@ -143,26 +144,66 @@ Deliverables:
   coordinates remain coherent after orientation changes.
 - Official Tab5 companion keyboard support after its exact hardware protocol is
   verified from official documentation.
-- USB-A keyboard runtime validation.
-- Shared normalized key-event and terminal-input mapping layer used by both
-  keyboard transports.
+- Shared normalized key-event and terminal-input mapping layer that keeps the
+  official keyboard independent of transport details.
 - Input mapping for arrows, Home/End, Page Up/Down, Insert/Delete, function
   keys, Ctrl, Alt, and Escape.
 - Application cursor/keypad mode affects emitted input sequences.
 - Serial bridge and keyboard input share the same terminal input semantics.
 
+Deferred outside Stage 5:
+
+- USB-A keyboard implementation and runtime validation. The existing
+  experimental probe is retained, but work resumes only after an explicit user
+  request.
+
 ## Stage 6: Test And Regression Harness
 
 Goal: keep compatibility from regressing as features are added.
 
-Status: next mainline stage after Stage 5 reaches its recorded completion
-condition.
+Status: completed on 2026-06-12. R1-R4 automated infrastructure and hardware
+runs passed, and the user reported no problem in the final physical check of
+status-bar placement, A164 input, battery-level refresh, and display
+responsiveness. Charging-state detection remains an explicitly deferred issue
+outside the Stage 6 completion condition.
 
 Deliverables:
 
-- Small escape-sequence corpus that can be replayed over USB bridge.
+- Consolidated regression manifest for the existing Stage 1-4 escape-sequence
+  corpora and real-login-shell checks.
+- Diagnostic-only, machine-readable terminal state summaries covering cursor,
+  modes, margins, dimensions, and screen-buffer content or hashes.
+- Host-side assertions that replay known byte streams and compare terminal
+  replies and screen state with checked-in expectations.
 - Manual app checklist: `clear`, `reset`, `tput`, `less`, `nano`, `vim`,
   `htop`, and `tmux` where available.
-- Optional host-side script to send known byte streams and compare screen state
-  summaries from diagnostic firmware.
+- One documented local workflow that runs deterministic checks and the
+  available real-shell smoke tests while preserving detailed logs.
 - Documented known gaps.
+
+## Stage 7: Unicode Width And Cell Integrity
+
+Goal: implement mainstream terminal column semantics before increasing glyph
+coverage.
+
+Status on 2026-06-12: U1 and U2 completed and hardware-regression tested.
+
+U1 deliverables:
+
+- Explicit single-width, wide-lead, and wide-continuation cells.
+- Width-aware cursor rendering and row serialization.
+- Wide-pair repair for erase, insert/delete character, redraw, and overwrite.
+- Whole-glyph wrapping at the right margin.
+- Whole-row scrolling that preserves wide-pair state.
+
+U2 deliverables:
+
+- Fixed Unicode 15.0.0 `wcwidth`-style zero/wide interval tables.
+- East Asian wide/fullwidth characters consume two columns.
+- Combining characters attach to the previous cell without cursor advance.
+- Strict UTF-8 scalar validation and deterministic replacement for malformed
+  sequences.
+- Ambiguous-width characters use one column.
+
+Current scope limit: this stage establishes layout, not comprehensive glyph
+coverage, bidirectional text, complex shaping, or unlimited grapheme clusters.

@@ -232,28 +232,41 @@ adb devices -l
 
 ```text
 ttyS0 / DBG 调试登录：115200 8N1
-ttyS1 / M5-Bus 登录：921600 8N1
+ttyS1 / M5-Bus Tab5 登录：921600 8N1，xterm-256color，truecolor，32x64
 用户：root
 默认密码：123456
 ```
 
 官方默认密码信息只用于需要密码登录的路径；不要把新密码写入仓库。
 
-当前现场状态（2026-06-08）：
+当前现场状态（2026-06-12）：
 
 - `ttyS0` / `DBG_TXD/DBG_RXD` 保留为默认系统 Log/调试登录路径。
-- M5-Bus UART `/dev/ttyS1` 已按用户目标改作 `921600 8N1` 的额外运行期实体终端登录口。
+- M5-Bus UART `/dev/ttyS1` 已按用户目标改作 `921600 8N1` 的额外运行期实体终端登录口；`agetty` 类型为 `xterm-256color`。
 - `ttyS1` 当前使用 `--autologin root`，不需要输入账号/密码；外部终端接入后应直接得到 root shell。
+- `/etc/profile.d/m5bus-ttyS1-tab5.sh` 仅在控制终端为 `/dev/ttyS1` 时设置 `TERM=xterm-256color`、`COLORTERM=truecolor` 和 `stty rows 32 cols 64`。
 - 为释放 `ttyS1`，`llm-sys.service` 已 mask/inactive；M5-Bus StackFlow/JSON API 通信不可用，回滚见 `scripts/enable_m5bus_uart_login_adb.sh`。
 
 针对“外部独立终端设备”的检查顺序：
 
 1. 确认 Module LLM 侧登录 UART：当前采纳配置为 `ttyS0` / `DBG_TXD/DBG_RXD` / 系统 Log 调试路径。
-2. 确认外部终端板侧 UART：连接 ttyS1 时配置 `921600 8N1`；3.3V TTL、电平兼容、TX/RX 交叉、公共 GND、无硬件流控。
+2. 确认外部终端板侧 UART：连接 ttyS1 时配置 `921600 8N1`、`xterm-256color`、32 行 64 列；3.3V TTL、电平兼容、TX/RX 交叉、公共 GND、无硬件流控。
 3. 确认外部终端板的软件：能运行串口终端程序，把键盘输入发到 UART，把 UART 输出显示到屏幕。
 4. 确认 Module LLM 侧服务：`console=ttyS0,115200n8`、`serial-getty@ttyS0.service` active/running。
 5. 若目标是 M5-Bus UART 实体终端，查 `CFG-M5BUS-UART-LOGIN-001`，确认 `serial-getty@ttyS1.service` active/running 且 `llm-sys.service` masked/inactive。
 6. 若用户想把 M5-Bus UART 改成账号/密码登录，不要记录密码；先把 ttyS1 drop-in 中的 `--autologin root` 去掉，再验证 root 密码和恢复路径。
+
+ttyS1 / Tab5 验证：
+
+```sh
+echo "$TERM"       # xterm-256color
+echo "$COLORTERM"  # truecolor
+stty size          # 32 64
+tput colors        # 256
+htop
+```
+
+若通过 ADB 审计，必须同时确认 ttyS0 仍为 115200 且非 ttyS1 的 `/dev/pts/*` 会话 source `/etc/profile.d/m5bus-ttyS1-tab5.sh` 后环境不变。
 
 ## 6. SSH 接入
 

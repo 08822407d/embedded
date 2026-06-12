@@ -33,16 +33,14 @@ try {
     $env:PATH = "$ToolchainBin;$env:PATH"
     Push-Location $ProjectRoot
     try {
-        $process = Start-Process `
-            -FilePath $PlatformIo `
-            -ArgumentList @("run", "-e", $Environment, "-j", $Jobs) `
-            -WorkingDirectory $ProjectRoot `
-            -NoNewWindow `
-            -RedirectStandardOutput $OutputLog `
-            -RedirectStandardError $ErrorLog `
-            -Wait `
-            -PassThru
-        $exitCode = $process.ExitCode
+        # The worker is already detached from the caller. Direct execution
+        # avoids Start-Process rebuilding a case-insensitive environment
+        # dictionary, which fails when the host supplies both PATH and Path.
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & $PlatformIo run -e $Environment -j $Jobs 1> $OutputLog 2> $ErrorLog
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorActionPreference
     }
     finally {
         Pop-Location

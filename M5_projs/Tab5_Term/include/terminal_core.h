@@ -9,6 +9,12 @@ namespace terminal {
 
 using ResponseWriter = void (*)(const uint8_t *data, size_t length);
 
+enum class TerminalCellWidth : uint8_t {
+    Continuation = 0,
+    Single = 1,
+    Wide = 2,
+};
+
 struct TerminalConfig {
     int32_t x;
     int32_t y;
@@ -21,6 +27,39 @@ struct TerminalConfig {
     ResponseWriter response_writer;
 };
 
+struct TerminalStateSnapshot {
+    uint16_t columns;
+    uint16_t rows;
+    uint16_t cursor_column;
+    uint16_t cursor_row;
+    uint16_t saved_column;
+    uint16_t saved_row;
+    uint16_t scroll_top;
+    uint16_t scroll_bottom;
+    uint16_t current_foreground;
+    uint16_t current_background;
+    uint8_t current_attributes;
+    bool wrap_enabled;
+    bool wrap_pending;
+    bool origin_mode;
+    bool application_cursor_mode;
+    bool application_keypad_mode;
+    bool bracketed_paste_mode;
+    bool mouse_tracking_mode;
+    bool cursor_visible;
+    bool alternate_screen;
+    uint32_t buffer_hash;
+};
+
+struct TerminalCellSnapshot {
+    char text[9];
+    uint16_t foreground;
+    uint16_t background;
+    uint8_t attributes;
+    TerminalCellWidth width;
+    bool dec_special_graphics;
+};
+
 void begin(const TerminalConfig& config);
 void reset();
 void redraw();
@@ -31,5 +70,13 @@ uint16_t rows();
 bool applicationCursorMode();
 bool applicationKeypadMode();
 bool bracketedPasteMode();
+bool getStateSnapshot(TerminalStateSnapshot *snapshot);
+bool getCellSnapshot(uint16_t row, uint16_t column, TerminalCellSnapshot *snapshot);
+uint32_t rowHash(uint16_t row);
+size_t copyRowText(
+    uint16_t row,
+    char *buffer,
+    size_t capacity,
+    bool trim_trailing_spaces = true);
 
 } // namespace terminal

@@ -9,6 +9,8 @@ param(
         "probe",
         "boot-log",
         "app-smoke",
+        "terminal-regression",
+        "screenshot",
         "baud"
     )]
     [string]$Action,
@@ -25,7 +27,10 @@ param(
     [switch]$DefaultBaud,
     [string]$LinuxTty = "/dev/ttyS1",
     [int]$BuildWaitMinutes = 30,
-    [int]$BuildStallWarningSeconds = 120
+    [int]$BuildStallWarningSeconds = 120,
+    [string]$OutputPath = "",
+    [string]$Baseline = "",
+    [int]$ChannelTolerance = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -355,6 +360,55 @@ try {
             }
 
             Get-Content -Path $log | Select-Object -Last 30
+        }
+
+        "terminal-regression" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "run_terminal_regression.py"
+            $rawLog = Join-Path $logRoot "terminal-regression-$timestamp.raw.log"
+            $log = Join-Path $logRoot "terminal-regression-$timestamp.log"
+
+            Invoke-LoggedCommand -Label "Terminal regression on $Port" -LogPath $log -Command {
+                & $python $script --port $Port --raw-log $rawLog
+            }
+
+            Get-Content -Path $log | Select-Object -Last 20
+        }
+
+        "screenshot" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "capture_screen.py"
+            $screenshotRoot = Join-Path $logRoot "screenshots"
+            New-Item -ItemType Directory -Force -Path $screenshotRoot | Out-Null
+            $capturePath = if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+                Join-Path $screenshotRoot "tab5-screen-$timestamp.png"
+            } elseif ([System.IO.Path]::IsPathRooted($OutputPath)) {
+                $OutputPath
+            } else {
+                Join-Path $projectRoot $OutputPath
+            }
+            $arguments = @(
+                "--port", $Port,
+                "--output", $capturePath,
+                "--channel-tolerance", "$ChannelTolerance"
+            )
+            if (-not [string]::IsNullOrWhiteSpace($Baseline)) {
+                $baselinePath = if ([System.IO.Path]::IsPathRooted($Baseline)) {
+                    $Baseline
+                } else {
+                    Join-Path $projectRoot $Baseline
+                }
+                $arguments += @("--baseline", $baselinePath)
+            }
+            $log = Join-Path $logRoot "screenshot-$timestamp.log"
+
+            Invoke-LoggedCommand -Label "Capture Tab5 screen on $Port" -LogPath $log -Command {
+                & $python $script @arguments
+            }
+
+            Get-Content -Path $log | Select-Object -Last 12
         }
 
         "baud" {

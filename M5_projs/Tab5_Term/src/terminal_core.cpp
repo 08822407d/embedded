@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "unicode_width.h"
 
 namespace terminal {
 namespace {
@@ -51,12 +52,15 @@ enum class CharacterSetSlot : uint8_t {
 
 struct Cell {
     char ch;
-    char text[5];
+    char text[9];
     CharacterSet charset;
+    TerminalCellWidth width;
     uint16_t fg;
     uint16_t bg;
     uint8_t attrs;
 };
+
+static_assert(sizeof(Cell) <= 18, "Cell growth exceeds the planned screen-buffer budget");
 
 struct RuntimeSnapshot {
     uint16_t cursor_col = 0;
@@ -140,6 +144,9 @@ Cell primary_cells[kMaxRows][kMaxColumns];
 Cell alternate_cells[kMaxRows][kMaxColumns];
 Cell (*cells)[kMaxColumns] = primary_cells;
 
+constexpr uint32_t kFnv1aOffset = 2166136261u;
+constexpr uint32_t kFnv1aPrime = 16777619u;
+
 constexpr uint16_t rgb565(uint8_t red, uint8_t green, uint8_t blue)
 {
     return static_cast<uint16_t>(
@@ -201,7 +208,15 @@ int32_t minInt(int32_t a, int32_t b)
 
 Cell blankCell()
 {
-    return Cell{' ', {'\0'}, CharacterSet::Ascii, state.current_fg, state.current_bg, 0};
+    return Cell{
+        ' ',
+        {'\0'},
+        CharacterSet::Ascii,
+        TerminalCellWidth::Single,
+        state.current_fg,
+        state.current_bg,
+        0,
+    };
 }
 
 bool proportionalRenderingEnabled()
@@ -241,30 +256,68 @@ bool isUtf8Continuation(uint8_t byte)
     return (byte & 0xc0) == 0x80;
 }
 
-uint32_t decodeUtf8CellText(const char *text)
+bool decodeUtf8Sequence(
+    const char *text,
+    size_t available,
+    uint32_t *codepoint,
+    uint8_t *consumed)
 {
-    if (text == nullptr) {
-        return 0;
+    if (text == nullptr || available == 0 || codepoint == nullptr || consumed == nullptr) {
+        return false;
     }
 
     const uint8_t b0 = static_cast<uint8_t>(text[0]);
-    const uint8_t b1 = static_cast<uint8_t>(text[1]);
-    const uint8_t b2 = static_cast<uint8_t>(text[2]);
-    const uint8_t b3 = static_cast<uint8_t>(text[3]);
     if (b0 < 0x80) {
-        return b0;
+        *codepoint = b0;
+        *consumed = 1;
+        return true;
     }
-    if (b0 >= 0xc2 && b0 <= 0xdf && isUtf8Continuation(b1) && text[2] == '\0') {
-        return static_cast<uint32_t>(((b0 & 0x1f) << 6) | (b1 & 0x3f));
+
+    if (b0 >= 0xc2 && b0 <= 0xdf && available >= 2) {
+        const uint8_t b1 = static_cast<uint8_t>(text[1]);
+        if (!isUtf8Continuation(b1)) {
+            return false;
+        }
+        *codepoint = static_cast<uint32_t>(((b0 & 0x1f) << 6) | (b1 & 0x3f));
+        *consumed = 2;
+        return true;
     }
-    if (b0 >= 0xe0 && b0 <= 0xef && isUtf8Continuation(b1) && isUtf8Continuation(b2) && text[3] == '\0') {
-        return static_cast<uint32_t>(((b0 & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f));
+
+    if (b0 >= 0xe0 && b0 <= 0xef && available >= 3) {
+        const uint8_t b1 = static_cast<uint8_t>(text[1]);
+        const uint8_t b2 = static_cast<uint8_t>(text[2]);
+        const bool second_valid =
+            (b0 == 0xe0 && b1 >= 0xa0 && b1 <= 0xbf)
+            || (b0 == 0xed && b1 >= 0x80 && b1 <= 0x9f)
+            || ((b0 >= 0xe1 && b0 <= 0xec) && isUtf8Continuation(b1))
+            || ((b0 >= 0xee && b0 <= 0xef) && isUtf8Continuation(b1));
+        if (!second_valid || !isUtf8Continuation(b2)) {
+            return false;
+        }
+        *codepoint = static_cast<uint32_t>(
+            ((b0 & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f));
+        *consumed = 3;
+        return unicode::isValidScalar(*codepoint);
     }
-    if (b0 >= 0xf0 && b0 <= 0xf4 && isUtf8Continuation(b1) && isUtf8Continuation(b2) && isUtf8Continuation(b3)) {
-        return static_cast<uint32_t>(
+
+    if (b0 >= 0xf0 && b0 <= 0xf4 && available >= 4) {
+        const uint8_t b1 = static_cast<uint8_t>(text[1]);
+        const uint8_t b2 = static_cast<uint8_t>(text[2]);
+        const uint8_t b3 = static_cast<uint8_t>(text[3]);
+        const bool second_valid =
+            (b0 == 0xf0 && b1 >= 0x90 && b1 <= 0xbf)
+            || ((b0 >= 0xf1 && b0 <= 0xf3) && isUtf8Continuation(b1))
+            || (b0 == 0xf4 && b1 >= 0x80 && b1 <= 0x8f);
+        if (!second_valid || !isUtf8Continuation(b2) || !isUtf8Continuation(b3)) {
+            return false;
+        }
+        *codepoint = static_cast<uint32_t>(
             ((b0 & 0x07) << 18) | ((b1 & 0x3f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f));
+        *consumed = 4;
+        return unicode::isValidScalar(*codepoint);
     }
-    return 0xfffd;
+
+    return false;
 }
 
 void drawSixByEightGlyph(
@@ -347,6 +400,39 @@ bool drawUnicodeFallbackCell(uint32_t codepoint, int32_t x, int32_t y, int32_t b
     }
 }
 
+void drawCombiningFallback(
+    uint32_t codepoint,
+    int32_t x,
+    int32_t y,
+    int32_t box_width,
+    uint16_t fg)
+{
+    const int32_t center = x + box_width / 2;
+    const int32_t top = y + maxInt(1, state.cell_height / 10);
+    switch (codepoint) {
+    case 0x0300: // grave
+        M5.Display.drawLine(center - 3, top, center + 1, top + 3, fg);
+        break;
+    case 0x0301: // acute
+        M5.Display.drawLine(center + 3, top, center - 1, top + 3, fg);
+        break;
+    case 0x0302: // circumflex
+        M5.Display.drawLine(center - 3, top + 3, center, top, fg);
+        M5.Display.drawLine(center, top, center + 3, top + 3, fg);
+        break;
+    case 0x0303: // tilde
+        M5.Display.drawLine(center - 4, top + 2, center - 1, top, fg);
+        M5.Display.drawLine(center - 1, top, center + 3, top + 2, fg);
+        break;
+    case 0x0308: // diaeresis
+        M5.Display.fillCircle(center - 3, top + 1, 1, fg);
+        M5.Display.fillCircle(center + 3, top + 1, 1, fg);
+        break;
+    default:
+        break;
+    }
+}
+
 void drawAsciiCellText(
     const char *text,
     int32_t x,
@@ -375,19 +461,110 @@ void drawCellText(const char *text, int32_t x, int32_t y, int32_t box_width, uin
     }
 
     const bool center_in_box = !proportionalRenderingEnabled();
-    if (isUtf8CellText(text)) {
-        const uint32_t codepoint = decodeUtf8CellText(text);
-        if (drawUnicodeFallbackCell(codepoint, x, y, box_width, fg, bold)) {
-            return;
-        }
-        text = "?";
-        bold = false;
-    } else {
-        drawAsciiCellText(text, x, y, box_width, fg, bg, bold, center_in_box);
+    const size_t text_length = strlen(text);
+    uint32_t base_codepoint = 0xfffd;
+    uint8_t base_length = 0;
+    if (!decodeUtf8Sequence(text, text_length, &base_codepoint, &base_length)) {
+        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box);
         return;
     }
 
-    drawAsciiCellText(text, x, y, box_width, fg, bg, bold, center_in_box);
+    if (base_codepoint < 0x80) {
+        char base_text[2] = {static_cast<char>(base_codepoint), '\0'};
+        drawAsciiCellText(base_text, x, y, box_width, fg, bg, bold, center_in_box);
+    } else if (!drawUnicodeFallbackCell(base_codepoint, x, y, box_width, fg, bold)) {
+        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box);
+    }
+
+    size_t offset = base_length;
+    while (offset < text_length) {
+        uint32_t codepoint = 0;
+        uint8_t consumed = 0;
+        if (!decodeUtf8Sequence(
+                text + offset,
+                text_length - offset,
+                &codepoint,
+                &consumed)) {
+            break;
+        }
+        if (unicode::columnWidth(codepoint) == unicode::ColumnWidth::Zero) {
+            drawCombiningFallback(codepoint, x, y, box_width, fg);
+        }
+        offset += consumed;
+    }
+}
+
+bool isWideLead(const Cell& cell)
+{
+    return cell.width == TerminalCellWidth::Wide;
+}
+
+bool isWideContinuation(const Cell& cell)
+{
+    return cell.width == TerminalCellWidth::Continuation;
+}
+
+uint16_t glyphLeadColumn(uint16_t row, uint16_t col)
+{
+    if (row < state.rows && col < state.cols && isWideContinuation(cells[row][col])
+        && col > 0 && isWideLead(cells[row][col - 1])) {
+        return static_cast<uint16_t>(col - 1);
+    }
+    return col;
+}
+
+uint8_t cellColumnWidth(const Cell& cell)
+{
+    if (isWideLead(cell)) {
+        return 2;
+    }
+    if (isWideContinuation(cell)) {
+        return 0;
+    }
+    return 1;
+}
+
+bool clearGlyphAt(uint16_t row, uint16_t col)
+{
+    if (row >= state.rows || col >= state.cols) {
+        return false;
+    }
+
+    const Cell blank = blankCell();
+    if (isWideContinuation(cells[row][col])
+        && col > 0 && isWideLead(cells[row][col - 1])) {
+        cells[row][col - 1] = blank;
+        cells[row][col] = blank;
+        return true;
+    }
+    if (isWideLead(cells[row][col])) {
+        cells[row][col] = blank;
+        if (col + 1 < state.cols && isWideContinuation(cells[row][col + 1])) {
+            cells[row][col + 1] = blank;
+        }
+        return true;
+    }
+    cells[row][col] = blank;
+    return false;
+}
+
+void repairWideCellsInRow(uint16_t row)
+{
+    if (row >= state.rows) {
+        return;
+    }
+
+    for (uint16_t col = 0; col < state.cols; ++col) {
+        if (isWideLead(cells[row][col])) {
+            if (col + 1 >= state.cols || !isWideContinuation(cells[row][col + 1])) {
+                cells[row][col] = blankCell();
+            } else {
+                ++col;
+            }
+        } else if (isWideContinuation(cells[row][col])) {
+            cells[row][col] = blankCell();
+        }
+    }
 }
 
 int32_t terminalRenderWidth()
@@ -436,6 +613,9 @@ void sendResponse(const char *text)
 
 const char *cellText(const Cell& cell, char fallback_text[2])
 {
+    if (isWideContinuation(cell)) {
+        return "";
+    }
     const char *text = cell.text[0] != '\0' ? cell.text : "";
     fallback_text[0] = cell.ch;
     fallback_text[1] = '\0';
@@ -443,6 +623,45 @@ const char *cellText(const Cell& cell, char fallback_text[2])
         text = fallback_text;
     }
     return text;
+}
+
+uint32_t hashByte(uint32_t hash, uint8_t value)
+{
+    return (hash ^ value) * kFnv1aPrime;
+}
+
+uint32_t hashUint16(uint32_t hash, uint16_t value)
+{
+    hash = hashByte(hash, static_cast<uint8_t>(value & 0xff));
+    return hashByte(hash, static_cast<uint8_t>((value >> 8) & 0xff));
+}
+
+uint32_t hashCell(uint32_t hash, const Cell& cell)
+{
+    hash = hashByte(hash, static_cast<uint8_t>(cell.ch));
+    for (size_t index = 0; index < sizeof(cell.text); ++index) {
+        hash = hashByte(hash, static_cast<uint8_t>(cell.text[index]));
+    }
+    hash = hashByte(
+        hash,
+        cell.charset == CharacterSet::DecSpecialGraphics ? 1 : 0);
+    hash = hashByte(hash, static_cast<uint8_t>(cell.width));
+    hash = hashUint16(hash, cell.fg);
+    hash = hashUint16(hash, cell.bg);
+    return hashByte(hash, cell.attrs);
+}
+
+uint32_t activeBufferHash()
+{
+    uint32_t hash = kFnv1aOffset;
+    hash = hashUint16(hash, state.cols);
+    hash = hashUint16(hash, state.rows);
+    for (uint16_t row = 0; row < state.rows; ++row) {
+        for (uint16_t column = 0; column < state.cols; ++column) {
+            hash = hashCell(hash, cells[row][column]);
+        }
+    }
+    return hash;
 }
 
 int32_t textAdvance(const char *text, bool bold)
@@ -457,8 +676,15 @@ int32_t textAdvance(const char *text, bool bold)
 
 int32_t cellAdvance(const Cell& cell)
 {
+    const uint8_t columns = cellColumnWidth(cell);
+    if (columns == 0) {
+        return 0;
+    }
     if (!proportionalRenderingEnabled()) {
-        return state.cell_width;
+        return state.cell_width * columns;
+    }
+    if (columns == 2) {
+        return state.cell_width * 2;
     }
     if (cell.charset == CharacterSet::DecSpecialGraphics && cell.ch != ' ') {
         return state.cell_width;
@@ -491,8 +717,11 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
         return;
     }
 
-    box_width = maxInt(1, box_width);
     const Cell& cell = cells[row][col];
+    if (isWideContinuation(cell)) {
+        return;
+    }
+    box_width = maxInt(1, box_width);
     uint16_t fg = cell.fg;
     uint16_t bg = cell.bg;
     if ((cell.attrs & kAttrDim) != 0) {
@@ -633,12 +862,18 @@ void renderRowWithCursor(uint16_t row, bool include_cursor);
 
 void renderCell(uint16_t row, uint16_t col, bool cursor)
 {
+    col = glyphLeadColumn(row, col);
     if (proportionalRenderingEnabled()) {
-        renderRowWithCursor(row, cursor && row == state.cursor_row && col == state.cursor_col);
+        renderRowWithCursor(row, cursor && row == state.cursor_row);
         return;
     }
 
-    renderCellAt(row, col, state.config.x + col * state.cell_width, state.cell_width, cursor);
+    renderCellAt(
+        row,
+        col,
+        state.config.x + col * state.cell_width,
+        state.cell_width * cellColumnWidth(cells[row][col]),
+        cursor);
 }
 
 void eraseCursor()
@@ -650,7 +885,10 @@ void eraseCursor()
     if (proportionalRenderingEnabled()) {
         renderRowWithCursor(state.cursor_row, false);
     } else {
-        renderCell(state.cursor_row, state.cursor_col, false);
+        renderCell(
+            state.cursor_row,
+            glyphLeadColumn(state.cursor_row, state.cursor_col),
+            false);
     }
     state.cursor_drawn = false;
 }
@@ -664,7 +902,10 @@ void drawCursor()
     if (proportionalRenderingEnabled()) {
         renderRowWithCursor(state.cursor_row, true);
     } else {
-        renderCell(state.cursor_row, state.cursor_col, true);
+        renderCell(
+            state.cursor_row,
+            glyphLeadColumn(state.cursor_row, state.cursor_col),
+            true);
     }
     state.cursor_drawn = true;
 }
@@ -675,13 +916,9 @@ void clearCell(uint16_t row, uint16_t col, bool render)
         return;
     }
 
-    cells[row][col] = blankCell();
+    clearGlyphAt(row, col);
     if (render) {
-        if (proportionalRenderingEnabled()) {
-            renderRowWithCursor(row, false);
-        } else {
-            renderCell(row, col, false);
-        }
+        renderRowWithCursor(row, false);
     }
 }
 
@@ -711,6 +948,10 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
     }
 
     const int32_t y = state.config.y + row * state.cell_height;
+    const uint16_t cursor_col =
+        row == state.cursor_row
+        ? glyphLeadColumn(row, state.cursor_col)
+        : state.cursor_col;
     if (proportionalRenderingEnabled()) {
         const int32_t render_width = terminalRenderWidth();
         const int32_t render_right = state.config.x + render_width;
@@ -718,7 +959,12 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
         int32_t x = state.config.x;
         for (uint16_t col = 0; col < state.cols && x < render_right; ++col) {
             const int32_t advance = cellAdvance(cells[row][col]);
-            renderCellAt(row, col, x, advance, include_cursor && row == state.cursor_row && col == state.cursor_col);
+            renderCellAt(
+                row,
+                col,
+                x,
+                advance,
+                include_cursor && row == state.cursor_row && col == cursor_col);
             x += advance;
         }
         return;
@@ -729,8 +975,8 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
             row,
             col,
             state.config.x + col * state.cell_width,
-            state.cell_width,
-            include_cursor && row == state.cursor_row && col == state.cursor_col);
+            state.cell_width * cellColumnWidth(cells[row][col]),
+            include_cursor && row == state.cursor_row && col == cursor_col);
     }
 }
 
@@ -958,21 +1204,75 @@ void backspace()
 
     if (state.cursor_col > 0) {
         --state.cursor_col;
+        if (isWideContinuation(cells[state.cursor_row][state.cursor_col])
+            && state.cursor_col > 0
+            && isWideLead(cells[state.cursor_row][state.cursor_col - 1])) {
+            --state.cursor_col;
+        }
     }
 }
 
-void advanceAfterCellWrite()
+void advanceAfterCellWrite(uint8_t columns)
 {
-    if (state.cursor_col + 1 >= state.cols) {
+    const uint16_t final_column = static_cast<uint16_t>(
+        minInt(state.cols - 1, state.cursor_col + columns - 1));
+    if (final_column + 1 >= state.cols) {
+        state.cursor_col = final_column;
         if (state.wrap_enabled) {
             state.wrap_pending = true;
         }
     } else {
-        ++state.cursor_col;
+        state.cursor_col = static_cast<uint16_t>(final_column + 1);
     }
 }
 
-void putTextCell(const char *text, uint8_t length, char fallback_ch, CharacterSet charset)
+bool previousGlyphPosition(uint16_t *row, uint16_t *col)
+{
+    if (row == nullptr || col == nullptr || state.rows == 0 || state.cols == 0) {
+        return false;
+    }
+
+    *row = state.cursor_row;
+    if (state.wrap_pending) {
+        *col = state.cursor_col;
+    } else {
+        if (state.cursor_col == 0) {
+            return false;
+        }
+        *col = static_cast<uint16_t>(state.cursor_col - 1);
+    }
+    *col = glyphLeadColumn(*row, *col);
+    const Cell& cell = cells[*row][*col];
+    return !isWideContinuation(cell)
+        && !(cell.ch == ' ' && cell.text[0] == '\0');
+}
+
+void appendCombiningText(const char *text, uint8_t length)
+{
+    uint16_t row = 0;
+    uint16_t col = 0;
+    if (text == nullptr || length == 0 || !previousGlyphPosition(&row, &col)) {
+        return;
+    }
+
+    Cell& cell = cells[row][col];
+    const size_t current_length = strlen(cell.text);
+    if (current_length + length >= sizeof(cell.text)) {
+        return;
+    }
+    for (uint8_t index = 0; index < length; ++index) {
+        cell.text[current_length + index] = text[index];
+    }
+    cell.text[current_length + length] = '\0';
+    renderCell(row, col, false);
+}
+
+void putTextCell(
+    const char *text,
+    uint8_t length,
+    char fallback_ch,
+    CharacterSet charset,
+    TerminalCellWidth width)
 {
     if (state.rows == 0 || state.cols == 0) {
         return;
@@ -986,37 +1286,81 @@ void putTextCell(const char *text, uint8_t length, char fallback_ch, CharacterSe
         }
     }
 
-    Cell& cell = cells[state.cursor_row][state.cursor_col];
+    if (width == TerminalCellWidth::Wide
+        && state.cursor_col + 1 >= state.cols) {
+        if (state.wrap_enabled) {
+            state.cursor_col = 0;
+            lineFeed();
+        } else {
+            text = "?";
+            length = 1;
+            fallback_ch = '?';
+            charset = CharacterSet::Ascii;
+            width = TerminalCellWidth::Single;
+        }
+    }
+
+    const uint16_t row = state.cursor_row;
+    const uint16_t col = state.cursor_col;
+    bool touched_wide = clearGlyphAt(row, col);
+    if (width == TerminalCellWidth::Wide) {
+        touched_wide = clearGlyphAt(row, static_cast<uint16_t>(col + 1)) || touched_wide;
+    }
+
+    Cell& cell = cells[row][col];
     cell.ch = fallback_ch;
     cell.charset = charset;
+    cell.width = width;
     cell.fg = state.current_fg;
     cell.bg = state.current_bg;
     cell.attrs = state.current_attrs;
-    for (uint8_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < sizeof(cell.text); ++i) {
         cell.text[i] = '\0';
     }
     if (text != nullptr && length > 0) {
-        const uint8_t copy_length = minInt(length, 4);
+        const uint8_t copy_length = minInt(length, sizeof(cell.text) - 1);
         for (uint8_t i = 0; i < copy_length; ++i) {
             cell.text[i] = text[i];
         }
         cell.text[copy_length] = '\0';
     }
 
-    renderCell(state.cursor_row, state.cursor_col, false);
-    advanceAfterCellWrite();
+    if (width == TerminalCellWidth::Wide) {
+        Cell& continuation = cells[row][col + 1];
+        continuation = blankCell();
+        continuation.width = TerminalCellWidth::Continuation;
+        continuation.fg = state.current_fg;
+        continuation.bg = state.current_bg;
+        continuation.attrs = state.current_attrs;
+        renderCell(row, col, false);
+    } else if (touched_wide) {
+        renderRow(row);
+    } else {
+        renderCell(row, col, false);
+    }
+    advanceAfterCellWrite(cellColumnWidth(cell));
 }
 
 void putPrintable(uint8_t byte)
 {
     const CharacterSet charset = state.use_g1 ? state.g1_charset : state.g0_charset;
     const char text[2] = {static_cast<char>(byte), '\0'};
-    putTextCell(text, 1, static_cast<char>(byte), charset);
+    putTextCell(
+        text,
+        1,
+        static_cast<char>(byte),
+        charset,
+        TerminalCellWidth::Single);
 }
 
 void putReplacementCharacter()
 {
-    putTextCell("?", 1, '?', CharacterSet::Ascii);
+    putTextCell(
+        "?",
+        1,
+        '?',
+        CharacterSet::Ascii,
+        TerminalCellWidth::Single);
 }
 
 void resetTabStops()
@@ -1082,25 +1426,6 @@ void setOriginMode(bool enabled)
     setCursorFromCsi(1, 1);
 }
 
-void renderCellsInRow(uint16_t row, uint16_t start_col, uint16_t end_col)
-{
-    if (row >= state.rows || start_col >= state.cols || end_col >= state.cols || start_col > end_col) {
-        return;
-    }
-
-    if (proportionalRenderingEnabled()) {
-        renderRowWithCursor(row, false);
-        return;
-    }
-
-    for (uint16_t col = start_col; col <= end_col; ++col) {
-        renderCell(row, col, false);
-        if (col == UINT16_MAX) {
-            break;
-        }
-    }
-}
-
 void insertChars(int32_t count_param)
 {
     clearWrapPending();
@@ -1117,7 +1442,8 @@ void insertChars(int32_t count_param)
     for (uint16_t col = state.cursor_col; col < state.cursor_col + count; ++col) {
         cells[row][col] = blankCell();
     }
-    renderCellsInRow(row, state.cursor_col, state.cols - 1);
+    repairWideCellsInRow(row);
+    renderRow(row);
 }
 
 void deleteChars(int32_t count_param)
@@ -1136,7 +1462,8 @@ void deleteChars(int32_t count_param)
     for (uint16_t col = state.cols - count; col < state.cols; ++col) {
         cells[row][col] = blankCell();
     }
-    renderCellsInRow(row, state.cursor_col, state.cols - 1);
+    repairWideCellsInRow(row);
+    renderRow(row);
 }
 
 void eraseChars(int32_t count_param)
@@ -1151,7 +1478,8 @@ void eraseChars(int32_t count_param)
     for (uint16_t col = state.cursor_col; col < state.cursor_col + count; ++col) {
         clearCell(state.cursor_row, col, false);
     }
-    renderCellsInRow(state.cursor_row, state.cursor_col, state.cursor_col + count - 1);
+    repairWideCellsInRow(state.cursor_row);
+    renderRow(state.cursor_row);
 }
 
 void insertLines(int32_t count_param)
@@ -1231,7 +1559,8 @@ void eraseInLine(int32_t mode)
             break;
         }
     }
-    renderCellsInRow(state.cursor_row, start_col, end_col);
+    repairWideCellsInRow(state.cursor_row);
+    renderRow(state.cursor_row);
 }
 
 void eraseInDisplay(int32_t mode)
@@ -1256,7 +1585,8 @@ void eraseInDisplay(int32_t mode)
                     break;
                 }
             }
-            renderCellsInRow(row, 0, end_col);
+            repairWideCellsInRow(row);
+            renderRow(row);
         }
         return;
     }
@@ -1266,7 +1596,8 @@ void eraseInDisplay(int32_t mode)
         for (uint16_t col = start_col; col < state.cols; ++col) {
             clearCell(row, col, false);
         }
-        renderCellsInRow(row, start_col, state.cols - 1);
+        repairWideCellsInRow(row);
+        renderRow(row);
     }
 }
 
@@ -1839,11 +2170,38 @@ void processUtf8(uint8_t byte)
     ++state.utf8_length;
     if (state.utf8_length >= state.utf8_expected) {
         state.utf8_buffer[minInt(state.utf8_expected, 4)] = '\0';
-        putTextCell(
-            state.utf8_buffer,
-            minInt(state.utf8_expected, 4),
-            '?',
-            CharacterSet::Ascii);
+        uint32_t codepoint = 0;
+        uint8_t consumed = 0;
+        const uint8_t sequence_length = minInt(state.utf8_expected, 4);
+        if (!decodeUtf8Sequence(
+                state.utf8_buffer,
+                sequence_length,
+                &codepoint,
+                &consumed)
+            || consumed != sequence_length) {
+            putReplacementCharacter();
+        } else {
+            const unicode::ColumnWidth width = unicode::columnWidth(codepoint);
+            if (width == unicode::ColumnWidth::Zero) {
+                appendCombiningText(state.utf8_buffer, sequence_length);
+            } else if (width == unicode::ColumnWidth::Wide) {
+                putTextCell(
+                    state.utf8_buffer,
+                    sequence_length,
+                    '?',
+                    CharacterSet::Ascii,
+                    TerminalCellWidth::Wide);
+            } else if (width == unicode::ColumnWidth::Narrow) {
+                putTextCell(
+                    state.utf8_buffer,
+                    sequence_length,
+                    '?',
+                    CharacterSet::Ascii,
+                    TerminalCellWidth::Single);
+            } else {
+                putReplacementCharacter();
+            }
+        }
         state.utf8_length = 0;
         state.utf8_expected = 0;
         state.parser_state = ParserState::Ground;
@@ -2179,6 +2537,131 @@ bool applicationKeypadMode()
 bool bracketedPasteMode()
 {
     return state.bracketed_paste_mode;
+}
+
+bool getStateSnapshot(TerminalStateSnapshot *snapshot)
+{
+    if (!state.initialized || snapshot == nullptr) {
+        return false;
+    }
+
+    *snapshot = {
+        .columns = state.cols,
+        .rows = state.rows,
+        .cursor_column = state.cursor_col,
+        .cursor_row = state.cursor_row,
+        .saved_column = state.saved_col,
+        .saved_row = state.saved_row,
+        .scroll_top = state.scroll_top,
+        .scroll_bottom = state.scroll_bottom,
+        .current_foreground = state.current_fg,
+        .current_background = state.current_bg,
+        .current_attributes = state.current_attrs,
+        .wrap_enabled = state.wrap_enabled,
+        .wrap_pending = state.wrap_pending,
+        .origin_mode = state.origin_mode,
+        .application_cursor_mode = state.application_cursor_mode,
+        .application_keypad_mode = state.application_keypad_mode,
+        .bracketed_paste_mode = state.bracketed_paste_mode,
+        .mouse_tracking_mode = state.mouse_tracking_mode,
+        .cursor_visible = state.cursor_visible,
+        .alternate_screen = state.using_alternate_screen,
+        .buffer_hash = activeBufferHash(),
+    };
+    return true;
+}
+
+bool getCellSnapshot(
+    uint16_t row,
+    uint16_t column,
+    TerminalCellSnapshot *snapshot)
+{
+    if (!state.initialized || snapshot == nullptr ||
+        row >= state.rows || column >= state.cols) {
+        return false;
+    }
+
+    const Cell& cell = cells[row][column];
+    char fallback[2] = {};
+    const char *text = cellText(cell, fallback);
+    for (size_t index = 0; index < sizeof(snapshot->text); ++index) {
+        snapshot->text[index] = '\0';
+    }
+    for (size_t index = 0;
+         index + 1 < sizeof(snapshot->text) && text[index] != '\0';
+         ++index) {
+        snapshot->text[index] = text[index];
+    }
+    snapshot->foreground = cell.fg;
+    snapshot->background = cell.bg;
+    snapshot->attributes = cell.attrs;
+    snapshot->width = cell.width;
+    snapshot->dec_special_graphics =
+        cell.charset == CharacterSet::DecSpecialGraphics;
+    return true;
+}
+
+uint32_t rowHash(uint16_t row)
+{
+    if (!state.initialized || row >= state.rows) {
+        return 0;
+    }
+
+    uint32_t hash = hashUint16(kFnv1aOffset, row);
+    for (uint16_t column = 0; column < state.cols; ++column) {
+        hash = hashCell(hash, cells[row][column]);
+    }
+    return hash;
+}
+
+size_t copyRowText(
+    uint16_t row,
+    char *buffer,
+    size_t capacity,
+    bool trim_trailing_spaces)
+{
+    if (buffer != nullptr && capacity > 0) {
+        buffer[0] = '\0';
+    }
+    if (!state.initialized || row >= state.rows ||
+        buffer == nullptr || capacity == 0) {
+        return 0;
+    }
+
+    uint16_t endColumn = state.cols;
+    if (trim_trailing_spaces) {
+        while (endColumn > 0) {
+            const Cell& cell = cells[row][endColumn - 1];
+            if (isWideContinuation(cell) || isWideLead(cell)) {
+                break;
+            }
+            char fallback[2] = {};
+            const char *text = cellText(cell, fallback);
+            if (text[0] != ' ' || text[1] != '\0' ||
+                cell.charset != CharacterSet::Ascii) {
+                break;
+            }
+            --endColumn;
+        }
+    }
+
+    size_t written = 0;
+    for (uint16_t column = 0; column < endColumn; ++column) {
+        if (isWideContinuation(cells[row][column])) {
+            continue;
+        }
+        char fallback[2] = {};
+        const char *text = cellText(cells[row][column], fallback);
+        for (size_t index = 0; text[index] != '\0'; ++index) {
+            if (written + 1 >= capacity) {
+                buffer[written] = '\0';
+                return written;
+            }
+            buffer[written++] = text[index];
+        }
+    }
+    buffer[written] = '\0';
+    return written;
 }
 
 } // namespace terminal

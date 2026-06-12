@@ -25,7 +25,9 @@ uint32_t lastM5UpdateMs = 0;
 
 void formatStatusTitle(char *buffer, size_t buffer_size)
 {
-#if ENABLE_TERMINAL_CDC_INJECTION
+#if ENABLE_TERMINAL_STATE_DIAGNOSTICS
+    snprintf(buffer, buffer_size, "Tab5 Terminal Regression 115200");
+#elif ENABLE_TERMINAL_CDC_INJECTION
     snprintf(buffer, buffer_size, "Tab5 Terminal CDC Inject 115200");
 #elif ENABLE_USB_LOGIN_UART_BRIDGE
     snprintf(

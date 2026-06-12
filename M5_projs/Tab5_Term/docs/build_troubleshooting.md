@@ -126,6 +126,30 @@ Follow-up rule:
 - Add later incidents here. Promote a suspected secondary cause to confirmed
   only after a discriminating test supports it.
 
+## Observation 2026-06-12: New Environments Trigger Long Full Builds
+
+Context:
+
+- Screen-capture work added a source file and a new
+  `tab5_screen_capture` PlatformIO environment.
+- Detached builds continued to update their file-backed logs and completed
+  without manual process intervention.
+
+Observed successful durations:
+
+- `tab5_terminal_regression`: 655.12 seconds;
+- first `tab5_screen_capture`: 701.91 seconds;
+- restored `tab5_min_uart_terminal`: 541.99 seconds.
+
+Interpretation:
+
+- Adding a source file or first building a new environment can compile the full
+  M5Unified/M5GFX dependency graph separately for that environment.
+- These runs were slow but not stalled: log activity continued and each worker
+  wrote a successful result.
+- Do not use elapsed time alone to classify a build as stuck. Apply the log,
+  process, CPU, and I/O criteria in the triage procedure.
+
 ## Incident 2026-06-08: Native stderr Misclassified As Build Failure
 
 Context:
@@ -146,6 +170,36 @@ Confirmed cause and fix:
 
 - PowerShell promoted native stderr output into an error record before the
   worker could judge PlatformIO's process exit code.
-- The worker now launches PlatformIO with `Start-Process`, redirects stdout and
-  stderr directly to separate files, waits for completion, and uses only the
-  native process exit code to decide success.
+- The initial fix used `Start-Process`; the 2026-06-12 incident below
+  superseded that implementation. The worker now invokes PlatformIO directly
+  with `$ErrorActionPreference = "Continue"`, redirects stdout and stderr to
+  separate files, and uses only `$LASTEXITCODE` to decide success.
+
+## Incident 2026-06-12: Duplicate PATH Keys Break Start-Process
+
+Context:
+
+- Environment: `tab5_terminal_regression`, `-j 2`.
+- The standard detached worker started normally but failed before PlatformIO
+  entered compilation.
+
+Observed evidence:
+
+- `Start-Process` raised an `ArgumentException` stating that dictionary key
+  `Path` could not be added because key `PATH` already existed.
+- The inherited Codex process environment contained both case variants with
+  identical values.
+- Output log remained empty and the result file recorded 0.2 seconds, proving
+  this was not a compiler or firmware failure.
+
+Confirmed cause and fix:
+
+- `Start-Process` reconstructs the inherited environment as a
+  case-insensitive dictionary on Windows and rejects the duplicate keys.
+- The worker is already an independent hidden process with file-backed logs,
+  so it now invokes PlatformIO directly inside that worker, redirects stdout
+  and stderr to their existing separate files, temporarily uses
+  `$ErrorActionPreference = "Continue"`, and decides success from
+  `$LASTEXITCODE`.
+- This preserves detached build lifetime while avoiding `Start-Process`
+  environment normalization.
