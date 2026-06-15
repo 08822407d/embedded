@@ -101,8 +101,11 @@ Expected useful outcomes:
 - Host analysis proposed `current_ma > -389.9` as a high-confidence
   external-power threshold.
 
-This run supports a future debounced INA226-current heuristic. It is not yet an
-accepted production rule for the status-bar lightning icon.
+This run supported the production status-bar heuristic added on 2026-06-15:
+enter external-power state when current is greater than `-300mA`, exit when
+current is less than `-600mA`, and require two consecutive 500ms samples before
+switching. `CHG_STAT`/`M5.Power.isCharging()` remain diagnostic-only for this
+decision path.
 
 ## Restore
 

@@ -438,6 +438,14 @@ USB keyboard support is explicitly excluded from this condition.
   host analysis proposed `current_ma > -389.9` as a high-confidence candidate
   external-power threshold. Production lightning-icon behavior is still
   unchanged until a debounced heuristic is implemented and accepted.
+- 2026-06-15: implemented the production lightning-icon heuristic from the
+  captured evidence. The status bar now treats INA226 current as the source of
+  external-power truth, with hysteresis thresholds of `>-300mA` to enter and
+  `<-600mA` to exit, requiring two consecutive 500ms samples before switching.
+  `CHG_STAT`/`M5.Power.isCharging()` remain diagnostic signals only. Both
+  `tab5_min_uart_terminal` and `tab5_power_status_probe` built successfully;
+  the updated formal firmware was flashed and the login-shell probe returned
+  `shell-path-ok: m5stack-LLM`.
 - 2026-06-15: Stage 8 was closed after T1 and T2 were completed at their
   documented validation levels. T1 was hardware-regression tested. T2 remains
   intentionally not hardware-validated because it is preparatory geometry API

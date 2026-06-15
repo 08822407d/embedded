@@ -514,6 +514,14 @@ Power status validation build:
   high-confidence external-power threshold. Treat this as evidence for a
   future debounced INA226-current heuristic, not yet as an accepted production
   rule.
+- Production heuristic implemented on 2026-06-15: the status-bar lightning icon
+  now uses INA226 current instead of `CHG_STAT`/`M5.Power.isCharging()`. Enter
+  external-power state when current is greater than `-300mA`; exit when current
+  is less than `-600mA`; require two consecutive 500ms samples before switching.
+  `CHG_STAT`/API values remain useful diagnostics but are not the production
+  truth source. `tab5_min_uart_terminal` and `tab5_power_status_probe` built
+  successfully; the formal firmware was flashed and verified with
+  `shell-path-ok: m5stack-LLM`.
 
 Power detect probe workflow:
 
