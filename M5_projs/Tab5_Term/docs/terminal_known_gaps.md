@@ -60,6 +60,8 @@ implementation and regression tests pass.
 - Dynamic charge-state detection was intentionally shelved after the observed
   hardware/API indicators did not reliably follow cable insertion and removal.
   It has been reopened only for automated evidence collection through
-  `tab5_power_detect_probe`; no production rule has been accepted yet.
+  `tab5_power_detect_probe`. The first capture found a high-confidence
+  INA226-current threshold candidate for external power, but no production rule
+  has been accepted yet.
 - This deferred issue was explicitly excluded from Stage 6 acceptance on
   2026-06-12. Battery percentage/level refresh remains independently accepted.

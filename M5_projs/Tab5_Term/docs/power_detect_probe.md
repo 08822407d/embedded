@@ -86,6 +86,24 @@ Expected useful outcomes:
   enough, meaning firmware cannot reliably infer the state without a different
   hardware signal.
 
+## Captured Runs
+
+2026-06-15, `.logs/power-detect-20260615-143030.*`:
+
+- 361 samples over 180 seconds, no dropped samples.
+- User unplugged USB data, cycled the charge cable five times, then reconnected
+  USB data.
+- `api` and raw `CHG_STAT` both changed only once near the beginning for 14
+  samples and did not follow the repeated charge-cable cycles.
+- INA226 current formed two clear clusters:
+  - no external power: 46 samples around `-979mA`;
+  - external power / charging: 315 samples around `+199mA`.
+- Host analysis proposed `current_ma > -389.9` as a high-confidence
+  external-power threshold.
+
+This run supports a future debounced INA226-current heuristic. It is not yet an
+accepted production rule for the status-bar lightning icon.
+
 ## Restore
 
 After probing, restore the formal terminal firmware:

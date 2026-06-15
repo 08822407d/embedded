@@ -431,6 +431,13 @@ USB keyboard support is explicitly excluded from this condition.
   can plug/unplug cables while the device records samples locally and exports
   them after CDC reconnect. This does not yet solve charging-state detection;
   it produces evidence for choosing or rejecting a production heuristic.
+- 2026-06-15: first automated power-detect run captured 361 samples over 180s
+  with no drops. `api`/raw `CHG_STAT` changed only for 14 early samples and did
+  not track repeated cable cycles. INA226 current split cleanly into about
+  `-979mA` no-external-power and `+199mA` external-power/charging clusters; the
+  host analysis proposed `current_ma > -389.9` as a high-confidence candidate
+  external-power threshold. Production lightning-icon behavior is still
+  unchanged until a debounced heuristic is implemented and accepted.
 - 2026-06-15: Stage 8 was closed after T1 and T2 were completed at their
   documented validation levels. T1 was hardware-regression tested. T2 remains
   intentionally not hardware-validated because it is preparatory geometry API

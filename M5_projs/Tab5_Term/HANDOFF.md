@@ -503,6 +503,17 @@ Power status validation build:
   dump collection, and threshold analysis. This is still diagnostic evidence
   gathering; do not change the production lightning icon until a captured log
   shows a stable rule.
+- First automated capture on 2026-06-15:
+  `.logs/power-detect-20260615-143030.*` recorded 361 samples across 180s with
+  no dropped samples while the user unplugged USB data, cycled the charge cable
+  five times, and reconnected USB data. `api`/raw `pin` only went low for 14
+  early samples and did not track the repeated cable cycles. INA226 current
+  formed two clear clusters: a no-external-power cluster around `-979mA`
+  (46 samples) and an external-power/charging cluster around `+199mA`
+  (315 samples). The host analysis proposed `current_ma > -389.9` as a
+  high-confidence external-power threshold. Treat this as evidence for a
+  future debounced INA226-current heuristic, not yet as an accepted production
+  rule.
 
 Power detect probe workflow:
 
