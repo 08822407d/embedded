@@ -385,6 +385,12 @@ Current fixed settings:
   `stage8-protocol` regression case. The complete regression run passed 7/7,
   then `tab5_min_uart_terminal` was restored and the shell probe returned
   `shell-path-ok: m5stack-LLM`.
+- T2 on 2026-06-15 added `terminal::TerminalGeometry` and
+  `terminal::getGeometry()` as the shared geometry source for future transport
+  layers. The snapshot includes viewport origin/size, rendered grid size, cell
+  size, and logical rows/columns. This is preparatory work for SSH/Telnet/PTY
+  integration, not a raw UART resize mechanism. It is locally build-checked but
+  not hardware-validated.
 - proportional renderer: retained in `tab5_terminal_font_prop_preview`
 - Screen orientation: `SCREEN_ORIENTATION_KEYBOARD_MOUNTED`; this maps the
   original landscape rotation `1` to opposite landscape rotation `3`, matching

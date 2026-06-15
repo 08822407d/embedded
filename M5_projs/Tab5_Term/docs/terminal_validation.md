@@ -381,6 +381,13 @@ This response prepares future SSH/Telnet/PTY-backed integrations. It is not
 used to auto-resize the current raw UART login shell; that path still uses the
 Module LLM profile's persistent `stty rows 32 cols 64`.
 
+Stage 8 T2 adds the shared terminal geometry snapshot API used by the T1
+response path and by future transport layers. It has no separate hardware
+validation requirement yet because it is preparatory and not user-visible. On
+2026-06-15 both formal and regression environments built successfully; hardware
+validation is deferred until an advanced login transport or PTY-backed
+integration consumes it.
+
 Validation record:
 
 - 2026-06-15: `stage8-protocol` passed as part of the full seven-case hardware

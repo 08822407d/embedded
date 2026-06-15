@@ -252,6 +252,23 @@ The regression firmware passed all seven deterministic cases, including
 `stage8-protocol`, and the restored formal firmware returned
 `shell-path-ok: m5stack-LLM`.
 
+### Milestone T2: Terminal Geometry Snapshot API
+
+- Provide a single read-only terminal geometry snapshot for future transport
+  layers.
+- Include viewport origin/size, rendered grid size, cell size, and character
+  rows/columns.
+- Keep the existing raw UART login behavior unchanged and do not inject `stty`
+  commands.
+- Reuse the snapshot from the existing `CSI 18 t` response path so later
+  protocol work has one geometry source.
+
+Status: implemented and locally build-checked on 2026-06-15, not
+hardware-validated. Both `tab5_min_uart_terminal` and
+`tab5_terminal_regression` built successfully. This is preparatory API work for
+future SSH/Telnet/PTY-backed transports and is intentionally left for validation
+when one of those advanced features is implemented.
+
 ## Completed Mainline Stage: Stage 5 Input And Integration
 
 Goal: make the official Tab5 companion keyboard production-ready while keeping

@@ -2106,13 +2106,18 @@ void reportDecCursorPosition()
 
 void reportTextAreaSize()
 {
+    TerminalGeometry geometry = {};
+    if (!getGeometry(&geometry)) {
+        return;
+    }
+
     char response[24];
     snprintf(
         response,
         sizeof(response),
         "\x1b[8;%u;%ut",
-        static_cast<unsigned>(state.rows),
-        static_cast<unsigned>(state.cols));
+        static_cast<unsigned>(geometry.rows),
+        static_cast<unsigned>(geometry.columns));
     sendResponse(response);
 }
 
@@ -2751,6 +2756,25 @@ uint16_t columns()
 uint16_t rows()
 {
     return state.rows;
+}
+
+bool getGeometry(TerminalGeometry *geometry)
+{
+    if (!state.initialized || geometry == nullptr) {
+        return false;
+    }
+
+    geometry->x = state.config.x;
+    geometry->y = state.config.y;
+    geometry->pixel_width = state.config.width;
+    geometry->pixel_height = state.config.height;
+    geometry->rendered_width = terminalRenderWidth();
+    geometry->rendered_height = state.rows * state.cell_height;
+    geometry->cell_width = state.cell_width;
+    geometry->cell_height = state.cell_height;
+    geometry->columns = state.cols;
+    geometry->rows = state.rows;
+    return true;
 }
 
 bool applicationCursorMode()

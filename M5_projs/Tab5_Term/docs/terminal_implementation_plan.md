@@ -243,3 +243,15 @@ T1 deliverables:
 
 Status on 2026-06-15: T1 completed and hardware-regression tested. The
 `stage8-protocol` corpus checks `CSI 18 t` response bytes.
+
+T2 deliverables:
+
+- Read-only terminal geometry snapshot API for future transport layers.
+- Snapshot includes terminal viewport origin/size, rendered grid size, cell
+  size, and logical rows/columns.
+- Existing `CSI 18 t` response path uses the shared geometry snapshot.
+- No change to raw UART login behavior and no firmware-side `stty` injection.
+
+Status on 2026-06-15: T2 implemented and locally build-checked, not
+hardware-validated. Validation is deferred until a mature login transport or
+PTY-backed integration consumes this API.

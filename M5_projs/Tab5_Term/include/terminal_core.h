@@ -27,6 +27,19 @@ struct TerminalConfig {
     ResponseWriter response_writer;
 };
 
+struct TerminalGeometry {
+    int32_t x;
+    int32_t y;
+    int32_t pixel_width;
+    int32_t pixel_height;
+    int32_t rendered_width;
+    int32_t rendered_height;
+    int32_t cell_width;
+    int32_t cell_height;
+    uint16_t columns;
+    uint16_t rows;
+};
+
 struct TerminalStateSnapshot {
     uint16_t columns;
     uint16_t rows;
@@ -67,6 +80,7 @@ void writeByte(uint8_t byte);
 void writeBytes(const uint8_t *data, size_t length);
 uint16_t columns();
 uint16_t rows();
+bool getGeometry(TerminalGeometry *geometry);
 bool applicationCursorMode();
 bool applicationKeypadMode();
 bool bracketedPasteMode();
