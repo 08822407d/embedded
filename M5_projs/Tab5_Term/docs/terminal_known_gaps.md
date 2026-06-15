@@ -61,7 +61,9 @@ implementation and regression tests pass.
   `M5.Power.isCharging()` because those signals did not reliably follow cable
   insertion and removal on the tested Tab5. The production status-bar lightning
   icon now uses a debounced INA226-current heuristic derived from
-  `tab5_power_detect_probe` evidence. Broader validation across battery levels
-  and charger types remains useful.
+  `tab5_power_detect_probe` evidence: strong negative current means charging.
+  A debug/programming data cable may not show the lightning icon if the battery
+  current is not sufficiently negative. Broader validation across battery
+  levels and charger types remains useful.
 - This deferred issue was explicitly excluded from Stage 6 acceptance on
   2026-06-12. Battery percentage/level refresh remains independently accepted.

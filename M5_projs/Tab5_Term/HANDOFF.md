@@ -319,9 +319,8 @@ Terminal validation input strategy:
   - `tab5_usb_keyboard_probe` builds with `ENABLE_USB_KEYBOARD_PROBE=1`
 - The status bar renders a themed battery area at the right edge. For Tab5,
   `M5.Power.getBatteryLevel()` uses the board's INA226 reading and estimates
-  level as a 2S Li-Po pack. `M5.Power.isCharging()` reads the IP2326 charge
-  status through IO expander pin `E2.P6/CHG_STAT`; the battery icon shows a
-  lightning mark while charging.
+  level as a 2S Li-Po pack. The battery icon shows a lightning mark when the
+  INA226 current heuristic infers that the battery is charging.
 - UI colors and status bar rendering have been split out of `src/main.cpp` into
   `src/ui_theme.cpp` and `src/status_bar.cpp` so future terminal UI work does
   not accumulate in the main loop.
@@ -446,11 +445,10 @@ Tab5 battery facts confirmed from M5Unified/M5Stack sources:
   sources do not expose a usable PI4IOE `nINT` line to ESP32-P4 GPIO. Do not
   build a fake interrupt path without confirming the schematic or a board
   revision.
-- Current runtime strategy: poll only `isCharging()` every `500ms`, poll
+- Current runtime strategy: poll INA226 current every `500ms`, poll
   `getBatteryLevel()` every `10000ms`, and redraw the battery area only when
-  the displayed battery level or charging state changes. This keeps start/stop
-  charging latency below human-noticeable levels while avoiding high-frequency
-  INA226 reads.
+  the displayed battery level or inferred charging state changes. This keeps
+  start/stop charging latency below human-noticeable levels.
 - User validation on 2026-06-04 showed `E2.P6/CHG_STAT` and
   `M5.Power.isCharging()` both stayed high through repeated USB data cable and
   charge cable insert/remove cycles: `p6=1 api=1 ev=0`, while `n` kept
@@ -471,11 +469,12 @@ Power status validation build:
   `ENABLE_POWER_STATUS_DIAGNOSTICS=1`.
 - The diagnostic build currently draws
   two compact lines in the green status bar. Line 1 is
-  `p=<raw> a=<state> i=<mA> v=<mV> e=<changes> n=<samples>`. Line 2 is
-  `w=<count> ai=<mA> r=<mA>..<mA> av=<mV> all=<mA>..<mA>`. `p` is raw
-  `E2.P6/CHG_STAT`, `a` is the M5Unified `isCharging()` result, `i` is the
-  current INA226 battery current, `v` is INA226 battery voltage, `e` increments
-  on raw/API state changes after boot, and `n` increments on each 500ms
+  `p=<raw> a=<api> x=<heuristic> i=<mA> v=<mV> e=<changes> n=<samples>`.
+  Line 2 is `w=<count> ai=<mA> r=<mA>..<mA> av=<mV> all=<mA>..<mA>`. `p` is
+  raw `E2.P6/CHG_STAT`, `a` is the M5Unified `isCharging()` result, `x` is the
+  INA226-current heuristic result, `i` is the current INA226 battery current,
+  `v` is INA226 battery voltage, `e` increments on raw/API/heuristic state
+  changes after boot, and `n` increments on each 500ms
   charging-status sample. `w/ai/r/av` summarize the latest 10 samples
   (approximately 5 seconds); `all` is the observed current range since boot.
 - This screen-side diagnostic is needed because unplugging the USB power/data
@@ -508,20 +507,16 @@ Power status validation build:
   no dropped samples while the user unplugged USB data, cycled the charge cable
   five times, and reconnected USB data. `api`/raw `pin` only went low for 14
   early samples and did not track the repeated cable cycles. INA226 current
-  formed two clear clusters: a no-external-power cluster around `-979mA`
-  (46 samples) and an external-power/charging cluster around `+199mA`
-  (315 samples). The host analysis proposed `current_ma > -389.9` as a
-  high-confidence external-power threshold. Treat this as evidence for a
-  future debounced INA226-current heuristic, not yet as an accepted production
-  rule.
-- Production heuristic implemented on 2026-06-15: the status-bar lightning icon
+- User validation after the first heuristic showed the sign had been interpreted
+  backwards: plugging in the charge cable hid the lightning icon, and unplugging
+  showed it. Treat the `-979mA` cluster as strong charging current and the
+  `+199mA` cluster as non-charging/discharge behavior.
+- Corrected production heuristic on 2026-06-15: the status-bar lightning icon
   now uses INA226 current instead of `CHG_STAT`/`M5.Power.isCharging()`. Enter
-  external-power state when current is greater than `-300mA`; exit when current
-  is less than `-600mA`; require two consecutive 500ms samples before switching.
-  `CHG_STAT`/API values remain useful diagnostics but are not the production
-  truth source. `tab5_min_uart_terminal` and `tab5_power_status_probe` built
-  successfully; the formal firmware was flashed and verified with
-  `shell-path-ok: m5stack-LLM`.
+  charging state when current is less than `-600mA`; exit when current is
+  greater than `-300mA`; require two consecutive 500ms samples before
+  switching. `CHG_STAT`/API values remain useful diagnostics but are not the
+  production truth source.
 
 Power detect probe workflow:
 
@@ -782,7 +777,7 @@ After boot:
 - The Tab5 screen shows the status line with UART pins and baud rate.
 - The right side of the status line shows a black battery panel with enlarged
   percentage text and an iOS-style battery icon. A lightning mark inside the
-  icon means M5Unified reports that the battery is charging.
+  icon means the INA226-current heuristic infers that the battery is charging.
 - Bytes from `LoginSerial` are passed through `terminal_core` and rendered
   below the status bar. The formal build uses fixed 18x20 cells with the
   DejaVu18 font face. The proportional renderer is preview-only.

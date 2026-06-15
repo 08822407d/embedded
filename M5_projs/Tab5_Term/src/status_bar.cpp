@@ -11,12 +11,12 @@ namespace {
 constexpr int32_t kStatusTextX = 4;
 constexpr int32_t kStatusCenterY = STATUS_BAR_HEIGHT / 2;
 // Tab5 CHG_STAT was observed to miss repeated cable transitions on the tested
-// hardware. The lightning icon uses a debounced INA226-current heuristic.
+// hardware. The lightning icon uses a debounced INA226 charge-current heuristic.
 constexpr uint32_t kBatteryLevelUpdateIntervalMs = 10000;
 constexpr uint32_t kChargingUpdateIntervalMs = 500;
-constexpr int32_t kExternalPowerEnterCurrentMa = -300;
-constexpr int32_t kExternalPowerExitCurrentMa = -600;
-constexpr uint8_t kExternalPowerSamplesToSwitch = 2;
+constexpr int32_t kChargingEnterCurrentMa = -600;
+constexpr int32_t kChargingExitCurrentMa = -300;
+constexpr uint8_t kChargingSamplesToSwitch = 2;
 constexpr int32_t kUnknownBatteryLevel = -1;
 constexpr int32_t kUninitializedBatteryLevel = -2;
 
@@ -66,7 +66,7 @@ struct Point {
 struct ChargingStatus {
     bool api_charging;
     bool raw_pin_high;
-    bool external_power;
+    bool current_charging;
     int32_t battery_current_ma;
     int32_t battery_voltage_mv;
 };
@@ -77,10 +77,10 @@ uint32_t last_charging_update_ms = 0;
 int32_t last_battery_level = kUninitializedBatteryLevel;
 bool last_charging = false;
 bool last_charging_valid = false;
-bool inferred_external_power = false;
-bool inferred_external_power_valid = false;
-bool pending_external_power = false;
-uint8_t pending_external_power_count = 0;
+bool inferred_current_charging = false;
+bool inferred_current_charging_valid = false;
+bool pending_current_charging = false;
+uint8_t pending_current_charging_count = 0;
 #if ENABLE_POWER_STATUS_DIAGNOSTICS
 constexpr size_t kDiagnosticWindowSampleCount = 10;
 
@@ -88,7 +88,7 @@ uint32_t charging_sample_count = 0;
 uint32_t charging_change_count = 0;
 bool last_diag_api_charging = false;
 bool last_diag_raw_pin_high = false;
-bool last_diag_external_power = false;
+bool last_diag_current_charging = false;
 int32_t diag_current_min_ma = 0;
 int32_t diag_current_max_ma = 0;
 int32_t diag_current_window_ma[kDiagnosticWindowSampleCount] = {};
@@ -136,51 +136,51 @@ int32_t readBatteryLevel()
     return level;
 }
 
-bool updateExternalPowerHeuristic(int32_t battery_current_ma)
+bool updateChargingHeuristic(int32_t battery_current_ma)
 {
-    if (!inferred_external_power_valid) {
-        inferred_external_power =
-            battery_current_ma > kExternalPowerEnterCurrentMa;
-        inferred_external_power_valid = true;
-        pending_external_power = inferred_external_power;
-        pending_external_power_count = 0;
-        return inferred_external_power;
+    if (!inferred_current_charging_valid) {
+        inferred_current_charging =
+            battery_current_ma < kChargingEnterCurrentMa;
+        inferred_current_charging_valid = true;
+        pending_current_charging = inferred_current_charging;
+        pending_current_charging_count = 0;
+        return inferred_current_charging;
     }
 
-    bool target = inferred_external_power;
-    if (inferred_external_power) {
-        if (battery_current_ma < kExternalPowerExitCurrentMa) {
+    bool target = inferred_current_charging;
+    if (inferred_current_charging) {
+        if (battery_current_ma > kChargingExitCurrentMa) {
             target = false;
         }
-    } else if (battery_current_ma > kExternalPowerEnterCurrentMa) {
+    } else if (battery_current_ma < kChargingEnterCurrentMa) {
         target = true;
     }
 
-    if (target == inferred_external_power) {
-        pending_external_power = target;
-        pending_external_power_count = 0;
-        return inferred_external_power;
+    if (target == inferred_current_charging) {
+        pending_current_charging = target;
+        pending_current_charging_count = 0;
+        return inferred_current_charging;
     }
 
-    if (pending_external_power != target || pending_external_power_count == 0) {
-        pending_external_power = target;
-        pending_external_power_count = 1;
-    } else if (pending_external_power_count < kExternalPowerSamplesToSwitch) {
-        ++pending_external_power_count;
+    if (pending_current_charging != target || pending_current_charging_count == 0) {
+        pending_current_charging = target;
+        pending_current_charging_count = 1;
+    } else if (pending_current_charging_count < kChargingSamplesToSwitch) {
+        ++pending_current_charging_count;
     }
 
-    if (pending_external_power_count >= kExternalPowerSamplesToSwitch) {
-        inferred_external_power = target;
-        pending_external_power_count = 0;
+    if (pending_current_charging_count >= kChargingSamplesToSwitch) {
+        inferred_current_charging = target;
+        pending_current_charging_count = 0;
     }
-    return inferred_external_power;
+    return inferred_current_charging;
 }
 
 ChargingStatus readChargingStatus()
 {
     const bool api_charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
     const int32_t battery_current_ma = M5.Power.getBatteryCurrent();
-    const bool external_power = updateExternalPowerHeuristic(battery_current_ma);
+    const bool current_charging = updateChargingHeuristic(battery_current_ma);
 #if ENABLE_POWER_STATUS_DIAGNOSTICS
     const bool raw_pin_high = M5.getIOExpander(1).digitalRead(6);
     const int32_t battery_voltage_mv = M5.Power.getBatteryVoltage();
@@ -192,7 +192,7 @@ ChargingStatus readChargingStatus()
     return {
         api_charging,
         raw_pin_high,
-        external_power,
+        current_charging,
         battery_current_ma,
         battery_voltage_mv,
     };
@@ -296,7 +296,7 @@ void recordChargingDiagnostic(const ChargingStatus& status, uint32_t now)
     if (last_diag_valid) {
         if (status.api_charging != last_diag_api_charging
             || status.raw_pin_high != last_diag_raw_pin_high
-            || status.external_power != last_diag_external_power) {
+            || status.current_charging != last_diag_current_charging) {
             ++charging_change_count;
         }
         diag_current_min_ma = minInt(diag_current_min_ma, status.battery_current_ma);
@@ -311,7 +311,7 @@ void recordChargingDiagnostic(const ChargingStatus& status, uint32_t now)
     ++charging_sample_count;
     last_diag_api_charging = status.api_charging;
     last_diag_raw_pin_high = status.raw_pin_high;
-    last_diag_external_power = status.external_power;
+    last_diag_current_charging = status.current_charging;
     last_diag_valid = true;
 }
 
@@ -337,7 +337,7 @@ void drawPowerDiagnostics(const ChargingStatus& status, uint32_t now)
         "p=%d a=%d x=%d i=%+ld v=%ld e=%lu n=%lu",
         status.raw_pin_high ? 1 : 0,
         status.api_charging ? 1 : 0,
-        status.external_power ? 1 : 0,
+        status.current_charging ? 1 : 0,
         static_cast<long>(status.battery_current_ma),
         static_cast<long>(status.battery_voltage_mv),
         static_cast<unsigned long>(charging_change_count),
@@ -532,16 +532,16 @@ void beginStatusBar(const TerminalTheme& selected_theme)
     last_battery_level = kUninitializedBatteryLevel;
     last_charging = false;
     last_charging_valid = false;
-    inferred_external_power = false;
-    inferred_external_power_valid = false;
-    pending_external_power = false;
-    pending_external_power_count = 0;
+    inferred_current_charging = false;
+    inferred_current_charging_valid = false;
+    pending_current_charging = false;
+    pending_current_charging_count = 0;
 #if ENABLE_POWER_STATUS_DIAGNOSTICS
     charging_sample_count = 0;
     charging_change_count = 0;
     last_diag_api_charging = false;
     last_diag_raw_pin_high = false;
-    last_diag_external_power = false;
+    last_diag_current_charging = false;
     diag_current_min_ma = 0;
     diag_current_max_ma = 0;
     resetDiagnosticWindow();
@@ -593,7 +593,7 @@ void refreshBatteryStatus(bool force)
     }
     if (need_charging) {
         charging_status = readChargingStatus();
-        charging = charging_status.external_power;
+        charging = charging_status.current_charging;
         last_charging_update_ms = now;
 #if ENABLE_POWER_STATUS_DIAGNOSTICS
         recordChargingDiagnostic(charging_status, now);

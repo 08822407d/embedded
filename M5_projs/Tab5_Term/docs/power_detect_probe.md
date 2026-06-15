@@ -96,16 +96,17 @@ Expected useful outcomes:
 - `api` and raw `CHG_STAT` both changed only once near the beginning for 14
   samples and did not follow the repeated charge-cable cycles.
 - INA226 current formed two clear clusters:
-  - no external power: 46 samples around `-979mA`;
-  - external power / charging: 315 samples around `+199mA`.
-- Host analysis proposed `current_ma > -389.9` as a high-confidence
-  external-power threshold.
+  - strong negative current: 46 samples around `-979mA`;
+  - weak/positive current: 315 samples around `+199mA`.
+- Initial automated labeling treated positive current as external power, but
+  user validation showed the sign was backwards for the lightning icon:
+  plugging in the charge cable hid the icon, and unplugging showed it.
 
-This run supported the production status-bar heuristic added on 2026-06-15:
-enter external-power state when current is greater than `-300mA`, exit when
-current is less than `-600mA`, and require two consecutive 500ms samples before
-switching. `CHG_STAT`/`M5.Power.isCharging()` remain diagnostic-only for this
-decision path.
+The corrected production status-bar heuristic added on 2026-06-15 treats
+strong negative INA226 current as charging: enter charging state when current
+is less than `-600mA`, exit when current is greater than `-300mA`, and require
+two consecutive 500ms samples before switching. `CHG_STAT` /
+`M5.Power.isCharging()` remain diagnostic-only for this decision path.
 
 ## Restore
 
