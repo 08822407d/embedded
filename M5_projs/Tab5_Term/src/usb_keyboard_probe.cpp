@@ -12,10 +12,13 @@
 #include "esp_intr_alloc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "usb/usb_host.h"
+
+#include "hid_keyboard_mapper.h"
+#include "input_event_queue.h"
+#include "input_mapper.h"
 
 namespace {
 constexpr char kTag[] = "usb_kbd";
@@ -30,25 +33,8 @@ constexpr uint8_t kBootKeyboardReportBytes = 8;
 constexpr uint8_t kBootKeyboardKeyCount = 6;
 constexpr TickType_t kControlTransferTimeout = pdMS_TO_TICKS(1000);
 constexpr TickType_t kClientPollInterval = pdMS_TO_TICKS(50);
-
-constexpr uint8_t kModLeftCtrl = 0x01;
-constexpr uint8_t kModLeftShift = 0x02;
-constexpr uint8_t kModLeftAlt = 0x04;
-constexpr uint8_t kModRightCtrl = 0x10;
-constexpr uint8_t kModRightShift = 0x20;
-constexpr uint8_t kModRightAlt = 0x40;
-
-constexpr uint8_t kHidKeyA = 0x04;
-constexpr uint8_t kHidKeyZ = 0x1D;
-constexpr uint8_t kHidKeyEnter = 0x28;
-constexpr uint8_t kHidKeyEsc = 0x29;
-constexpr uint8_t kHidKeyBackspace = 0x2A;
-constexpr uint8_t kHidKeyTab = 0x2B;
-constexpr uint8_t kHidKeySlash = 0x38;
-constexpr uint8_t kHidKeyRight = 0x4F;
-constexpr uint8_t kHidKeyLeft = 0x50;
-constexpr uint8_t kHidKeyDown = 0x51;
-constexpr uint8_t kHidKeyUp = 0x52;
+constexpr uint32_t kRepeatDelayMs = 500;
+constexpr uint32_t kRepeatIntervalMs = 55;
 
 struct KeyboardEndpoint {
     uint8_t interface_number = 0;
@@ -63,6 +49,10 @@ struct KeyboardDevice {
     usb_transfer_t *report_transfer = nullptr;
     KeyboardEndpoint endpoint;
     uint8_t previous_keys[kBootKeyboardKeyCount] = {};
+    uint8_t previous_modifier = 0;
+    uint8_t repeat_key = 0;
+    uint8_t repeat_modifier = 0;
+    uint32_t next_repeat_ms = 0;
     bool interface_claimed = false;
     bool report_in_flight = false;
     bool connected = false;
@@ -73,7 +63,6 @@ struct ControlTransferContext {
     usb_transfer_status_t status = USB_TRANSFER_STATUS_ERROR;
 };
 
-QueueHandle_t key_queue = nullptr;
 SemaphoreHandle_t host_ready = nullptr;
 TaskHandle_t host_task = nullptr;
 TaskHandle_t client_task = nullptr;
@@ -85,97 +74,9 @@ bool open_requested = false;
 bool close_requested = false;
 uint8_t pending_device_address = 0;
 
-const uint8_t keycode_to_ascii[kHidKeySlash + 1][2] = {
-    {0, 0},       // 0x00
-    {0, 0},       // 0x01
-    {0, 0},       // 0x02
-    {0, 0},       // 0x03
-    {'a', 'A'},   // 0x04
-    {'b', 'B'},   // 0x05
-    {'c', 'C'},   // 0x06
-    {'d', 'D'},   // 0x07
-    {'e', 'E'},   // 0x08
-    {'f', 'F'},   // 0x09
-    {'g', 'G'},   // 0x0A
-    {'h', 'H'},   // 0x0B
-    {'i', 'I'},   // 0x0C
-    {'j', 'J'},   // 0x0D
-    {'k', 'K'},   // 0x0E
-    {'l', 'L'},   // 0x0F
-    {'m', 'M'},   // 0x10
-    {'n', 'N'},   // 0x11
-    {'o', 'O'},   // 0x12
-    {'p', 'P'},   // 0x13
-    {'q', 'Q'},   // 0x14
-    {'r', 'R'},   // 0x15
-    {'s', 'S'},   // 0x16
-    {'t', 'T'},   // 0x17
-    {'u', 'U'},   // 0x18
-    {'v', 'V'},   // 0x19
-    {'w', 'W'},   // 0x1A
-    {'x', 'X'},   // 0x1B
-    {'y', 'Y'},   // 0x1C
-    {'z', 'Z'},   // 0x1D
-    {'1', '!'},   // 0x1E
-    {'2', '@'},   // 0x1F
-    {'3', '#'},   // 0x20
-    {'4', '$'},   // 0x21
-    {'5', '%'},   // 0x22
-    {'6', '^'},   // 0x23
-    {'7', '&'},   // 0x24
-    {'8', '*'},   // 0x25
-    {'9', '('},   // 0x26
-    {'0', ')'},   // 0x27
-    {'\r', '\r'}, // 0x28
-    {0x1B, 0x1B}, // 0x29
-    {0x7F, 0x7F}, // 0x2A
-    {'\t', 0},    // 0x2B
-    {' ', ' '},   // 0x2C
-    {'-', '_'},   // 0x2D
-    {'=', '+'},   // 0x2E
-    {'[', '{'},   // 0x2F
-    {']', '}'},   // 0x30
-    {'\\', '|'},  // 0x31
-    {'\\', '|'},  // 0x32
-    {';', ':'},   // 0x33
-    {'\'', '"'},  // 0x34
-    {'`', '~'},   // 0x35
-    {',', '<'},   // 0x36
-    {'.', '>'},   // 0x37
-    {'/', '?'}    // 0x38
-};
-
-bool isShift(uint8_t modifier)
+bool isValidBootKey(uint8_t key)
 {
-    return (modifier & (kModLeftShift | kModRightShift)) != 0;
-}
-
-bool isCtrl(uint8_t modifier)
-{
-    return (modifier & (kModLeftCtrl | kModRightCtrl)) != 0;
-}
-
-bool isAlt(uint8_t modifier)
-{
-    return (modifier & (kModLeftAlt | kModRightAlt)) != 0;
-}
-
-void enqueueByte(uint8_t byte)
-{
-    if (key_queue == nullptr) {
-        return;
-    }
-    if (xQueueSend(key_queue, &byte, 0) != pdTRUE) {
-        ESP_LOGW(kTag, "keyboard input queue full");
-    }
-}
-
-void enqueueBytes(const char *bytes)
-{
-    while (*bytes != '\0') {
-        enqueueByte(static_cast<uint8_t>(*bytes));
-        ++bytes;
-    }
+    return key > 0x03;
 }
 
 bool keyFound(const uint8_t *keys, uint8_t key)
@@ -188,94 +89,70 @@ bool keyFound(const uint8_t *keys, uint8_t key)
     return false;
 }
 
-bool keyToByte(uint8_t modifier, uint8_t key_code, uint8_t *byte)
+uint8_t firstActiveKey(const uint8_t *keys)
 {
-    if (isCtrl(modifier)) {
-        if (key_code >= kHidKeyA && key_code <= kHidKeyZ) {
-            *byte = static_cast<uint8_t>(key_code - kHidKeyA + 1);
-            return true;
-        }
-        switch (key_code) {
-        case 0x2F:
-            *byte = 0x1B; // Ctrl+[
-            return true;
-        case 0x30:
-            *byte = 0x1D; // Ctrl+]
-            return true;
-        case 0x31:
-            *byte = 0x1C; // Ctrl+backslash
-            return true;
-        default:
-            break;
+    for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
+        if (isValidBootKey(keys[i])) {
+            return keys[i];
         }
     }
-
-    if (key_code <= kHidKeySlash) {
-        const uint8_t shifted = isShift(modifier) ? 1 : 0;
-        const uint8_t value = keycode_to_ascii[key_code][shifted];
-        if (value != 0) {
-            *byte = value;
-            return true;
-        }
-    }
-
-    return false;
+    return 0;
 }
 
-void handlePressedKey(uint8_t modifier, uint8_t key_code)
+void clearRepeat()
 {
-    if (key_code <= 0x03) {
+    keyboard.repeat_key = 0;
+    keyboard.repeat_modifier = 0;
+    keyboard.next_repeat_ms = 0;
+}
+
+void armRepeat(uint8_t modifier, uint8_t key, uint32_t delay_ms)
+{
+    if (!isValidBootKey(key)) {
+        clearRepeat();
         return;
     }
 
-    if (key_code == kHidKeyTab && isShift(modifier)) {
-        enqueueBytes("\x1B[Z");
+    keyboard.repeat_key = key;
+    keyboard.repeat_modifier = modifier;
+    keyboard.next_repeat_ms = millis() + delay_ms;
+}
+
+void submitKeyEvent(uint8_t hid_modifier, uint8_t hid_usage, input::KeyAction action)
+{
+    if (!isValidBootKey(hid_usage)) {
         return;
     }
 
-    uint8_t byte = 0;
-    if (keyToByte(modifier, key_code, &byte)) {
-        if (isAlt(modifier)) {
-            enqueueByte(0x1B);
-        }
-        enqueueByte(byte);
+    const input::KeyCode key = input::hidUsageToKeyCode(hid_usage);
+    if (key == input::KeyCode::Unknown) {
         return;
     }
 
-    switch (key_code) {
-    case kHidKeyUp:
-        enqueueBytes("\x1B[A");
-        break;
-    case kHidKeyDown:
-        enqueueBytes("\x1B[B");
-        break;
-    case kHidKeyRight:
-        enqueueBytes("\x1B[C");
-        break;
-    case kHidKeyLeft:
-        enqueueBytes("\x1B[D");
-        break;
-    case 0x49:
-        enqueueBytes("\x1B[2~"); // Insert
-        break;
-    case 0x4A:
-        enqueueBytes("\x1B[H"); // Home
-        break;
-    case 0x4B:
-        enqueueBytes("\x1B[5~"); // Page Up
-        break;
-    case 0x4C:
-        enqueueBytes("\x1B[3~"); // Delete
-        break;
-    case 0x4D:
-        enqueueBytes("\x1B[F"); // End
-        break;
-    case 0x4E:
-        enqueueBytes("\x1B[6~"); // Page Down
-        break;
-    default:
-        break;
+    const uint8_t modifiers = input::normalizeHidModifiers(hid_modifier);
+    if (!input::submitKeyEvent({
+            .key = key,
+            .modifiers = modifiers,
+            .action = action,
+        })) {
+        ESP_LOGW(kTag, "input event queue full");
     }
+}
+
+void maybeSubmitRepeat(uint8_t modifier, const uint8_t *keys)
+{
+    if (!isValidBootKey(keyboard.repeat_key) || !keyFound(keys, keyboard.repeat_key)) {
+        return;
+    }
+
+    keyboard.repeat_modifier = modifier;
+    const uint32_t now = millis();
+    if (static_cast<int32_t>(now - keyboard.next_repeat_ms) < 0) {
+        return;
+    }
+
+    submitKeyEvent(keyboard.repeat_modifier, keyboard.repeat_key, input::KeyAction::Repeat);
+    keyboard.next_repeat_ms = now + kRepeatIntervalMs;
 }
 
 void processKeyboardReport(const uint8_t *data, int length)
@@ -286,14 +163,41 @@ void processKeyboardReport(const uint8_t *data, int length)
 
     const uint8_t modifier = data[0];
     const uint8_t *keys = &data[2];
+    bool pressed_new_key = false;
 
     for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
-        const uint8_t key_code = keys[i];
-        if (key_code > 0x03 && !keyFound(keyboard.previous_keys, key_code)) {
-            handlePressedKey(modifier, key_code);
+        const uint8_t key = keyboard.previous_keys[i];
+        if (isValidBootKey(key) && !keyFound(keys, key)) {
+            submitKeyEvent(keyboard.previous_modifier, key, input::KeyAction::Release);
+            if (keyboard.repeat_key == key) {
+                clearRepeat();
+            }
         }
     }
 
+    for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
+        const uint8_t key = keys[i];
+        if (isValidBootKey(key) && !keyFound(keyboard.previous_keys, key)) {
+            submitKeyEvent(modifier, key, input::KeyAction::Press);
+            armRepeat(modifier, key, kRepeatDelayMs);
+            pressed_new_key = true;
+        }
+    }
+
+    if (!pressed_new_key) {
+        if (isValidBootKey(keyboard.repeat_key) && keyFound(keys, keyboard.repeat_key)) {
+            maybeSubmitRepeat(modifier, keys);
+        } else {
+            const uint8_t key = firstActiveKey(keys);
+            if (isValidBootKey(key)) {
+                armRepeat(modifier, key, kRepeatDelayMs);
+            } else {
+                clearRepeat();
+            }
+        }
+    }
+
+    keyboard.previous_modifier = modifier;
     memcpy(keyboard.previous_keys, keys, kBootKeyboardKeyCount);
 }
 
@@ -402,6 +306,8 @@ esp_err_t sendHidClassOutRequest(
     while (xSemaphoreTake(context->done, 0) != pdTRUE) {
         if ((xTaskGetTickCount() - start) >= kControlTransferTimeout) {
             ESP_LOGW(kTag, "control request 0x%02x timed out", request);
+            // Keep the transfer/context allocated on timeout because the USB
+            // callback may still arrive after this function returns.
             return ESP_ERR_TIMEOUT;
         }
         const esp_err_t event_err = usb_host_client_handle_events(client, pdMS_TO_TICKS(20));
@@ -410,7 +316,10 @@ esp_err_t sendHidClassOutRequest(
         }
     }
 
-    err = (context->status == USB_TRANSFER_STATUS_COMPLETED) ? ESP_OK : ESP_FAIL;
+    if (err == ESP_OK) {
+        err = (context->status == USB_TRANSFER_STATUS_COMPLETED) ? ESP_OK : ESP_FAIL;
+    }
+
     vSemaphoreDelete(context->done);
     free(context);
     usb_host_transfer_free(transfer);
@@ -585,6 +494,7 @@ void openDevice(uint8_t address)
 
     keyboard.connected = true;
     memset(keyboard.previous_keys, 0, sizeof(keyboard.previous_keys));
+    clearRepeat();
     ESP_LOGI(
         kTag,
         "keyboard connected interface=%u ep=0x%02x mps=%u",
@@ -701,17 +611,14 @@ void usbKeyboardProbeBegin()
         return;
     }
 
-    key_queue = xQueueCreate(USB_KEYBOARD_INPUT_QUEUE_LENGTH, sizeof(uint8_t));
-    if (key_queue == nullptr) {
-        ESP_LOGE(kTag, "keyboard input queue allocation failed");
+    if (!input::beginEventQueue()) {
+        ESP_LOGE(kTag, "input event queue allocation failed");
         return;
     }
 
     host_ready = xSemaphoreCreateBinary();
     if (host_ready == nullptr) {
         ESP_LOGE(kTag, "host ready semaphore allocation failed");
-        vQueueDelete(key_queue);
-        key_queue = nullptr;
         return;
     }
 
@@ -726,8 +633,6 @@ void usbKeyboardProbeBegin()
         ESP_LOGE(kTag, "USB host task creation failed");
         vSemaphoreDelete(host_ready);
         host_ready = nullptr;
-        vQueueDelete(key_queue);
-        key_queue = nullptr;
         return;
     }
 
@@ -752,14 +657,6 @@ void usbKeyboardProbeBegin()
     ESP_LOGI(kTag, "USB keyboard probe enabled");
 }
 
-bool usbKeyboardProbeReadByte(uint8_t *byte)
-{
-    if (byte == nullptr || key_queue == nullptr) {
-        return false;
-    }
-    return xQueueReceive(key_queue, byte, 0) == pdTRUE;
-}
-
 bool usbKeyboardProbeIsEnabled()
 {
     return probe_enabled;
@@ -768,12 +665,6 @@ bool usbKeyboardProbeIsEnabled()
 #else
 
 void usbKeyboardProbeBegin() {}
-
-bool usbKeyboardProbeReadByte(uint8_t *byte)
-{
-    (void)byte;
-    return false;
-}
 
 bool usbKeyboardProbeIsEnabled()
 {

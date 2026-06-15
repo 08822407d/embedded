@@ -150,6 +150,31 @@ Interpretation:
 - Do not use elapsed time alone to classify a build as stuck. Apply the log,
   process, CPU, and I/O criteria in the triage procedure.
 
+## Observation 2026-06-15: USB Keyboard Probe Rebuilds Dependencies
+
+Context:
+
+- USB-A keyboard preparation added a shared source file and changed both the
+  `tab5_usb_keyboard_probe` and `tab5_min_uart_terminal` build graphs.
+- Both builds used the detached wrapper and kept updating file-backed logs.
+
+Observed successful durations:
+
+- `tab5_usb_keyboard_probe`: 505.3 seconds;
+- `tab5_min_uart_terminal`: 457.9 seconds.
+
+Interpretation:
+
+- The USB probe environment compiled the full M5GFX/M5Unified/M5Unit
+  dependency graph and then the project sources. The formal environment also
+  rebuilt after the shared HID mapper source was added.
+- The caller timed out before the detached worker completed, but the worker
+  stayed alive and wrote successful result files.
+- Correct response is to use `build-status` / `build-wait` or inspect the
+  latest `.logs/build-*.out.log` activity, not to start duplicate builds.
+- The probe firmware was later flashed and basic USB-A keyboard input passed,
+  so this slow build was not evidence of a USB host implementation failure.
+
 ## Incident 2026-06-08: Native stderr Misclassified As Build Failure
 
 Context:

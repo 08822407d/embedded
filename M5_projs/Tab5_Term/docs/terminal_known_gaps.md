@@ -29,7 +29,12 @@ implementation and regression tests pass.
   the current physical input path.
 - The A164 driver tracks one non-modifier HID key at a time. Full simultaneous
   non-modifier rollover is not guaranteed.
-- USB-A keyboard support is explicitly deferred.
+- USB-A keyboard support is currently probe-only. It builds in the
+  `tab5_usb_keyboard_probe` environment and uses the shared input mapper. Basic
+  physical input through the Tab5 USB-A port has passed, but reconnect, repeat,
+  rollover, modifier coverage, and full-screen-app behavior have not yet been
+  fully validated. Formal firmware does not enable USB keyboard input by
+  default.
 - Only terminal queries and private modes covered by the Stage 1-4 corpus and
   real-application smoke are currently claimed.
 

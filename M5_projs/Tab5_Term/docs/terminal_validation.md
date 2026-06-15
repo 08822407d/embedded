@@ -168,6 +168,41 @@ Expected screen highlights:
 - The `BCE:` row keeps a blue background from `blue-to-eol` through the erased
   tail of the row.
 
+USB-A keyboard probe:
+
+```powershell
+.\tools\tab5.ps1 build tab5_usb_keyboard_probe
+.\tools\tab5.ps1 flash tab5_usb_keyboard_probe -Port COM3
+.\tools\tab5.ps1 boot-log tab5_usb_keyboard_probe -Port COM3
+```
+
+This is a probe build, not the default formal firmware. It enables USB-A host
+power and disables the official A164 keyboard path so USB keyboard behavior can
+be isolated. Connect a USB HID boot keyboard to the Tab5 USB-A port after the
+firmware starts. Expected debug log highlights include `USB keyboard probe
+enabled`, `waiting for USB HID boot keyboard`, and `keyboard connected`.
+
+Validation sequence on the real login shell:
+
+- Type `printf 'usb-keyboard-ok\n'` and press Enter. The output should show
+  `usb-keyboard-ok`.
+- In the shell prompt, type `abc`, press Left twice, type `X`, and press Enter.
+  The command line should edit at the cursor rather than append only at the
+  end.
+- Run `cat -v`, then press Ctrl+C. The shell should return to the prompt.
+- Hold Backspace or an arrow key long enough to observe software repeat.
+- Test Shift, Ctrl, and Alt-prefix behavior where the attached keyboard exposes
+  those modifiers.
+- Unplug and replug the keyboard, then repeat the simple `printf` test.
+
+After USB probe testing, restore the normal firmware:
+
+```powershell
+.\tools\tab5.ps1 build tab5_min_uart_terminal
+.\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
+.\tools\tab5.ps1 probe tab5_min_uart_terminal -Port COM3
+```
+
 ## Stage 1: Core Screen And Parser
 
 Basic shell output:
@@ -516,8 +551,15 @@ Expected:
 Record device model, firmware environment, connection method, and unavailable
 keys for every physical validation pass.
 
-USB keyboard validation is deferred and is not part of the current Stage 5
-exit criteria.
+USB keyboard validation record:
+
+- 2026-06-15: `tab5_usb_keyboard_probe` was flashed, boot logging confirmed the
+  USB host task was waiting for a HID boot keyboard, the login shell probe
+  still reached `m5stack-LLM`, and the user connected a USB keyboard to the
+  Tab5 USB-A port and successfully performed an input test.
+- Remaining before declaring USB keyboard support complete: reconnect,
+  modifier keys, software repeat, rollover limitations, and at least one
+  full-screen application.
 
 Official Tab5 Keyboard first-pass check:
 

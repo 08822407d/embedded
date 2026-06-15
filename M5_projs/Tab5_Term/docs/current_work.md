@@ -64,7 +64,8 @@ regressing.
 
 Status: completed on 2026-06-12. Automated regression passed, the formal
 firmware was restored, and the user reported no problem in the final physical
-checks. USB keyboard support remains deferred.
+checks. USB keyboard support was later resumed as a separate probe-only
+follow-up and does not change the original Stage 5 acceptance result.
 
 Existing groundwork:
 
@@ -153,7 +154,7 @@ formal image, and runs the shell checks. The complete script was exercised with
 - Record unsupported behavior instead of silently treating it as compatible.
 - Prioritize compatibility additions only when real applications expose them.
 - Keep current known gaps explicit, including CJK double-width/combining text
-  and deferred USB keyboard support.
+  and probe-only USB keyboard support.
 
 Status: completed. `docs/terminal_known_gaps.md` records the initial gap
 inventory. On 2026-06-12 the user reported no problem with status-bar
@@ -289,9 +290,9 @@ Status: completed on 2026-06-12 after user-reported physical keyboard and
 integration testing found no observed problem.
 
 The shared input contract and mapper are implemented, and the official I2C
-keyboard driver is present in the formal firmware. USB keyboard support is
-deferred indefinitely by user request and was not part of the Stage 5
-completion condition.
+keyboard driver is present in the formal firmware. USB keyboard support was
+excluded from the original Stage 5 completion condition, but the user resumed
+probe-only preparation on 2026-06-15.
 
 Stage 5 display prerequisite:
 
@@ -325,8 +326,10 @@ Terminal-size synchronization:
 Hardware paths:
 
 - USB keyboard: a low-level HID boot-keyboard probe for the Tab5 USB-A host
-  port remains in the repository. Its implementation and runtime validation are
-  deferred; do not resume them without a new user request.
+  port remains in the repository. Probe-only work resumed on 2026-06-15.
+  Basic physical input through the USB-A port passed, but reconnect, modifiers,
+  repeat behavior, rollover, full-screen app behavior, and default-firmware
+  enablement are not yet complete.
 - Official companion keyboard: A164 Tab5 Keyboard on Ext.Port1, I2C address
   `0x6D`, `SDA=G0`, `SCL=G1`, active-low interrupt `G50`. The formal firmware
   uses official `M5Unit-KEYBOARD` 0.1.0 in HID mode.
@@ -372,10 +375,22 @@ Compile-time assertions validate representative byte sequences.
 Exit condition: USB keyboard works through reconnects and no longer depends on
 probe-only direct byte translation.
 
-Status: deferred indefinitely by user request on 2026-06-12. This milestone is
-removed from the Stage 5 completion condition. Preserve the existing probe but
-do not modify, flash, or validate it unless the user explicitly resumes USB
-keyboard support.
+Status: resumed by user request on 2026-06-15, still isolated to the
+`tab5_usb_keyboard_probe` environment until physical validation passes. The
+current preparation extracted HID modifier/usage mapping into a shared module
+used by both the official keyboard and USB probe. The USB probe now emits
+normalized `input::KeyEvent` values, including software repeat for held keys,
+and the main loop routes those events through the same xterm-aware
+`input_mapper` path as the official keyboard. `tab5_usb_keyboard_probe` and
+`tab5_min_uart_terminal` both build successfully. The USB probe firmware was
+flashed, its boot log confirmed `waiting for USB HID boot keyboard`, and the
+login shell probe still returned `shell-path-ok: m5stack-LLM`. The user then
+connected a USB keyboard to the USB-A port and reported successful input
+testing. Treat this as the completed USB-A keyboard probe first-pass stage:
+the USB host path is proven alive, the input path no longer depends on
+probe-only byte translation, and basic shell input works through the shared
+mapper. Reconnect, modifier, repeat, rollover, shell/full-screen app behavior,
+and formal-firmware enablement move to the next USB input hardening stage.
 
 ### Milestone I3: Official Companion Keyboard
 
@@ -421,10 +436,27 @@ keyboard has reached its device-specific exit condition, and its integration
 validation has been recorded. The keyboard-mounted display direction must also
 be visually confirmed with the physical installation, including status-bar
 position, battery-area position, terminal geometry, and absence of mirroring.
-USB keyboard support is explicitly excluded from this condition.
+USB keyboard support was explicitly excluded from this condition. The resumed
+USB work is a follow-up path and must pass the I2 exit condition before it is
+enabled in the formal firmware by default.
 
 ## Progress Log
 
+- 2026-06-15: USB-A keyboard support was resumed. Added shared
+  HID-keyboard mapping (`hid_keyboard_mapper`) so the official A164 keyboard
+  and USB boot-keyboard probe use the same modifier/usage-to-`KeyCode`
+  translation. Reworked `usb_keyboard_probe` to submit normalized key events
+  instead of direct bytes, added basic software repeat for held USB keys, and
+  changed the main input bridge so either official keyboard or USB probe events
+  pass through the common `input_mapper`. `tab5_usb_keyboard_probe` built
+  successfully in 505.3s and `tab5_min_uart_terminal` in 457.9s. The USB probe
+  firmware was flashed to COM3, boot logging confirmed the host task is waiting
+  for a HID boot keyboard, and the login shell probe still reached
+  `m5stack-LLM`. The user then connected a USB keyboard to the USB-A port and
+  confirmed successful input. This is a first-pass physical validation only;
+  reconnect, modifiers, repeat, rollover, full-screen applications, and
+  default-firmware enablement remain open for the next USB input hardening
+  stage. Current USB-A keyboard probe first-pass stage is closed.
 - 2026-06-15: dynamic charge-state detection was reopened only as a diagnostic
   effort. Added `tab5_power_detect_probe`, a RAM ring-buffer power logger,
   `tools/power_detect_probe.py`, and `tools/tab5.ps1 power-detect` so the user

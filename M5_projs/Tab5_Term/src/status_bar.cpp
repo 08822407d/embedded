@@ -371,38 +371,69 @@ void drawPowerDiagnostics(const ChargingStatus& status, uint32_t now)
 }
 #endif
 
-void fillBolt(const Point *points, uint16_t color)
+void fillBolt(const Point *points, int32_t dx, int32_t dy, uint16_t color)
 {
-    M5.Display.fillTriangle(points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y, color);
-    M5.Display.fillTriangle(points[0].x, points[0].y, points[2].x, points[2].y, points[5].x, points[5].y, color);
-    M5.Display.fillTriangle(points[5].x, points[5].y, points[2].x, points[2].y, points[3].x, points[3].y, color);
-    M5.Display.fillTriangle(points[5].x, points[5].y, points[3].x, points[3].y, points[4].x, points[4].y, color);
+    M5.Display.fillTriangle(
+        points[0].x + dx,
+        points[0].y + dy,
+        points[1].x + dx,
+        points[1].y + dy,
+        points[2].x + dx,
+        points[2].y + dy,
+        color);
+    M5.Display.fillTriangle(
+        points[0].x + dx,
+        points[0].y + dy,
+        points[2].x + dx,
+        points[2].y + dy,
+        points[5].x + dx,
+        points[5].y + dy,
+        color);
+    M5.Display.fillTriangle(
+        points[5].x + dx,
+        points[5].y + dy,
+        points[2].x + dx,
+        points[2].y + dy,
+        points[3].x + dx,
+        points[3].y + dy,
+        color);
+    M5.Display.fillTriangle(
+        points[5].x + dx,
+        points[5].y + dy,
+        points[3].x + dx,
+        points[3].y + dy,
+        points[4].x + dx,
+        points[4].y + dy,
+        color);
 }
 
 void drawChargingBolt(int32_t icon_x, int32_t icon_y)
 {
     const auto& colors = theme();
     const int32_t center_x = icon_x + kBatteryArea.icon_body_width / 2;
-    const int32_t mid_y = icon_y + kBatteryArea.icon_height / 2;
-    const Point outline[] = {
-        {center_x + 6, icon_y + 1},
-        {center_x - 8, mid_y + 3},
-        {center_x - 1, mid_y + 2},
-        {center_x - 4, icon_y + kBatteryArea.icon_height - 1},
-        {center_x + 9, mid_y - 4},
-        {center_x + 2, mid_y - 3},
-    };
     const Point body[] = {
-        {center_x + 5, icon_y + 3},
-        {center_x - 5, mid_y + 2},
-        {center_x + 1, mid_y + 1},
-        {center_x - 2, icon_y + kBatteryArea.icon_height - 4},
-        {center_x + 7, mid_y - 3},
-        {center_x + 1, mid_y - 2},
+        {center_x + 5, icon_y + 1},
+        {center_x - 3, icon_y + 9},
+        {center_x + 2, icon_y + 9},
+        {center_x - 3, icon_y + kBatteryArea.icon_height - 1},
+        {center_x + 10, icon_y + 7},
+        {center_x + 4, icon_y + 8},
+    };
+    constexpr Point outline_offsets[] = {
+        {-1, -1},
+        {0, -1},
+        {1, -1},
+        {-1, 0},
+        {1, 0},
+        {-1, 1},
+        {0, 1},
+        {1, 1},
     };
 
-    fillBolt(outline, colors.screen_background);
-    fillBolt(body, colors.battery_lightning);
+    for (const Point& offset : outline_offsets) {
+        fillBolt(body, offset.x, offset.y, colors.screen_background);
+    }
+    fillBolt(body, 0, 0, colors.battery_lightning);
 }
 
 void fillSmoothBatteryShape(

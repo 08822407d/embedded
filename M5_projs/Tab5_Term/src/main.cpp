@@ -18,7 +18,6 @@
 
 namespace {
 constexpr size_t kMaxBytesPerLoop = 96;
-constexpr size_t kMaxKeyboardBytesPerLoop = 64;
 constexpr size_t kMaxInputEventsPerLoop = 64;
 constexpr uint32_t kM5UpdateIntervalMs = 20;
 
@@ -141,22 +140,9 @@ void bridgeUsbToLoginUart()
 #endif
 }
 
-void bridgeKeyboardToLoginUart()
-{
-#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
-    uint8_t byte = 0;
-    size_t processed = 0;
-
-    while (processed < kMaxKeyboardBytesPerLoop && usbKeyboardProbeReadByte(&byte)) {
-        login_uart::serial().write(byte);
-        ++processed;
-    }
-#endif
-}
-
 void bridgeInputEventsToLoginUart()
 {
-#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+#if (ENABLE_TAB5_KEYBOARD || ENABLE_USB_KEYBOARD_PROBE) && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     input::KeyEvent event;
     size_t processed = 0;
 
@@ -202,14 +188,20 @@ void setup()
 #if ENABLE_POWER_DETECT_PROBE
     power_detect_probe::begin();
 #endif
-#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION
-    Serial.println("USB keyboard probe enabled");
-    usbKeyboardProbeBegin();
+#if (ENABLE_TAB5_KEYBOARD || ENABLE_USB_KEYBOARD_PROBE) && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    const bool inputQueueReady = input::beginEventQueue();
+    if (!inputQueueReady) {
+        Serial.println("[input] input event queue allocation failed");
+    }
 #endif
-#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION
-    if (!input::beginEventQueue()) {
-        Serial.println("[tab5-kbd] input event queue allocation failed");
-    } else {
+#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    Serial.println("USB keyboard probe enabled");
+    if (inputQueueReady) {
+        usbKeyboardProbeBegin();
+    }
+#endif
+#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    if (inputQueueReady) {
         tab5KeyboardInputBegin();
     }
 #endif
@@ -244,7 +236,6 @@ void loop()
     terminal_debug::drainCdcInjection();
     power_detect_probe::update();
     bridgeUsbToLoginUart();
-    bridgeKeyboardToLoginUart();
     tab5KeyboardInputUpdate();
     bridgeInputEventsToLoginUart();
 #if !ENABLE_POWER_DETECT_PROBE

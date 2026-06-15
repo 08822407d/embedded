@@ -150,10 +150,13 @@ remaining physical A164 and integration tests. Its accepted baseline includes
 the 180-degree keyboard-mounted display orientation, `64x32` geometry,
 official A164 input, and 921600 login UART.
 
-USB keyboard support was
-deferred indefinitely by explicit user request on 2026-06-12; its existing
-probe should remain untouched unless the user explicitly resumes that work.
-USB support is not a Stage 6 requirement.
+USB keyboard support was deferred by explicit user request on 2026-06-12, then
+resumed on 2026-06-15. It is currently probe-only: `tab5_usb_keyboard_probe`
+builds, flashes, waits for a HID boot keyboard, and basic physical input via
+Tab5 USB-A has passed. The USB-A keyboard probe first-pass stage is closed.
+Do not treat USB keyboard as complete production input until reconnect,
+modifier, repeat, rollover, full-screen app behavior, and default-firmware
+enablement have been decided and validated in a later hardening stage.
 
 Module LLM ttyS1 terminal-environment integration was completed on 2026-06-12.
 The ttyS1-only login profile now survives reboot with
@@ -428,9 +431,14 @@ Battery icon visual notes:
   - `<=50%`: yellow
   - `>50%`: green
   - charging: green fill plus a lightning mark
-- The lightning mark is now a filled polygon, not a rounded stroke path. It has
-  a screen-background outline and a pale yellow body
-  `rgb565(255, 226, 120)`. Earlier rounded-stroke versions looked too soft.
+- The lightning mark is a filled polygon, not a rounded stroke path. It has a
+  screen-background outline and a pale yellow body `rgb565(255, 226, 120)`.
+  After a user reference image on 2026-06-15, the polygon was retuned to a
+  slimmer, sharper, right-leaning shape that spans almost the full battery body
+  height. The outline is generated from the same polygon by drawing 1-pixel
+  offset copies in the background color; do not maintain a separate outline
+  point set because it visibly drifts away from the body. Earlier rounded or
+  chunky versions looked too soft or crude.
 
 Tab5 battery facts confirmed from M5Unified/M5Stack sources:
 
@@ -1039,9 +1047,13 @@ Implemented probe:
 3. `src/usb_keyboard_probe.cpp` uses low-level `usb/usb_host.h` directly.
 4. The probe enumerates USB devices, claims HID boot keyboard interfaces, sends
    `SET_PROTOCOL boot` and `SET_IDLE`, then polls interrupt-IN boot reports.
-5. Basic US keyboard scancodes are translated to bytes and common VT-style
-   navigation sequences, then queued to the main loop.
-6. The main loop drains the keyboard queue and writes bytes to `LoginSerial`.
+5. HID modifier/usage mapping is shared with the official A164 keyboard via
+   `hid_keyboard_mapper`.
+6. USB boot reports are converted into normalized `input::KeyEvent` values,
+   including basic software repeat for held keys.
+7. The main loop drains the shared input event queue and routes USB events
+   through `input_mapper`, so application cursor/keypad modes use the same
+   xterm-compatible encoding as the official keyboard.
 
 Build verification completed on the Windows checkout:
 
@@ -1050,14 +1062,24 @@ Build verification completed on the Windows checkout:
 & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e tab5_usb_keyboard_probe
 ```
 
-Runtime validation with an actual USB keyboard on Tab5 USB-A is deferred and
-does not block the current mainline stage.
-Test the probe before treating it as the default terminal input path.
+First-pass runtime validation with an actual USB keyboard on Tab5 USB-A has
+passed, closing the USB-A keyboard probe first-pass stage. The probe is not yet
+the default terminal input path.
 
-This probe is now part of Stage 5 described in `docs/current_work.md`. It must
-be refactored toward a transport-independent key event/input mapping layer
-before USB and the official keyboard are both treated as supported production
-inputs.
+Current validation status:
+
+- `tab5_usb_keyboard_probe` built in 505.3s and `tab5_min_uart_terminal` built
+  in 457.9s after the shared HID mapper was added.
+- The probe firmware was flashed to COM3. Boot logging confirmed the USB host
+  task reached `waiting for USB HID boot keyboard`.
+- The login shell probe still reached `shell-path-ok: m5stack-LLM`.
+- The user connected a USB keyboard to the Tab5 USB-A port and confirmed
+  successful input.
+
+Remaining before treating USB and the official keyboard as supported
+production inputs: reconnect validation, modifier coverage, software repeat
+behavior, rollover limitations, full-screen application behavior, and the
+default-firmware enablement/coexistence decision.
 
 ## Terminal Font Decision
 
