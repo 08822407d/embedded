@@ -19,8 +19,8 @@ Current mainline stage and checkpoint are recorded in
 [docs/current_work.md](docs/current_work.md). Read it before continuing
 implementation so completed work is not repeated or lost.
 
-Stages 1 through 6 are complete. Stage 7 U1/U2 Unicode width and cell integrity
-are complete; later Stage 7 font coverage and grapheme work are not yet scoped.
+Stages 1 through 6 are complete. Stage 7 U1/U2 Unicode width and cell
+integrity and U3 common Unicode graphics fallback are complete.
 Stage 5 official A164 keyboard and integration work and Stage 6 regression
 infrastructure were accepted on 2026-06-12.
 The deterministic Stage 1-4 machine assertions and real-shell application
@@ -229,6 +229,12 @@ For the Unicode width/cell-integrity smoke test:
 
 ```sh
 python tools/send_terminal_test.py --port COM3 --test stage7-unicode
+```
+
+For the Unicode graphics fallback smoke test:
+
+```sh
+python tools/send_terminal_test.py --port COM3 --test stage7-unicode-graphics
 ```
 
 To capture the exact final framebuffer from `tab5_terminal_regression` or

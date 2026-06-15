@@ -9,6 +9,10 @@ import time
 import serial
 
 
+def utf8(text: str) -> bytes:
+    return text.encode("utf-8")
+
+
 STAGE1_SMOKE = (
     b"\x1b[2J\x1b[H"
     b"CDC injection render test\r\n"
@@ -113,6 +117,21 @@ STAGE7_UNICODE = (
     b"\x1b[16;1HEnd of U1/U2 Unicode width test"
 )
 
+STAGE7_UNICODE_GRAPHICS = (
+    b"\x1b[2J\x1b[H"
+    b"U3 Unicode graphics fallback test\r\n"
+    + utf8("Light:   \u250c\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2510\r\n")
+    + utf8("         \u2502    \u2502    \u2502\r\n")
+    + utf8("         \u251c\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2524\r\n")
+    + utf8("         \u2514\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2518\r\n")
+    + utf8("Heavy:   \u250f\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2513\r\n")
+    + utf8("         \u2503    \u2503    \u2503\r\n")
+    + utf8("         \u2517\u2501\u2501\u2501\u2501\u253b\u2501\u2501\u2501\u2501\u251b\r\n")
+    + utf8("Rounded: \u256d\u2500\u2500\u2500\u2500\u256e  \u2570\u2500\u2500\u2500\u2500\u256f\r\n")
+    + utf8("Blocks:  \u258f\u258e\u258d\u258c\u258b\u258a\u2589 \u2588 \u2580\u2584\u2590 \u2591\u2592\u2593\r\n")
+    + b"End of U3 Unicode graphics fallback test"
+)
+
 FONT_PREVIEW = (
     b"\x1b[2J\x1b[H"
     b"Font debug: DejaVu18 glyphs in fixed 18x20 cells\r\n"
@@ -175,6 +194,7 @@ TESTS = {
     "stage3-color": STAGE3_COLOR,
     "stage4-xterm": STAGE4_XTERM,
     "stage7-unicode": STAGE7_UNICODE,
+    "stage7-unicode-graphics": STAGE7_UNICODE_GRAPHICS,
 }
 
 

@@ -228,6 +228,78 @@
           "width": 0
         }
       ]
+    },
+    "stage7-unicode-graphics": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "U3 Unicode graphics fallback test",
+        "1": "Light:   ┌────┬────┐",
+        "2": "         │    │    │",
+        "3": "         ├────┼────┤",
+        "4": "         └────┴────┘",
+        "5": "Heavy:   ┏━━━━┳━━━━┓",
+        "6": "         ┃    ┃    ┃",
+        "7": "         ┗━━━━┻━━━━┛",
+        "8": "Rounded: ╭────╮  ╰────╯",
+        "9": "Blocks:  ▏▎▍▌▋▊▉ █ ▀▄▐ ░▒▓",
+        "10": "End of U3 Unicode graphics fallback test"
+      },
+      "cells": [
+        {
+          "row": 1,
+          "col": 9,
+          "text": "┌",
+          "width": 1
+        },
+        {
+          "row": 1,
+          "col": 10,
+          "text": "─",
+          "width": 1
+        },
+        {
+          "row": 2,
+          "col": 9,
+          "text": "│",
+          "width": 1
+        },
+        {
+          "row": 5,
+          "col": 9,
+          "text": "┏",
+          "width": 1
+        },
+        {
+          "row": 8,
+          "col": 9,
+          "text": "╭",
+          "width": 1
+        },
+        {
+          "row": 9,
+          "col": 9,
+          "text": "▏",
+          "width": 1
+        },
+        {
+          "row": 9,
+          "col": 17,
+          "text": "█",
+          "width": 1
+        },
+        {
+          "row": 9,
+          "col": 25,
+          "text": "▓",
+          "width": 1
+        }
+      ]
     }
   }
 }

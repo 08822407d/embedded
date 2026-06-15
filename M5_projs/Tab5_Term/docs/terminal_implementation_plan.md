@@ -186,7 +186,8 @@ Deliverables:
 Goal: implement mainstream terminal column semantics before increasing glyph
 coverage.
 
-Status on 2026-06-12: U1 and U2 completed and hardware-regression tested.
+Status: U1 and U2 completed and hardware-regression tested on 2026-06-12.
+U3 completed and hardware-regression tested on 2026-06-15.
 
 U1 deliverables:
 
@@ -205,5 +206,16 @@ U2 deliverables:
   sequences.
 - Ambiguous-width characters use one column.
 
-Current scope limit: this stage establishes layout, not comprehensive glyph
-coverage, bidirectional text, complex shaping, or unlimited grapheme clusters.
+U3 deliverables:
+
+- Deterministic fallback rendering for common Unicode box-drawing characters:
+  light, heavy, and rounded single-line corners, lines, tees, and crossings.
+- Deterministic fallback rendering for common block elements used by progress
+  bars and text charts: fractional left/lower blocks, half blocks, full block,
+  and light/medium/dark shade.
+- A `stage7-unicode-graphics` corpus with state/cell assertions and an
+  optional framebuffer screenshot path for pixel-level review.
+
+Current scope limit: this stage establishes layout and a small practical
+graphics fallback set, not comprehensive glyph coverage, bidirectional text,
+complex shaping, or unlimited grapheme clusters.

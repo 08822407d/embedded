@@ -159,9 +159,11 @@ Completion result: satisfied on 2026-06-12.
 Goal: make UTF-8 text obey mainstream terminal column rules before expanding
 font coverage.
 
-Status: U1 and U2 completed on 2026-06-12. The diagnostic firmware passed all
-five deterministic corpora on physical Tab5 hardware, the formal firmware was
-restored, and the login-shell/application smoke suite passed.
+Status: U1 and U2 completed on 2026-06-12. U3 completed on 2026-06-15 after the
+user asked to continue the plan while skipping deferred items. The diagnostic
+firmware passed six deterministic corpora on physical Tab5 hardware, a
+framebuffer screenshot confirmed the new Unicode graphics fallback pixels, the
+formal firmware was restored, and the login-shell probe passed.
 
 ### Milestone U1: Width-Aware Cell Model
 
@@ -192,8 +194,30 @@ Status: completed and hardware-regression tested.
 
 Status: completed and hardware-regression tested.
 
-Further Stage 7 font coverage or grapheme-cluster work is not yet approved.
-Keep it separate from the completed U1/U2 column model.
+### Milestone U3: Common Unicode Graphics Fallback
+
+- Render common Unicode box-drawing characters used by modern TUIs instead of
+  falling back to `?`.
+- Cover light, heavy, and rounded single-line box corners, tees, crossings,
+  horizontal lines, and vertical lines.
+- Render common block elements used for progress bars, meters, and simple
+  charts, including fractional left/lower blocks, half blocks, full block, and
+  light/medium/dark shade.
+- Keep these as deterministic renderer fallbacks; do not claim comprehensive
+  Unicode font coverage.
+- Add `stage7-unicode-graphics` to the CDC test corpus and regression
+  manifest. Use framebuffer capture for final-pixel inspection when the board
+  is available.
+
+Status: completed and hardware-regression tested on 2026-06-15. The
+`stage7-unicode-graphics` corpus passed together with Stage 1-4 and
+`stage7-unicode` at 6/6. The captured framebuffer was 1280x720 RGB565LE with
+CRC32 `6D8657DB`; the restored formal firmware then returned
+`shell-path-ok: m5stack-LLM`.
+
+Further Stage 7 grapheme-cluster, ZWJ emoji, bidirectional text, complex
+shaping, or broad CJK font coverage remains outside the active scope. Keep it
+separate from the completed U1/U2 column model and the U3 graphics fallback.
 
 ## Completed Mainline Stage: Stage 5 Input And Integration
 
@@ -340,6 +364,18 @@ USB keyboard support is explicitly excluded from this condition.
 
 ## Progress Log
 
+- 2026-06-15: the user instructed Codex to save updated requirements,
+  discovered issues, and new automation command notes before continuing the
+  plan, while skipping explicitly deferred work. Stage 7 U3 was selected as
+  the next non-deferred increment: common Unicode graphics fallback for
+  box-drawing and block-element glyphs. Implemented the fallback renderer,
+  added `stage7-unicode-graphics` to `tools/send_terminal_test.py` and the
+  regression manifest, built both `tab5_terminal_regression` and
+  `tab5_min_uart_terminal`, flashed the regression firmware, passed 6/6
+  hardware regression, captured `stage7-unicode-graphics.png` with CRC32
+  `6D8657DB`, restored formal firmware, and verified
+  `shell-path-ok: m5stack-LLM`. USB-A keyboard support and dynamic charge-state
+  detection remain skipped.
 - 2026-06-12: Stage 7 U1/U2 completed. Added the explicit single/wide/
   continuation cell model, Unicode 15.0.0 width tables, zero-width combining
   attachment, strict UTF-8 validation, and wide-cell-safe editing. The new

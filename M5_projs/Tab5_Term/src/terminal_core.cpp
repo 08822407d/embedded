@@ -350,6 +350,211 @@ void drawSixByEightGlyph(
     }
 }
 
+void drawBoxSegments(
+    int32_t x,
+    int32_t y,
+    int32_t box_width,
+    uint16_t fg,
+    bool left_segment,
+    bool right_segment,
+    bool up_segment,
+    bool down_segment,
+    bool heavy)
+{
+    const int32_t left = x + 1;
+    const int32_t right = x + box_width - 2;
+    const int32_t top = y + 1;
+    const int32_t bottom = y + state.cell_height - 2;
+    const int32_t mid_x = x + box_width / 2;
+    const int32_t mid_y = y + state.cell_height / 2;
+    const int32_t base_thickness = maxInt(1, minInt(box_width, state.cell_height) / (heavy ? 5 : 8));
+    const int32_t thickness = maxInt(1, minInt(4, base_thickness));
+    const int32_t h_y = mid_y - thickness / 2;
+    const int32_t v_x = mid_x - thickness / 2;
+
+    const auto draw_horizontal_segment = [&](int32_t x0, int32_t x1) {
+        if (x1 < x0) {
+            return;
+        }
+        for (int32_t offset = 0; offset < thickness; ++offset) {
+            M5.Display.drawFastHLine(x0, h_y + offset, x1 - x0 + 1, fg);
+        }
+    };
+    const auto draw_vertical_segment = [&](int32_t y0, int32_t y1) {
+        if (y1 < y0) {
+            return;
+        }
+        for (int32_t offset = 0; offset < thickness; ++offset) {
+            M5.Display.drawFastVLine(v_x + offset, y0, y1 - y0 + 1, fg);
+        }
+    };
+
+    if (left_segment) {
+        draw_horizontal_segment(left, mid_x);
+    }
+    if (right_segment) {
+        draw_horizontal_segment(mid_x, right);
+    }
+    if (up_segment) {
+        draw_vertical_segment(top, mid_y);
+    }
+    if (down_segment) {
+        draw_vertical_segment(mid_y, bottom);
+    }
+}
+
+bool drawUnicodeBoxDrawing(uint32_t codepoint, int32_t x, int32_t y, int32_t box_width, uint16_t fg, bool bold)
+{
+    bool left = false;
+    bool right = false;
+    bool up = false;
+    bool down = false;
+    bool heavy = bold;
+
+    switch (codepoint) {
+    case 0x2500: // light horizontal
+        left = true; right = true;
+        break;
+    case 0x2502: // light vertical
+        up = true; down = true;
+        break;
+    case 0x250c: // light down and right
+    case 0x256d: // rounded down and right
+        right = true; down = true;
+        break;
+    case 0x2510: // light down and left
+    case 0x256e: // rounded down and left
+        left = true; down = true;
+        break;
+    case 0x2514: // light up and right
+    case 0x2570: // rounded up and right
+        right = true; up = true;
+        break;
+    case 0x2518: // light up and left
+    case 0x256f: // rounded up and left
+        left = true; up = true;
+        break;
+    case 0x251c: // light vertical and right
+        up = true; down = true; right = true;
+        break;
+    case 0x2524: // light vertical and left
+        up = true; down = true; left = true;
+        break;
+    case 0x252c: // light down and horizontal
+        left = true; right = true; down = true;
+        break;
+    case 0x2534: // light up and horizontal
+        left = true; right = true; up = true;
+        break;
+    case 0x253c: // light vertical and horizontal
+        left = true; right = true; up = true; down = true;
+        break;
+    case 0x2501: // heavy horizontal
+        left = true; right = true; heavy = true;
+        break;
+    case 0x2503: // heavy vertical
+        up = true; down = true; heavy = true;
+        break;
+    case 0x250f: // heavy down and right
+        right = true; down = true; heavy = true;
+        break;
+    case 0x2513: // heavy down and left
+        left = true; down = true; heavy = true;
+        break;
+    case 0x2517: // heavy up and right
+        right = true; up = true; heavy = true;
+        break;
+    case 0x251b: // heavy up and left
+        left = true; up = true; heavy = true;
+        break;
+    case 0x2523: // heavy vertical and right
+        up = true; down = true; right = true; heavy = true;
+        break;
+    case 0x252b: // heavy vertical and left
+        up = true; down = true; left = true; heavy = true;
+        break;
+    case 0x2533: // heavy down and horizontal
+        left = true; right = true; down = true; heavy = true;
+        break;
+    case 0x253b: // heavy up and horizontal
+        left = true; right = true; up = true; heavy = true;
+        break;
+    case 0x254b: // heavy vertical and horizontal
+        left = true; right = true; up = true; down = true; heavy = true;
+        break;
+    default:
+        return false;
+    }
+
+    drawBoxSegments(x, y, box_width, fg, left, right, up, down, heavy);
+    return true;
+}
+
+void drawShadeCell(int32_t x, int32_t y, int32_t box_width, uint16_t fg, uint8_t density)
+{
+    const int32_t step = 4;
+    const int32_t dot = density >= 3 ? 3 : density >= 2 ? 2 : 1;
+    for (int32_t yy = 0; yy < state.cell_height; yy += step) {
+        for (int32_t xx = 0; xx < box_width; xx += step) {
+            const int32_t phase = ((xx / step) + (yy / step)) & 3;
+            if ((density == 1 && phase != 0)
+                || (density == 2 && phase == 3)
+                || (density == 3 && phase == 1)) {
+                continue;
+            }
+            M5.Display.fillRect(
+                x + xx,
+                y + yy,
+                minInt(dot, box_width - xx),
+                minInt(dot, state.cell_height - yy),
+                fg);
+        }
+    }
+}
+
+bool drawUnicodeBlockElement(uint32_t codepoint, int32_t x, int32_t y, int32_t box_width, uint16_t fg)
+{
+    if (codepoint >= 0x2581 && codepoint <= 0x2588) {
+        const int32_t eighths = static_cast<int32_t>(codepoint - 0x2580);
+        const int32_t height = maxInt(1, state.cell_height * eighths / 8);
+        M5.Display.fillRect(x, y + state.cell_height - height, box_width, height, fg);
+        return true;
+    }
+    if (codepoint >= 0x2589 && codepoint <= 0x258f) {
+        static constexpr uint8_t kLeftEighths[] = {7, 6, 5, 4, 3, 2, 1};
+        const int32_t width = maxInt(
+            1,
+            box_width * kLeftEighths[codepoint - 0x2589] / 8);
+        M5.Display.fillRect(x, y, width, state.cell_height, fg);
+        return true;
+    }
+
+    switch (codepoint) {
+    case 0x2580: // upper half block
+        M5.Display.fillRect(x, y, box_width, maxInt(1, state.cell_height / 2), fg);
+        return true;
+    case 0x2590: // right half block
+        M5.Display.fillRect(
+            x + box_width / 2,
+            y,
+            maxInt(1, box_width - box_width / 2),
+            state.cell_height,
+            fg);
+        return true;
+    case 0x2591: // light shade
+        drawShadeCell(x, y, box_width, fg, 1);
+        return true;
+    case 0x2592: // medium shade
+        drawShadeCell(x, y, box_width, fg, 2);
+        return true;
+    case 0x2593: // dark shade
+        drawShadeCell(x, y, box_width, fg, 3);
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool drawUnicodeFallbackCell(uint32_t codepoint, int32_t x, int32_t y, int32_t box_width, uint16_t fg, bool bold)
 {
     // These single-cell glyphs keep UTF-8 validation deterministic until a
@@ -384,6 +589,13 @@ bool drawUnicodeFallbackCell(uint32_t codepoint, int32_t x, int32_t y, int32_t b
         0b001000,
         0b000000,
     };
+
+    if (drawUnicodeBoxDrawing(codepoint, x, y, box_width, fg, bold)) {
+        return true;
+    }
+    if (drawUnicodeBlockElement(codepoint, x, y, box_width, fg)) {
+        return true;
+    }
 
     switch (codepoint) {
     case 0x00e9:

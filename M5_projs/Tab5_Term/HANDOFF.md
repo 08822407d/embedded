@@ -132,7 +132,10 @@ Expected future split:
 Stages 1 through 6 are complete. Stage 6, Test And Regression Harness, was
 accepted on 2026-06-12 after its automated workflow passed and the user
 reported no problem in the final physical checks. Stage 7 U1/U2 Unicode width
-and cell integrity are complete; later Stage 7 work is not yet approved. The
+and cell integrity are complete. On 2026-06-15 the user approved continuing the
+plan while skipping deferred work, so Stage 7 U3 added common Unicode
+box-drawing and block-element renderer fallbacks. U3 passed hardware
+regression and framebuffer capture, and the formal firmware was restored. The
 canonical stage state is in `docs/current_work.md`.
 
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
@@ -339,14 +342,16 @@ Terminal validation input strategy:
   `?2004`, mouse/focus mode tracking or safe ignore for common private modes,
   primary DA, secondary DA, CPR, DEC private CPR, ESC `Z` DECID, and a UTF-8
   printable-cell path. UTF-8 is currently one codepoint per cell; CJK
-  double-width layout is not implemented yet. The formal build renders ASCII
-  with M5GFX `DejaVu18` in fixed 18x20 cells. The retained proportional preview
-  uses actual glyph advances. The Stage 4 UTF-8 validation
-  glyphs (`é`, `Ω`, `中`) render through deterministic built-in 6x8 single-cell
+  double-width layout is implemented for the Unicode 15.0.0 width table. The
+  formal build renders ASCII with M5GFX `DejaVu18` in fixed 18x20 cells. The
+  retained proportional preview uses actual glyph advances. The Stage 4 UTF-8
+  validation glyphs (`é`, `Ω`, `中`) render through deterministic built-in 6x8
   bitmap fallbacks because the default GLCD font grouped UTF-8 bytes correctly
   but did not cover the sample glyphs reliably, and `efontCN_12` still did not
-  provide stable mixed Latin-1/Greek/CJK coverage on the Tab5 screen. Other
-  unsupported non-ASCII characters currently render as `?`.
+  provide stable mixed Latin-1/Greek/CJK coverage on the Tab5 screen. Stage 7
+  U3 adds deterministic drawn fallbacks for common Unicode box-drawing and
+  block-element glyphs. Other unsupported non-ASCII characters currently render
+  as `?`.
 
 ## Status Bar And Battery UI Decisions
 
@@ -1165,3 +1170,23 @@ The physical `stage7-unicode` regression passed together with Stage 1-4 at
 full-screen application smoke checks. See `docs/current_work.md` for the
 milestone contract and `docs/terminal_validation.md` for exact reproduction
 commands. Font coverage remains narrower than the now-correct column model.
+
+On 2026-06-15 the user asked to save current requirements, discovered issues,
+and automation-command notes before continuing planned work while skipping
+deferred items. U3 was selected as the next practical increment because modern
+terminal TUIs often use Unicode box drawing and block elements. The new local
+test name is `stage7-unicode-graphics`; use the framebuffer screenshot command
+for final-pixel review when the board is available.
+
+U3 validation on 2026-06-15:
+
+- `tab5_terminal_regression` built and flashed to COM3.
+- `tools/tab5.ps1 terminal-regression -Port COM3` passed 6/6, including
+  `stage7-unicode-graphics`.
+- `tools/tab5.ps1 screenshot -Port COM3 -OutputPath
+  .logs/screenshots/stage7-unicode-graphics.png` captured a 1280x720 RGB565LE
+  framebuffer with CRC32 `6D8657DB`.
+- The screenshot showed connected light/heavy/rounded box samples and visible
+  block/shade elements.
+- `tab5_min_uart_terminal` was flashed back and
+  `tools/tab5.ps1 probe -Port COM3` returned `shell-path-ok: m5stack-LLM`.

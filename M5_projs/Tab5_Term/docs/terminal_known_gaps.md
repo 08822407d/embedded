@@ -14,9 +14,10 @@ implementation and regression tests pass.
 - Combining layout currently has simple drawn fallbacks for grave, acute,
   circumflex, tilde, and diaeresis. Other zero-width marks remain stored and
   width-correct but may not be visible with the current font path.
-- The current font path has deterministic fallback glyphs only for `é`, `Ω`,
-  and `中`; other unsupported base code points render as `?` even when their
-  one- or two-column layout is correct.
+- The current font path has deterministic fallback glyphs for the Stage 4
+  validation characters `é`, `Ω`, and `中`, plus the Stage 7 U3 common
+  Unicode box-drawing and block-element set. Other unsupported base code
+  points render as `?` even when their one- or two-column layout is correct.
 - Unicode line breaking, bidirectional text, and complex shaping are outside
   the current terminal scope.
 

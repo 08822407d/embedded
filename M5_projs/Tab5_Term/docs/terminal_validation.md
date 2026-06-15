@@ -641,6 +641,31 @@ Expected:
   continuation cell.
 - `Invalid: ?OK` shows one deterministic replacement and parser recovery.
 
+Stage 7 U3 Unicode graphics fallback check:
+
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" `
+  tools\run_terminal_regression.py --port COM3 --case stage7-unicode-graphics
+```
+
+Expected: `PASS stage7-unicode-graphics` and `1 passed, 0 failed`. The
+assertions confirm that common box-drawing and block-element codepoints are
+stored as single-width UTF-8 cells rather than falling back to ASCII `?`.
+
+Visual/final-pixel check:
+
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" `
+  tools\send_terminal_test.py --port COM3 --test stage7-unicode-graphics
+.\tools\tab5.ps1 screenshot -Port COM3 `
+  -OutputPath .logs\screenshots\stage7-unicode-graphics.png
+```
+
+Expected: the light, heavy, and rounded box samples render as connected line
+graphics, and the block row shows fractional blocks, full block, half blocks,
+right half block, and light/medium/dark shade. This remains a deterministic
+fallback set, not a complete Unicode font.
+
 Restore and verify the formal firmware after diagnostic testing:
 
 ```powershell
@@ -652,6 +677,11 @@ Restore and verify the formal firmware after diagnostic testing:
 
 Validation record:
 
+- 2026-06-15: Stage 1-4 plus `stage7-unicode` and
+  `stage7-unicode-graphics` passed 6/6 on physical Tab5. The framebuffer
+  screenshot for `stage7-unicode-graphics` captured 1280x720 RGB565LE with
+  CRC32 `6D8657DB`. Formal firmware was restored afterward, and the login-shell
+  probe returned `shell-path-ok: m5stack-LLM`.
 - 2026-06-12: Stage 1-4 plus `stage7-unicode` passed 5/5 on physical Tab5.
 - Formal firmware was restored with verified flash hashes.
 - Login-shell probe returned `shell-path-ok: m5stack-LLM`.
