@@ -494,6 +494,25 @@ Power status validation build:
   firmware records timestamped state changes, current/voltage windows,
   extrema, and reboot/sample continuity; then present a compact summary on
   screen or over serial when available.
+- On 2026-06-15 that automatic recorder was implemented as
+  `tab5_power_detect_probe`. It samples every 500ms into a 4096-entry RAM ring
+  buffer, logs API charging, raw `E2.P6/CHG_STAT`, USB CDC connection state,
+  INA226 current/voltage, and battery percentage, then exports CSV over
+  `PWRLOG DUMP`. `tools/power_detect_probe.py` and
+  `tools/tab5.ps1 power-detect` automate COM-port disappear/reappear handling,
+  dump collection, and threshold analysis. This is still diagnostic evidence
+  gathering; do not change the production lightning icon until a captured log
+  shows a stable rule.
+
+Power detect probe workflow:
+
+```powershell
+.\tools\tab5.ps1 build tab5_power_detect_probe
+.\tools\tab5.ps1 flash tab5_power_detect_probe -Port COM3
+.\tools\tab5.ps1 power-detect -Port COM3 -DurationSeconds 180
+```
+
+See `docs/power_detect_probe.md` for output files and restore commands.
 
 ## Verified Hardware Path
 

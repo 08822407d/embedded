@@ -11,7 +11,8 @@ param(
         "app-smoke",
         "terminal-regression",
         "screenshot",
-        "baud"
+        "baud",
+        "power-detect"
     )]
     [string]$Action,
 
@@ -30,7 +31,8 @@ param(
     [int]$BuildStallWarningSeconds = 120,
     [string]$OutputPath = "",
     [string]$Baseline = "",
-    [int]$ChannelTolerance = 0
+    [int]$ChannelTolerance = 0,
+    [int]$DurationSeconds = 180
 )
 
 $ErrorActionPreference = "Stop"
@@ -436,6 +438,23 @@ try {
             }
 
             Get-Content -Path $log | Select-Object -Last 10
+        }
+
+        "power-detect" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "power_detect_probe.py"
+            $log = Join-Path $logRoot "power-detect-$timestamp.log"
+
+            Write-Host "Power-detect capture on $Port for ${DurationSeconds}s ..."
+            & $python $script --port $Port --duration $DurationSeconds --output-root $logRoot 2>&1 |
+                Tee-Object -FilePath $log
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -ne 0) {
+                Write-Host "Power-detect capture failed. Log: $log" -ForegroundColor Red
+                exit $exitCode
+            }
+            Write-Host "Power-detect capture succeeded. Log: $log" -ForegroundColor Green
         }
     }
 }

@@ -78,7 +78,9 @@ Existing groundwork:
   entry points.
 
 All R1-R5 milestones are complete. Charging-state detection remains an
-explicitly deferred known issue and was excluded from Stage 6 acceptance.
+explicitly unresolved known issue and was excluded from Stage 6 acceptance.
+A dedicated automatic probe now exists for collecting evidence, but no
+production charging-state rule has been accepted yet.
 
 ### Milestone R1: Baseline And Manifest
 
@@ -423,6 +425,12 @@ USB keyboard support is explicitly excluded from this condition.
 
 ## Progress Log
 
+- 2026-06-15: dynamic charge-state detection was reopened only as a diagnostic
+  effort. Added `tab5_power_detect_probe`, a RAM ring-buffer power logger,
+  `tools/power_detect_probe.py`, and `tools/tab5.ps1 power-detect` so the user
+  can plug/unplug cables while the device records samples locally and exports
+  them after CDC reconnect. This does not yet solve charging-state detection;
+  it produces evidence for choosing or rejecting a production heuristic.
 - 2026-06-15: Stage 8 was closed after T1 and T2 were completed at their
   documented validation levels. T1 was hardware-regression tested. T2 remains
   intentionally not hardware-validated because it is preparatory geometry API

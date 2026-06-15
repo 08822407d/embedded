@@ -7,6 +7,7 @@
 #include "input_event_queue.h"
 #include "input_mapper.h"
 #include "login_uart.h"
+#include "power_detect_probe.h"
 #include "status_bar.h"
 #include "tab5_keyboard_input.h"
 #include "terminal_core.h"
@@ -25,7 +26,9 @@ uint32_t lastM5UpdateMs = 0;
 
 void formatStatusTitle(char *buffer, size_t buffer_size)
 {
-#if ENABLE_TERMINAL_STATE_DIAGNOSTICS
+#if ENABLE_POWER_DETECT_PROBE
+    snprintf(buffer, buffer_size, "Tab5 Power Detect Probe");
+#elif ENABLE_TERMINAL_STATE_DIAGNOSTICS
     snprintf(buffer, buffer_size, "Tab5 Terminal Regression 115200");
 #elif ENABLE_TERMINAL_CDC_INJECTION
     snprintf(buffer, buffer_size, "Tab5 Terminal CDC Inject 115200");
@@ -113,7 +116,7 @@ void writeToDebug(uint8_t byte)
 
 void readLoginUartToDisplayAndDebug()
 {
-#if !ENABLE_TERMINAL_CDC_INJECTION
+#if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     size_t processed = 0;
     HardwareSerial& serial = login_uart::serial();
 
@@ -133,14 +136,14 @@ void readLoginUartToDisplayAndDebug()
 
 void bridgeUsbToLoginUart()
 {
-#if ENABLE_USB_LOGIN_UART_BRIDGE && !ENABLE_TERMINAL_CDC_INJECTION
+#if ENABLE_USB_LOGIN_UART_BRIDGE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     usb_management::update();
 #endif
 }
 
 void bridgeKeyboardToLoginUart()
 {
-#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION
+#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     uint8_t byte = 0;
     size_t processed = 0;
 
@@ -153,7 +156,7 @@ void bridgeKeyboardToLoginUart()
 
 void bridgeInputEventsToLoginUart()
 {
-#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION
+#if ENABLE_TAB5_KEYBOARD && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     input::KeyEvent event;
     size_t processed = 0;
 
@@ -183,7 +186,7 @@ void setup()
     M5.Power.setExtOutput(true, m5::ext_USB);
 #endif
 
-#if !ENABLE_TERMINAL_CDC_INJECTION
+#if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     login_uart::begin();
 #endif
     setupDisplay();
@@ -196,6 +199,9 @@ void setup()
 #if ENABLE_TERMINAL_CDC_INJECTION
     terminal_debug::beginCdcInjection();
 #endif
+#if ENABLE_POWER_DETECT_PROBE
+    power_detect_probe::begin();
+#endif
 #if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION
     Serial.println("USB keyboard probe enabled");
     usbKeyboardProbeBegin();
@@ -207,7 +213,7 @@ void setup()
         tab5KeyboardInputBegin();
     }
 #endif
-#if !ENABLE_TERMINAL_CDC_INJECTION
+#if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     const login_uart::State uartState = login_uart::state();
     Serial.printf(
         "Login UART: baud=%lu persisted=%s 8N1 RX=G%d TX=G%d\r\n",
@@ -220,7 +226,7 @@ void setup()
 
 void loop()
 {
-#if !ENABLE_TERMINAL_CDC_INJECTION
+#if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     const login_uart::ApplyResult baudResult = login_uart::update();
     if (baudResult != login_uart::ApplyResult::None) {
         refreshStatusTitle();
@@ -236,11 +242,14 @@ void loop()
 #endif
     readLoginUartToDisplayAndDebug();
     terminal_debug::drainCdcInjection();
+    power_detect_probe::update();
     bridgeUsbToLoginUart();
     bridgeKeyboardToLoginUart();
     tab5KeyboardInputUpdate();
     bridgeInputEventsToLoginUart();
+#if !ENABLE_POWER_DETECT_PROBE
     ui::refreshBatteryStatus(false);
+#endif
 
     const uint32_t now = millis();
     if (now - lastM5UpdateMs >= kM5UpdateIntervalMs) {
