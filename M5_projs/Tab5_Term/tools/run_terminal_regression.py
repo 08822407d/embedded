@@ -100,9 +100,19 @@ def query_line(
     chunk_size: int,
     chunk_delay: float,
     timeout: float,
+    retries: int,
 ) -> bytes:
-    send_chunks(ser, request, chunk_size, chunk_delay)
-    return read_response_line(ser, timeout, marker)
+    responses = bytearray()
+    attempts = max(1, retries + 1)
+    for attempt in range(attempts):
+        send_chunks(ser, request, chunk_size, chunk_delay)
+        response = read_response_line(ser, timeout, marker)
+        responses.extend(response)
+        if marker in response:
+            break
+        if attempt + 1 < attempts:
+            time.sleep(0.05)
+    return bytes(responses)
 
 
 def assert_case(
@@ -111,6 +121,7 @@ def assert_case(
     state: dict[str, str],
     rows: dict[int, str],
     cells: dict[tuple[int, int], dict[str, int | str]],
+    raw: bytes,
 ) -> list[str]:
     failures: list[str] = []
     for key, value in expected.get("state", {}).items():
@@ -138,6 +149,10 @@ def assert_case(
                 failures.append(
                     f"cell {key} {field}: expected {value!r}, got {actual!r}"
                 )
+    for expected_response in expected.get("responses_contains", []):
+        needle = expected_response.encode("latin1")
+        if needle not in raw:
+            failures.append(f"response missing: {expected_response.encode('unicode_escape')!r}")
     return failures
 
 
@@ -148,6 +163,7 @@ def run_case(
     chunk_size: int,
     chunk_delay: float,
     response_timeout: float,
+    query_retries: int,
 ) -> tuple[list[str], bytes]:
     ser.reset_input_buffer()
     send_chunks(ser, TESTS[case_name], chunk_size, chunk_delay)
@@ -162,6 +178,7 @@ def run_case(
             chunk_size,
             chunk_delay,
             response_timeout,
+            query_retries,
         )
     )
     for row in sorted(int(value) for value in expected.get("rows", {})):
@@ -173,6 +190,7 @@ def run_case(
                 chunk_size,
                 chunk_delay,
                 response_timeout,
+                query_retries,
             )
         )
     for cell in expected.get("cells", []):
@@ -186,13 +204,14 @@ def run_case(
                 chunk_size,
                 chunk_delay,
                 response_timeout,
+                query_retries,
             )
         )
     try:
         state, rows, cells = collect_responses(bytes(raw))
     except (UnicodeDecodeError, ValueError) as error:
         return [str(error)], bytes(raw)
-    return assert_case(case_name, expected, state, rows, cells), bytes(raw)
+    return assert_case(case_name, expected, state, rows, cells, bytes(raw)), bytes(raw)
 
 
 def main() -> int:
@@ -210,6 +229,12 @@ def main() -> int:
     parser.add_argument("--chunk-size", type=int, default=32)
     parser.add_argument("--chunk-delay", type=float, default=0.03)
     parser.add_argument("--response-timeout", type=float, default=3.0)
+    parser.add_argument(
+        "--query-retries",
+        type=int,
+        default=2,
+        help="Retry read-only OSC 777 diagnostic queries when a CDC reply is dropped",
+    )
     parser.add_argument("--raw-log", type=Path)
     args = parser.parse_args()
 
@@ -221,6 +246,8 @@ def main() -> int:
         parser.error(f"unknown regression case(s): {', '.join(unknown)}")
     if args.chunk_size < 1:
         parser.error("--chunk-size must be at least 1")
+    if args.query_retries < 0:
+        parser.error("--query-retries must be non-negative")
 
     raw_log = bytearray()
     failed = 0
@@ -243,6 +270,7 @@ def main() -> int:
                 args.chunk_size,
                 args.chunk_delay,
                 args.response_timeout,
+                args.query_retries,
             )
             raw_log.extend(f"\n===== {case_name} =====\n".encode("ascii"))
             raw_log.extend(raw)

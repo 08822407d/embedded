@@ -9,6 +9,12 @@ During early work, test with simple shell output first. Move toward
 `xterm-256color` only after the parser, screen model, color attributes, and
 input behavior have been validated.
 
+Preparatory work for future advanced transports or features does not require
+immediate Tab5 hardware validation unless it changes current user-visible
+behavior or the active UART login path. Record those items as implemented but
+unverified, with enough detail that they can be validated when the advanced
+feature is built.
+
 ## Stage 1: Core Screen And Parser
 
 Goal: replace direct display writes with a character-cell terminal core.
@@ -219,3 +225,21 @@ U3 deliverables:
 Current scope limit: this stage establishes layout and a small practical
 graphics fallback set, not comprehensive glyph coverage, bidirectional text,
 complex shaping, or unlimited grapheme clusters.
+
+## Stage 8: Terminal Protocol Readiness
+
+Goal: add standards-aligned protocol responses that help future mature login
+transports without changing the accepted raw UART login behavior.
+
+T1 deliverables:
+
+- xterm text-area size query `CSI 18 t`.
+- Response `CSI 8;<rows>;<cols>t` generated from the current terminal cell
+  geometry.
+- Regression coverage for the response bytes.
+- Documentation that raw UART login does not automatically consume this query;
+  current serial use continues to rely on the Module LLM profile's persistent
+  `stty rows 32 cols 64`.
+
+Status on 2026-06-15: T1 completed and hardware-regression tested. The
+`stage8-protocol` corpus checks `CSI 18 t` response bytes.

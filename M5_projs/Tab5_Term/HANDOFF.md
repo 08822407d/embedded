@@ -23,6 +23,13 @@ to preserve decisions and traps even if a long Codex session is compacted.
 - Do not wait for a separate documentation request when a task establishes a
   stable design decision, discovers a hardware fact, or exposes a repeatable
   trap. Update `HANDOFF.md` as part of that work.
+- Groundwork that only prepares future advanced features should normally avoid
+  hardware flashing or live-device validation. Implement the narrow internal
+  piece, document its behavior and intended future consumer, and mark the item
+  as implemented but unverified until the advanced feature that uses it is
+  developed and validated. Keep live hardware validation for user-visible
+  behavior, formal firmware changes, regression-risky changes, and work that
+  directly affects the current UART login path.
 - If Codex cannot confidently judge whether the documentation structure needs
   expansion, the user may periodically ask for a documentation-structure
   analysis. Record the resulting changes in this file.
@@ -370,6 +377,14 @@ Current fixed settings:
 - Raw UART has no standard unsolicited window-size negotiation. Keep the
   Module LLM TTY at `stty rows 32 cols 64`; optional xterm `CSI 18 t` reporting
   alone does not make a normal serial shell update its TTY size.
+- On 2026-06-15 the user explicitly approved implementing `CSI 18 t` only as
+  future protocol readiness for mature login transports such as SSH, Telnet, or
+  PTY-backed helpers. Do not use it as a raw UART login resize mechanism, and
+  do not inject visible `stty` commands from firmware.
+- T1 validation on 2026-06-15: `CSI 18 t` replies with `CSI 8;32;64t` in the
+  `stage8-protocol` regression case. The complete regression run passed 7/7,
+  then `tab5_min_uart_terminal` was restored and the shell probe returned
+  `shell-path-ok: m5stack-LLM`.
 - proportional renderer: retained in `tab5_terminal_font_prop_preview`
 - Screen orientation: `SCREEN_ORIENTATION_KEYBOARD_MOUNTED`; this maps the
   original landscape rotation `1` to opposite landscape rotation `3`, matching

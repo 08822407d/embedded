@@ -2104,6 +2104,18 @@ void reportDecCursorPosition()
     sendResponse(response);
 }
 
+void reportTextAreaSize()
+{
+    char response[24];
+    snprintf(
+        response,
+        sizeof(response),
+        "\x1b[8;%u;%ut",
+        static_cast<unsigned>(state.rows),
+        static_cast<unsigned>(state.cols));
+    sendResponse(response);
+}
+
 void executeDeviceStatusReport()
 {
     const int32_t report = csiParam(0, 0);
@@ -2234,6 +2246,11 @@ void executeCsi(uint8_t final_byte)
         break;
     case 's':
         saveCursor();
+        break;
+    case 't':
+        if (state.csi_private_marker == 0 && csiParam(0, 0) == 18) {
+            reportTextAreaSize();
+        }
         break;
     case 'u':
         restoreCursor();

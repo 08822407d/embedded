@@ -51,7 +51,9 @@ continuation, `1` single, or `2` wide lead.
 The host runner sends each state/row/cell query only after receiving the
 previous reply. A batched implementation was rejected after hardware runs
 showed that the final CDC request could be dropped while the device was
-simultaneously printing many diagnostic responses.
+simultaneously printing many diagnostic responses. The runner now retries
+read-only OSC 777 diagnostic queries a small number of times before failing a
+case; this handles occasional CDC reply drops without changing terminal state.
 
 The screen-capture command returns the current logical M5GFX framebuffer as
 RGB565LE with a CRC32. It is also available in the production-like

@@ -132,6 +132,15 @@ STAGE7_UNICODE_GRAPHICS = (
     + b"End of U3 Unicode graphics fallback test"
 )
 
+STAGE8_PROTOCOL = (
+    b"\x1b[2J\x1b[H"
+    b"Stage8 protocol readiness test\r\n"
+    b"xterm text area size query: \x1b[18t\r\n"
+    b"Expected reply for future mature transports: CSI 8;32;64 t\r\n"
+    b"Raw UART login still uses persistent stty rows 32 cols 64\r\n"
+    b"End of Stage8 protocol readiness test"
+)
+
 FONT_PREVIEW = (
     b"\x1b[2J\x1b[H"
     b"Font debug: DejaVu18 glyphs in fixed 18x20 cells\r\n"
@@ -195,6 +204,7 @@ TESTS = {
     "stage4-xterm": STAGE4_XTERM,
     "stage7-unicode": STAGE7_UNICODE,
     "stage7-unicode-graphics": STAGE7_UNICODE_GRAPHICS,
+    "stage8-protocol": STAGE8_PROTOCOL,
 }
 
 

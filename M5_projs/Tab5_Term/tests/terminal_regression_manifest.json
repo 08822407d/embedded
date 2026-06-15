@@ -300,6 +300,26 @@
           "width": 1
         }
       ]
+    },
+    "stage8-protocol": {
+      "state": {
+        "cols": 64,
+        "rows": 32,
+        "scroll": "0,31",
+        "origin": 0,
+        "alt": 0
+      },
+      "rows": {
+        "0": "Stage8 protocol readiness test",
+        "1": "xterm text area size query:",
+        "2": "Expected reply for future mature transports: CSI 8;32;64 t",
+        "3": "Raw UART login still uses persistent stty rows 32 cols 64",
+        "4": "End of Stage8 protocol readiness test"
+      },
+      "responses_contains": [
+        "\u001b[8;32;64t"
+      ],
+      "cells": []
     }
   }
 }

@@ -25,6 +25,14 @@ Build incidents, evidence, and confirmed mitigations are maintained in
 `docs/build_troubleshooting.md`; extend that record when a new failure pattern
 or discriminating test is found.
 
+Groundwork for later advanced features should not consume hardware validation
+time by default. For this kind of preparatory work, implement the narrow
+internal capability, document what it does and which future feature will use it,
+and record the status as implemented but unverified. Validate it later together
+with the advanced feature that makes it user-visible. Continue to run live
+device checks for current UART-login behavior, formal firmware changes,
+user-visible UI/input behavior, and high-regression-risk changes.
+
 ## Completed Checkpoint
 
 Completed through Stage 5:
@@ -154,7 +162,7 @@ remaining manual checks and known gaps.
 
 Completion result: satisfied on 2026-06-12.
 
-## Active Mainline Stage: Stage 7 Unicode Width And Cell Integrity
+## Completed Mainline Stage: Stage 7 Unicode Width And Cell Integrity
 
 Goal: make UTF-8 text obey mainstream terminal column rules before expanding
 font coverage.
@@ -218,6 +226,31 @@ CRC32 `6D8657DB`; the restored formal firmware then returned
 Further Stage 7 grapheme-cluster, ZWJ emoji, bidirectional text, complex
 shaping, or broad CJK font coverage remains outside the active scope. Keep it
 separate from the completed U1/U2 column model and the U3 graphics fallback.
+
+## Active Mainline Stage: Stage 8 Terminal Protocol Readiness
+
+Goal: add small standards-aligned protocol capabilities that prepare the Tab5
+terminal for future mature login transports such as SSH, Telnet, or PTY-backed
+serial helpers, without changing the accepted raw UART login behavior.
+
+Raw UART login remains fixed at the Module LLM profile's persistent
+`stty rows 32 cols 64`. Stage 8 must not inject visible shell commands or
+expect ordinary serial getty/login to query terminal size automatically.
+
+### Milestone T1: xterm Text-Area Size Report
+
+- Implement xterm window-manipulation query `CSI 18 t`.
+- Reply with `CSI 8;<rows>;<cols>t`, using the current logical terminal rows
+  and columns.
+- Validate this through the CDC regression response path.
+- Document that this is a standard xterm-style response for future
+  SSH/Telnet/PTY integration, not a raw-UART automatic resize mechanism.
+
+Status: completed and hardware-regression tested on 2026-06-15. Both
+`tab5_terminal_regression` and `tab5_min_uart_terminal` built successfully.
+The regression firmware passed all seven deterministic cases, including
+`stage8-protocol`, and the restored formal firmware returned
+`shell-path-ok: m5stack-LLM`.
 
 ## Completed Mainline Stage: Stage 5 Input And Integration
 
@@ -376,6 +409,18 @@ USB keyboard support is explicitly excluded from this condition.
   `6D8657DB`, restored formal firmware, and verified
   `shell-path-ok: m5stack-LLM`. USB-A keyboard support and dynamic charge-state
   detection remain skipped.
+- 2026-06-15: after confirming that raw UART login does not automatically use
+  xterm size queries, the user approved implementing `CSI 18 t` only as
+  future protocol readiness for mature transports such as SSH/Telnet/PTY-backed
+  helpers. It must not be used as a raw serial login resize mechanism.
+  Implemented `CSI 18 t` -> `CSI 8;32;64t`, added `stage8-protocol`, built
+  regression and formal firmware, passed hardware regression at 7/7, restored
+  formal firmware, and verified `shell-path-ok: m5stack-LLM`.
+- 2026-06-15: the first seven-case regression run dropped one read-only OSC 777
+  diagnostic cell reply in the existing `stage7-unicode` case while
+  `stage8-protocol` passed. The runner now retries read-only diagnostic
+  queries before failing; after reflashing the regression firmware the complete
+  run passed 7/7.
 - 2026-06-12: Stage 7 U1/U2 completed. Added the explicit single/wide/
   continuation cell model, Unicode 15.0.0 width tables, zero-width combining
   attachment, strict UTF-8 validation, and wide-cell-safe editing. The new

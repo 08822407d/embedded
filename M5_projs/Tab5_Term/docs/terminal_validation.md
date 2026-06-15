@@ -370,6 +370,23 @@ Expected host-side response from that helper includes:
 This means primary DA, secondary DA, CPR, DEC private CPR, and ESC `Z` DECID
 all replied through the terminal response callback.
 
+Stage 8 T1 adds the xterm text-area size query. The dedicated
+`stage8-protocol` regression case expects:
+
+```text
+\x1b[8;32;64t
+```
+
+This response prepares future SSH/Telnet/PTY-backed integrations. It is not
+used to auto-resize the current raw UART login shell; that path still uses the
+Module LLM profile's persistent `stty rows 32 cols 64`.
+
+Validation record:
+
+- 2026-06-15: `stage8-protocol` passed as part of the full seven-case hardware
+  regression run. The formal firmware was restored afterward, and the
+  login-shell probe returned `shell-path-ok: m5stack-LLM`.
+
 ## Font Preview
 
 CDC injection helper:
