@@ -35,7 +35,7 @@ user-visible UI/input behavior, and high-regression-risk changes.
 
 ## Completed Checkpoint
 
-Completed through Stage 5:
+Completed through Stage 8:
 
 - Stages 1 through 4 of `terminal_implementation_plan.md`.
 - Deterministic CDC tests for the implemented parser/screen features.
@@ -49,6 +49,9 @@ Completed through Stage 5:
   keyboard-mounted orientation, and 921600 login-UART integration.
 - The user completed the remaining practical A164 and integration checks on
   2026-06-12 and reported no observed problem.
+- Stage 6 regression harness, Stage 7 Unicode width/graphics fallback, and
+  Stage 8 protocol-readiness work are complete at their documented validation
+  levels.
 
 Do not restart completed font selection or Stage 1-4 deterministic tests unless
 new work causes a regression.
@@ -227,7 +230,7 @@ Further Stage 7 grapheme-cluster, ZWJ emoji, bidirectional text, complex
 shaping, or broad CJK font coverage remains outside the active scope. Keep it
 separate from the completed U1/U2 column model and the U3 graphics fallback.
 
-## Active Mainline Stage: Stage 8 Terminal Protocol Readiness
+## Completed Mainline Stage: Stage 8 Terminal Protocol Readiness
 
 Goal: add small standards-aligned protocol capabilities that prepare the Tab5
 terminal for future mature login transports such as SSH, Telnet, or PTY-backed
@@ -268,6 +271,12 @@ hardware-validated. Both `tab5_min_uart_terminal` and
 `tab5_terminal_regression` built successfully. This is preparatory API work for
 future SSH/Telnet/PTY-backed transports and is intentionally left for validation
 when one of those advanced features is implemented.
+
+Stage completion result: satisfied on 2026-06-15. Stage 8 is complete because
+all defined deliverables are implemented at the documented validation level:
+T1 was hardware-regression tested, and T2 is preparatory API work intentionally
+left for later validation with its future transport consumer. No Stage 9 scope
+is active yet.
 
 ## Completed Mainline Stage: Stage 5 Input And Integration
 
@@ -414,6 +423,10 @@ USB keyboard support is explicitly excluded from this condition.
 
 ## Progress Log
 
+- 2026-06-15: Stage 8 was closed after T1 and T2 were completed at their
+  documented validation levels. T1 was hardware-regression tested. T2 remains
+  intentionally not hardware-validated because it is preparatory geometry API
+  work for future mature transports. No Stage 9 scope is active yet.
 - 2026-06-15: the user instructed Codex to save updated requirements,
   discovered issues, and new automation command notes before continuing the
   plan, while skipping explicitly deferred work. Stage 7 U3 was selected as

@@ -391,6 +391,8 @@ Current fixed settings:
   size, and logical rows/columns. This is preparatory work for SSH/Telnet/PTY
   integration, not a raw UART resize mechanism. It is locally build-checked but
   not hardware-validated.
+- Stage 8 is complete as of 2026-06-15. There is no active Stage 9 scope yet;
+  define the next stage explicitly before starting new compatibility work.
 - proportional renderer: retained in `tab5_terminal_font_prop_preview`
 - Screen orientation: `SCREEN_ORIENTATION_KEYBOARD_MOUNTED`; this maps the
   original landscape rotation `1` to opposite landscape rotation `3`, matching

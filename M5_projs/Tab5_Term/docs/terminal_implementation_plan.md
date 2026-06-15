@@ -255,3 +255,7 @@ T2 deliverables:
 Status on 2026-06-15: T2 implemented and locally build-checked, not
 hardware-validated. Validation is deferred until a mature login transport or
 PTY-backed integration consumes this API.
+
+Stage 8 completion status on 2026-06-15: complete. T1 is hardware-regression
+tested. T2 is preparatory API work, so its hardware validation is intentionally
+deferred under the project rule for advanced-feature groundwork.
