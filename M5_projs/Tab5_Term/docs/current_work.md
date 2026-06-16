@@ -480,7 +480,10 @@ enabled in the formal firmware by default.
   A later standard probe captured zero bytes because a previous interactive
   shell command was still pending; the new `tools/tab5.ps1 recover` command
   restored the tty with `recover-ok: m5stack-LLM`, and the following standard
-  probe again returned `shell-path-ok: m5stack-LLM`.
+  probe again returned `shell-path-ok: m5stack-LLM`. The next USB TUI coverage
+  check also passed: after one missed-`q` attempt was recovered, `htop-usb`
+  exited `htop` through USB-keyboard `q` with `rc=0`, followed by a successful
+  shell probe.
 - 2026-06-15: USB-A keyboard support was resumed. Added shared
   HID-keyboard mapping (`hid_keyboard_mapper`) so the official A164 keyboard
   and USB boot-keyboard probe use the same modifier/usage-to-`KeyCode`

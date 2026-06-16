@@ -1175,6 +1175,9 @@ it closes without retry logging from `usb_keyboard_probe`. A later probe
 captured zero bytes because a previous interactive shell command was still
 pending; `tools/tab5.ps1 recover` returned `recover-ok: m5stack-LLM`, after
 which the standard probe again returned `shell-path-ok: m5stack-LLM`.
+The next USB TUI coverage check also passed: after one missed-`q` attempt was
+recovered, `tools/send_login_shell_demo.py --demo htop-usb` exited `htop`
+through USB-keyboard `q` with `rc=0`, followed by a successful standard probe.
 
 ## Terminal Font Decision
 

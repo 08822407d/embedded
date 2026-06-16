@@ -236,10 +236,11 @@ USB full-screen app check:
 
 ```powershell
 python tools/send_login_shell_demo.py --port COM3 --demo less-usb --capture-window 35
+python tools/send_login_shell_demo.py --port COM3 --demo htop-usb --capture-window 60
 ```
 
-The helper starts `less /etc/os-release`; press `q` on the USB keyboard. The
-test passes only if the shell marker returns `rc=0`.
+The helper starts a full-screen app; press `q` on the USB keyboard. The test
+passes only if the shell marker returns `rc=0`.
 
 USB keyboard formal/default build:
 
@@ -652,6 +653,10 @@ USB keyboard validation record:
   `tab5_min_uart_terminal_usb_keyboard` environment is now only a compatibility
   alias for the default formal build. Full NKRO and broad application coverage
   remain unclaimed limitations.
+- 2026-06-16: `htop-usb` was run against the default formal firmware. The first
+  attempt did not receive `q` during the capture window and was recovered with
+  `tools/tab5.ps1 recover`; the retry exited `htop` through USB-keyboard `q`
+  and returned `rc=0`, followed by a successful shell probe.
 
 Official Tab5 Keyboard first-pass check:
 
