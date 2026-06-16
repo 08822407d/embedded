@@ -1129,8 +1129,21 @@ autodetect failure, but it is not root-cause proof. `tab5_min_uart_terminal`
 and `tab5_min_uart_terminal_usb_keyboard` both rebuilt successfully with the
 guard. Only the normal firmware was flashed during the mitigation pass; its
 boot log showed no `[display]` retry and the shell probe returned
-`shell-path-ok: m5stack-LLM`. The guarded coexistence firmware remains
-unvalidated on hardware.
+`shell-path-ok: m5stack-LLM`.
+
+Later on 2026-06-16, guarded coexistence hardware validation passed. The first
+boot of `tab5_min_uart_terminal_usb_keyboard` reproduced the M5GFX panel
+detection failure, `display_boot_guard` restarted once, and the second boot
+detected the ST7123 panel. A164 initialized, USB host waited for a HID boot
+keyboard, and shell probe reached `m5stack-LLM`. USB keyboard validation then
+captured `usb^C` through `catv`, exited `less /etc/os-release` with
+USB-keyboard `q` and `rc=0`, and passed a final shell probe. A deliberate
+USB-A unplug/replug still logged `ESP_ERR_INVALID_STATE` while the endpoint was
+going away, but the keyboard re-enumerated. `usb_keyboard_probe` now defers
+report-transfer resubmission from the USB callback to the client task and adds
+short retry handling before closing repeated submit failures. Default
+`tab5_min_uart_terminal` still keeps USB keyboard disabled; the remaining
+decision is whether to promote USB keyboard into the formal default firmware.
 
 ## Terminal Font Decision
 

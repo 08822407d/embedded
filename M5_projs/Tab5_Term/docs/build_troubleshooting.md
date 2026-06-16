@@ -254,6 +254,23 @@ Mitigation added after the incident:
 - The guarded USB coexistence firmware was not reflashed during this recovery
   pass. It still needs targeted validation before the risk can be closed.
 
+Follow-up validation:
+
+- Later on 2026-06-16, the guarded `tab5_min_uart_terminal_usb_keyboard`
+  firmware was flashed. The first boot reproduced `M5Tab5 display panel was
+  not detected`; `display_boot_guard` logged an unusable display with `size=0x0`
+  and restarted. The second boot detected the ST7123 panel and continued.
+- USB coexistence tests then passed shell probe, `catv` input (`usb^C`), and
+  `less-usb` exit via USB-keyboard `q` with `rc=0`.
+- A deliberate USB-A unplug/replug can still produce an `ESP_ERR_INVALID_STATE`
+  submit failure while the endpoint is going away. The driver recovered by
+  closing and re-enumerating the keyboard. `usb_keyboard_probe` now defers
+  report resubmission out of the transfer callback into the USB client task and
+  adds short retry handling before closing a repeatedly failing keyboard.
+- Build verification after the USB report hardening:
+  - `tab5_min_uart_terminal_usb_keyboard`: 26.2 seconds, success.
+  - `tab5_min_uart_terminal`: 20.9 seconds, success.
+
 ## Incident 2026-06-08: Native stderr Misclassified As Build Failure
 
 Context:

@@ -533,9 +533,25 @@ enabled in the formal firmware by default.
   successfully in 390s, and the guarded normal firmware was flashed to COM3.
   A 10s boot log for the normal firmware showed no `[display]` retry and the
   strict shell probe again returned `shell-path-ok: m5stack-LLM`. The guarded
-  USB coexistence firmware has only been compile-verified; do not count the
-  black-screen risk as resolved until that environment passes a targeted
-  boot-log/visual test.
+  USB coexistence firmware initially had only been compile-verified; later in
+  the same session it passed targeted boot-log and input tests.
+- 2026-06-16: guarded `tab5_min_uart_terminal_usb_keyboard` was flashed and
+  tested. A 30s boot log reproduced the M5GFX panel-detection failure on the
+  first boot, then `display_boot_guard` logged
+  `[display] unusable after M5.begin: ... size=0x0 attempt=0/2`, restarted the
+  board, and the second boot detected `ST7123 display`. A164 initialized,
+  USB host started, and the shell probe returned `shell-path-ok: m5stack-LLM`.
+  USB keyboard input in the guarded coexistence firmware then passed:
+  `catv` captured `usb^C`; `less-usb` exited through USB-keyboard `q` and
+  returned `rc=0`; a final shell probe succeeded. During deliberate USB-A
+  unplug/replug, the host logged one `ESP_ERR_INVALID_STATE` submit failure and
+  recovered by disconnecting/re-enumerating the keyboard. The USB report path
+  was then hardened so callbacks request report resubmission and the client
+  task performs it with short retry handling. `tab5_min_uart_terminal_usb_keyboard`
+  rebuilt in 26.2s, was reflashed, passed a 45s boot/replug log, `catv`
+  `usb^C`, `less-usb rc=0`, and shell probe. `tab5_min_uart_terminal` also
+  rebuilt successfully in 20.9s. Remaining policy decision: whether/when to
+  enable USB keyboard in the default formal firmware.
 - 2026-06-15: dynamic charge-state detection was reopened only as a diagnostic
   effort. Added `tab5_power_detect_probe`, a RAM ring-buffer power logger,
   `tools/power_detect_probe.py`, and `tools/tab5.ps1 power-detect` so the user

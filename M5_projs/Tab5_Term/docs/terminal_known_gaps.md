@@ -41,9 +41,12 @@ implementation and regression tests pass.
   observed after testing it. The preceding log for that build showed an M5GFX
   panel-detection failure, and the board was recovered by flashing the normal
   `tab5_min_uart_terminal` firmware. A startup display guard has been added and
-  compile-verified for the coexistence target, but that target has not yet been
-  reflashed and visually/boot-log validated after the guard. Do not promote the
-  coexistence build to default until this display-init risk is resolved.
+  validated on the coexistence target: it recovered a reproduced failed display
+  autodetect by restarting once, after which USB keyboard `catv`, `less-usb`,
+  and shell-probe checks passed. This mitigates the black-screen failure, but
+  the underlying M5GFX/Tab5 display-autodetect race is not root-caused. Do not
+  promote USB keyboard to the default formal firmware until the user accepts
+  that policy and the remaining limitations are acceptable.
 - Only terminal queries and private modes covered by the Stage 1-4 corpus and
   real-application smoke are currently claimed.
 

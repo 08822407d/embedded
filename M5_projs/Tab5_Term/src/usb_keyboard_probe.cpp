@@ -35,6 +35,8 @@ constexpr TickType_t kControlTransferTimeout = pdMS_TO_TICKS(1000);
 constexpr TickType_t kClientPollInterval = pdMS_TO_TICKS(50);
 constexpr uint32_t kRepeatDelayMs = 500;
 constexpr uint32_t kRepeatIntervalMs = 55;
+constexpr uint32_t kReportRetryDelayMs = 25;
+constexpr uint8_t kMaxReportSubmitFailures = 8;
 
 struct KeyboardEndpoint {
     uint8_t interface_number = 0;
@@ -53,8 +55,11 @@ struct KeyboardDevice {
     uint8_t repeat_key = 0;
     uint8_t repeat_modifier = 0;
     uint32_t next_repeat_ms = 0;
+    uint32_t next_report_submit_ms = 0;
+    uint8_t report_submit_failures = 0;
     bool interface_claimed = false;
     bool report_in_flight = false;
+    bool report_submit_requested = false;
     bool connected = false;
 };
 
@@ -219,10 +224,20 @@ void processKeyboardReport(const uint8_t *data, int length)
 
 void reportTransferCallback(usb_transfer_t *transfer);
 
+void requestKeyboardReportSubmit(uint32_t delay_ms)
+{
+    keyboard.report_submit_requested = true;
+    keyboard.next_report_submit_ms = millis() + delay_ms;
+}
+
 bool submitKeyboardReportTransfer()
 {
     if (!keyboard.connected || keyboard.report_transfer == nullptr) {
+        keyboard.report_submit_requested = false;
         return false;
+    }
+    if (keyboard.report_in_flight) {
+        return true;
     }
 
     usb_transfer_t *transfer = keyboard.report_transfer;
@@ -237,11 +252,32 @@ bool submitKeyboardReportTransfer()
     if (err != ESP_OK) {
         ESP_LOGW(kTag, "submit keyboard report failed: %s", esp_err_to_name(err));
         keyboard.report_in_flight = false;
+        ++keyboard.report_submit_failures;
+        if (keyboard.report_submit_failures <= kMaxReportSubmitFailures) {
+            requestKeyboardReportSubmit(kReportRetryDelayMs);
+        } else {
+            ESP_LOGW(kTag, "closing keyboard after repeated report submit failures");
+            keyboard.connected = false;
+            close_requested = true;
+        }
         return false;
     }
 
     keyboard.report_in_flight = true;
+    keyboard.report_submit_requested = false;
+    keyboard.report_submit_failures = 0;
     return true;
+}
+
+void serviceKeyboardReportSubmit()
+{
+    if (!keyboard.report_submit_requested) {
+        return;
+    }
+    if (static_cast<int32_t>(millis() - keyboard.next_report_submit_ms) < 0) {
+        return;
+    }
+    submitKeyboardReportTransfer();
 }
 
 void reportTransferCallback(usb_transfer_t *transfer)
@@ -258,7 +294,7 @@ void reportTransferCallback(usb_transfer_t *transfer)
     }
 
     if (keyboard.connected) {
-        submitKeyboardReportTransfer();
+        requestKeyboardReportSubmit(0);
     }
 }
 
@@ -407,6 +443,7 @@ void closeKeyboardDevice()
     }
 
     keyboard.connected = false;
+    keyboard.report_submit_requested = false;
     releaseActiveKeys();
     clearRepeat();
 
@@ -511,6 +548,7 @@ void openDevice(uint8_t address)
     }
 
     keyboard.connected = true;
+    keyboard.report_submit_failures = 0;
     memset(keyboard.previous_keys, 0, sizeof(keyboard.previous_keys));
     clearRepeat();
     ESP_LOGI(
@@ -519,7 +557,7 @@ void openDevice(uint8_t address)
         keyboard.endpoint.interface_number,
         keyboard.endpoint.endpoint_address,
         keyboard.endpoint.max_packet_size);
-    submitKeyboardReportTransfer();
+    requestKeyboardReportSubmit(0);
 }
 
 void clientEventCallback(const usb_host_client_event_msg_t *event_msg, void *arg)
@@ -615,6 +653,8 @@ void usbKeyboardClientTask(void *arg)
             closeKeyboardDevice();
         }
 
+        serviceKeyboardReportSubmit();
+
         maybeSubmitRepeat(keyboard.previous_modifier);
 
         err = usb_host_client_handle_events(keyboard.client, kClientPollInterval);
@@ -623,6 +663,7 @@ void usbKeyboardClientTask(void *arg)
         }
 
         maybeSubmitRepeat(keyboard.previous_modifier);
+        serviceKeyboardReportSubmit();
     }
 }
 } // namespace

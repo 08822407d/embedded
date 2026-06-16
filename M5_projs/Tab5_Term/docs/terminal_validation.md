@@ -624,6 +624,13 @@ USB keyboard validation record:
   startup, USB keyboard enumeration, and A164 `addr=0x6D fw=0x01 mode=HID
   irq=G50`. Shell probe still reached `m5stack-LLM`. A `catv` capture in this
   build recorded physical USB keyboard input `usb` and `^C`.
+- 2026-06-16: after adding `display_boot_guard`, the guarded coexistence
+  firmware was flashed again. The first boot reproduced M5GFX panel detection
+  failure and the guard restarted the board; the second boot detected the
+  ST7123 panel, initialized A164 and USB host, and passed shell probe. After
+  report-resubmission hardening, guarded coexistence validation passed a 45s
+  boot/replug log, `catv` captured `usb^C`, `less-usb` exited with USB-keyboard
+  `q` and returned `rc=0`, and a final shell probe passed.
 
 Official Tab5 Keyboard first-pass check:
 
