@@ -239,7 +239,11 @@ keyboard input. Use it to validate coexistence before changing the default
 `tab5_min_uart_terminal` policy. A 2026-06-16 coexistence test later produced a
 black-screen report and an earlier boot log for that firmware showed
 `M5Tab5 display panel was not detected`; use this environment only for targeted
-USB coexistence debugging until that display-init risk is resolved.
+USB coexistence debugging until that display-init risk is resolved. Current
+firmware includes a startup display guard: if boot-log shows
+`[display] unusable after M5.begin`, the device should automatically restart up
+to two times. A valid test run must end with a visible screen, no repeated
+display-guard exhaustion, and a passing shell probe.
 
 After USB probe testing, restore the normal firmware:
 

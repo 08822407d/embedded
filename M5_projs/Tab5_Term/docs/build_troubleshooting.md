@@ -235,6 +235,25 @@ Interpretation:
   display-init risk and do not use it as the default firmware until the panel
   detection failure is understood or made non-reproducible across resets.
 
+Mitigation added after the incident:
+
+- `src/display_boot_guard.cpp` now checks M5GFX immediately after `M5.begin()`.
+  If `M5.Display.panel()` is null or the logical dimensions are outside the
+  configured plausible range, firmware logs `[display] unusable after M5.begin`
+  and automatically restarts up to `DISPLAY_BOOT_GUARD_MAX_RESTARTS` times.
+- This guard is intended to recover from transient M5GFX autodetect failures
+  without modifying the third-party M5GFX library. It does not prove the root
+  cause.
+- Build verification after adding the guard:
+  - `tab5_min_uart_terminal`: 345.6 seconds, success.
+  - `tab5_min_uart_terminal_usb_keyboard`: 390 seconds, success.
+- Runtime verification after adding the guard:
+  - the guarded normal firmware was flashed to COM3;
+  - a 10s boot log showed normal startup and no `[display]` retry;
+  - the strict login shell probe returned `shell-path-ok: m5stack-LLM`.
+- The guarded USB coexistence firmware was not reflashed during this recovery
+  pass. It still needs targeted validation before the risk can be closed.
+
 ## Incident 2026-06-08: Native stderr Misclassified As Build Failure
 
 Context:

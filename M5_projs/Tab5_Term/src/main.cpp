@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "app_config.h"
+#include "display_boot_guard.h"
 #include "display_orientation.h"
 #include "input_event_queue.h"
 #include "input_mapper.h"
@@ -168,6 +169,7 @@ void setup()
 
     auto cfg = M5.config();
     M5.begin(cfg);
+    display_boot_guard::restartIfDisplayUnusable();
 #if ENABLE_USB_KEYBOARD_PROBE
     M5.Power.setExtOutput(true, m5::ext_USB);
 #endif

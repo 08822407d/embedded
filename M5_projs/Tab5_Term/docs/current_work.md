@@ -414,7 +414,12 @@ environment had shown `M5Tab5 display panel was not detected`. Recovery was to
 rebuild and flash the normal `tab5_min_uart_terminal` firmware; its boot log no
 longer showed the panel-detection error and the shell probe again reached
 `m5stack-LLM`. Treat the USB coexistence build as risky until the display-init
-failure is understood or reproduced away.
+failure is understood or reproduced away. A follow-up guard now checks for a
+usable M5GFX panel and plausible display dimensions immediately after
+`M5.begin()`. If the panel is missing or dimensions are invalid, firmware logs
+`[display] unusable after M5.begin` and automatically restarts up to two times
+before continuing for diagnostics. This is a black-screen recovery guard, not a
+root-cause fix.
 
 ### Milestone I3: Official Companion Keyboard
 
@@ -519,6 +524,18 @@ enabled in the formal firmware by default.
   `921600 persisted=saved`, and a successful strict shell probe returning
   `shell-path-ok: m5stack-LLM`. Do not flash the coexistence environment again
   during routine work until the display-init risk is investigated.
+- 2026-06-16: added `display_boot_guard`, an application-level startup guard
+  that runs immediately after `M5.begin()`. It checks that M5GFX exposes a
+  non-null panel and plausible display dimensions, then clears its RTC retry
+  counter on success. On failure it prints `[display]` diagnostics and
+  `ESP.restart()`s up to two times. `tab5_min_uart_terminal` rebuilt
+  successfully in 345.6s, `tab5_min_uart_terminal_usb_keyboard` rebuilt
+  successfully in 390s, and the guarded normal firmware was flashed to COM3.
+  A 10s boot log for the normal firmware showed no `[display]` retry and the
+  strict shell probe again returned `shell-path-ok: m5stack-LLM`. The guarded
+  USB coexistence firmware has only been compile-verified; do not count the
+  black-screen risk as resolved until that environment passes a targeted
+  boot-log/visual test.
 - 2026-06-15: dynamic charge-state detection was reopened only as a diagnostic
   effort. Added `tab5_power_detect_probe`, a RAM ring-buffer power logger,
   `tools/power_detect_probe.py`, and `tools/tab5.ps1 power-detect` so the user

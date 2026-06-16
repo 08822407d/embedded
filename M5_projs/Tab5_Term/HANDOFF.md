@@ -1120,6 +1120,18 @@ detected`. The recovery path was to rebuild and flash the normal
 `tab5_min_uart_terminal_usb_keyboard` as a safe default until this display-init
 risk is investigated.
 
+Follow-up mitigation on 2026-06-16 added `display_boot_guard`: immediately
+after `M5.begin()`, firmware checks for a non-null M5GFX panel and plausible
+display dimensions. If the check fails, it logs `[display] unusable after
+M5.begin` and restarts up to two times using an RTC retry counter. This avoids
+leaving the device permanently black-screened after a transient display
+autodetect failure, but it is not root-cause proof. `tab5_min_uart_terminal`
+and `tab5_min_uart_terminal_usb_keyboard` both rebuilt successfully with the
+guard. Only the normal firmware was flashed during the mitigation pass; its
+boot log showed no `[display]` retry and the shell probe returned
+`shell-path-ok: m5stack-LLM`. The guarded coexistence firmware remains
+unvalidated on hardware.
+
 ## Terminal Font Decision
 
 On 2026-06-05, the user reported that the terminal font looked rough, like a
