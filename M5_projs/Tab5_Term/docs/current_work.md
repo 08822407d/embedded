@@ -392,6 +392,30 @@ probe-only byte translation, and basic shell input works through the shared
 mapper. Reconnect, modifier, repeat, rollover, shell/full-screen app behavior,
 and formal-firmware enablement move to the next USB input hardening stage.
 
+USB input hardening status: in progress. The first hardening change moves USB
+software repeat into the USB client task timer so held keys can repeat even
+when a boot keyboard only sends HID reports on state changes. Disconnect now
+clears the active repeat state and emits release events before resetting the
+probe state. Runtime reconnect validation passed through extended boot-log
+capture, and a `cat -v` capture showed Shift printable input, left/right arrow
+escape sequences, Backspace repeat, and Ctrl+C through the USB keyboard path.
+Rollover, full-screen app behavior, and formal-firmware enablement remain open.
+
+Formal integration status: opt-in environment added. `tab5_min_uart_terminal`
+still leaves USB keyboard disabled by default. `tab5_min_uart_terminal_usb_keyboard`
+enables the USB keyboard path without disabling the official A164 keyboard so
+coexistence can be validated before changing the default firmware policy. This
+environment built, flashed, booted with A164 ready, enumerated the USB keyboard,
+passed the login shell probe, and captured `usb` plus `^C` from the physical USB
+keyboard while A164 support remained enabled. The default firmware policy has
+not yet been changed. Later in the same session the user reported a black
+screen after running the opt-in coexistence build. A preceding boot log for that
+environment had shown `M5Tab5 display panel was not detected`. Recovery was to
+rebuild and flash the normal `tab5_min_uart_terminal` firmware; its boot log no
+longer showed the panel-detection error and the shell probe again reached
+`m5stack-LLM`. Treat the USB coexistence build as risky until the display-init
+failure is understood or reproduced away.
+
 ### Milestone I3: Official Companion Keyboard
 
 - Verify the exact official hardware and protocol from primary documentation.
@@ -457,6 +481,44 @@ enabled in the formal firmware by default.
   reconnect, modifiers, repeat, rollover, full-screen applications, and
   default-firmware enablement remain open for the next USB input hardening
   stage. Current USB-A keyboard probe first-pass stage is closed.
+- 2026-06-16: USB input hardening started. USB software repeat no longer
+  depends on repeated identical HID reports; the USB client task now services
+  repeat timing while polling host events. Disconnect also clears repeat state
+  and emits release events for active keys. `tools/tab5.ps1 boot-log` can now
+  use `-DurationSeconds` for longer USB attach/detach log captures.
+- 2026-06-16: USB-A keyboard hardening validation advanced. A 45s boot-log
+  capture recorded `keyboard connected`, `keyboard disconnected`, and
+  reconnected keyboard events for VID `0x046a` PID `0x00b7`. The new
+  `send_login_shell_demo.py --demo catv` mode captured real USB-keyboard input
+  through the login shell: `Aa!`, `^[[D`, `^[[C`, Backspace repeat echo, and
+  `^C`. Remaining USB work is rollover characterization, at least one
+  full-screen application driven from the USB keyboard, and the formal
+  firmware enablement/coexistence decision.
+- 2026-06-16: USB keyboard full-screen and basic rollover checks advanced.
+  `less-usb` started `less /etc/os-release`; the user exited it with USB-keyboard
+  `q`, and the shell marker returned `rc=0`. A `catv` capture for simultaneous
+  key groups showed `asd...jkl`, so at least 3-key printable groups reach the
+  host through the boot-keyboard report path; full NKRO is not claimed. Added
+  `tab5_min_uart_terminal_usb_keyboard` as an opt-in formal-terminal build that
+  keeps A164 enabled while also enabling USB keyboard input.
+- 2026-06-16: built and flashed `tab5_min_uart_terminal_usb_keyboard`. Boot log
+  confirmed the USB host task and official A164 driver both started
+  (`addr=0x6D fw=0x01 mode=HID irq=G50`), a replugged USB keyboard enumerated
+  as VID `0x046a` PID `0x00b7`, and the login shell probe still reached
+  `m5stack-LLM`. A `catv` run in this coexistence build captured physical USB
+  keyboard input `usb` and `^C`. Leave default `tab5_min_uart_terminal` unchanged
+  until the user accepts USB keyboard as a default production input.
+- 2026-06-16: black-screen incident after the opt-in USB coexistence firmware.
+  The user reported that the Tab5 showed nothing. The immediately prior
+  coexistence boot log had contained an M5GFX panel-detection failure
+  (`M5Tab5 display panel was not detected`). A direct flash attempt for the
+  normal firmware first failed because the local build artifacts were missing,
+  so `tab5_min_uart_terminal` was rebuilt in 360.2s, flashed to COM3, and
+  boot-logged for 10s. The restored formal firmware showed normal
+  `board_M5Tab5` autodetect, no panel-detection error, A164 ready, login UART
+  `921600 persisted=saved`, and a successful strict shell probe returning
+  `shell-path-ok: m5stack-LLM`. Do not flash the coexistence environment again
+  during routine work until the display-init risk is investigated.
 - 2026-06-15: dynamic charge-state detection was reopened only as a diagnostic
   effort. Added `tab5_power_detect_probe`, a RAM ring-buffer power logger,
   `tools/power_detect_probe.py`, and `tools/tab5.ps1 power-detect` so the user

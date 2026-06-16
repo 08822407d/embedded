@@ -175,6 +175,66 @@ Interpretation:
 - The probe firmware was later flashed and basic USB-A keyboard input passed,
   so this slow build was not evidence of a USB host implementation failure.
 
+## Observation 2026-06-16: First USB Coexistence Env Build
+
+Context:
+
+- Added `tab5_min_uart_terminal_usb_keyboard`, an opt-in formal terminal build
+  that keeps A164 enabled and also enables USB keyboard input.
+- This was a new PlatformIO environment, so it followed the same full
+  environment build pattern as earlier probe/debug environments.
+
+Observed successful duration:
+
+- `tab5_min_uart_terminal_usb_keyboard`: 450.8 seconds.
+
+Interpretation:
+
+- The long duration was expected first-build behavior for a new environment.
+  Subsequent cached builds should be much shorter. Do not treat this duration
+  alone as a source or USB host failure.
+
+## Incident 2026-06-16: USB Coexistence Firmware Black Screen
+
+Context:
+
+- `tab5_min_uart_terminal_usb_keyboard` was built and flashed for opt-in
+  coexistence testing with both A164 and USB-A keyboard paths enabled.
+- The first validation passed USB keyboard enumeration, A164 startup, login
+  shell probing, and a `catv` capture.
+
+Observed evidence:
+
+- A boot log for the coexistence firmware included an M5GFX display-panel
+  detection failure: `M5Tab5 display panel was not detected`.
+- The user later reported that the Tab5 screen was black.
+- An immediate attempt to flash the normal firmware failed because
+  `.pio\build\tab5_min_uart_terminal\bootloader.bin` was missing locally.
+
+Recovery:
+
+- Rebuild the known-stable formal environment before flashing if artifacts are
+  missing:
+
+```powershell
+.\tools\tab5.ps1 build tab5_min_uart_terminal
+.\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
+.\tools\tab5.ps1 boot-log tab5_min_uart_terminal -Port COM3 -DurationSeconds 10
+.\tools\tab5.ps1 probe tab5_min_uart_terminal -Port COM3
+```
+
+- The 2026-06-16 recovery rebuild took 360.2 seconds. The restored formal
+  firmware boot log showed normal `board_M5Tab5` autodetect, no
+  panel-detection error, A164 ready, and login UART
+  `baud=921600 persisted=saved`. The strict shell probe returned
+  `shell-path-ok: m5stack-LLM`.
+
+Interpretation:
+
+- This is not yet root-caused. Treat the USB coexistence environment as a
+  display-init risk and do not use it as the default firmware until the panel
+  detection failure is understood or made non-reproducible across resets.
+
 ## Incident 2026-06-08: Native stderr Misclassified As Build Failure
 
 Context:

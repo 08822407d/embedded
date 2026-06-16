@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import time
+import uuid
 
 import serial
 
@@ -66,6 +67,9 @@ TAB5SCROLL
 
 
 DEMOS = {
+    "catv": " true; cat -v\n",
+    "htop-usb": "htop",
+    "less-usb": "less /etc/os-release",
     "probe": SHELL_PROBE,
     "scroll": SCROLL_DEMO,
     "sgr": SGR_DEMO,
@@ -97,7 +101,12 @@ def main() -> int:
         parser.error("--capture-window must be non-negative")
 
     payload = DEMOS[args.demo].replace("\n", "\r\n").encode("utf-8")
+    interactive_catv = args.demo == "catv"
+    interactive_app = args.demo in ("htop-usb", "less-usb")
     response = bytearray()
+    nonce = uuid.uuid4().hex[:8].upper()
+    app_marker = f"__TAB5_{args.demo.upper().replace('-', '_')}_{nonce}__".encode("ascii")
+    app_marker_re = re.escape(app_marker) + rb":rc=([0-9]+)"
 
     ser = serial.Serial()
     ser.port = args.port
@@ -110,6 +119,23 @@ def main() -> int:
     with ser:
         time.sleep(args.open_delay)
         ser.reset_input_buffer()
+        if interactive_catv:
+            ser.write(b"\x03\x15")
+            ser.flush()
+            time.sleep(0.8)
+            ser.reset_input_buffer()
+        if interactive_app:
+            ser.write(b"\x03\x15")
+            ser.flush()
+            time.sleep(0.8)
+            ser.reset_input_buffer()
+            app_command = b" true; " + DEMOS[args.demo].encode("ascii")
+            payload = (
+                app_command
+                + b"; rc=$?; printf '\\r\\n"
+                + app_marker
+                + b":rc=%s\\r\\n' \"$rc\"\r"
+            )
         for start in range(0, len(payload), args.chunk_size):
             ser.write(payload[start : start + args.chunk_size])
             ser.flush()
@@ -121,8 +147,21 @@ def main() -> int:
             waiting = ser.in_waiting
             if waiting:
                 response.extend(ser.read(waiting))
+                if interactive_app and re.search(app_marker_re, response):
+                    break
             else:
                 time.sleep(0.05)
+
+        if interactive_catv:
+            ser.write(b"\x03")
+            ser.flush()
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                waiting = ser.in_waiting
+                if waiting:
+                    response.extend(ser.read(waiting))
+                else:
+                    time.sleep(0.05)
 
     print(f"sent {len(payload)} bytes to {args.port} ({args.demo})")
     print(f"captured {len(response)} bytes from login shell")
@@ -133,6 +172,16 @@ def main() -> int:
     ):
         print("probe failed: no executed shell-path-ok marker was captured")
         return 1
+    if interactive_app:
+        rc_match = re.search(app_marker_re, response)
+        if rc_match is None:
+            print(f"{args.demo} failed: marker not captured; press q on the USB keyboard during the window")
+            return 1
+        if rc_match.group(1) != b"0":
+            rc_value = rc_match.group(1).decode("ascii")
+            print(f"{args.demo} failed: app rc={rc_value}")
+            return 1
+        print(f"{args.demo} passed: app exited through observed shell marker")
     if args.demo == "scroll":
         clear_sequence = b"\x1b[r\x1b[2J\x1b[H"
         rendered_output = bytes(response).rpartition(clear_sequence)[2]

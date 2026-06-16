@@ -89,10 +89,15 @@ bool keyFound(const uint8_t *keys, uint8_t key)
     return false;
 }
 
-uint8_t firstActiveKey(const uint8_t *keys)
+bool isSupportedBootKey(uint8_t key)
+{
+    return isValidBootKey(key) && input::hidUsageToKeyCode(key) != input::KeyCode::Unknown;
+}
+
+uint8_t firstSupportedActiveKey(const uint8_t *keys)
 {
     for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
-        if (isValidBootKey(keys[i])) {
+        if (isSupportedBootKey(keys[i])) {
             return keys[i];
         }
     }
@@ -118,15 +123,15 @@ void armRepeat(uint8_t modifier, uint8_t key, uint32_t delay_ms)
     keyboard.next_repeat_ms = millis() + delay_ms;
 }
 
-void submitKeyEvent(uint8_t hid_modifier, uint8_t hid_usage, input::KeyAction action)
+bool submitKeyEvent(uint8_t hid_modifier, uint8_t hid_usage, input::KeyAction action)
 {
     if (!isValidBootKey(hid_usage)) {
-        return;
+        return false;
     }
 
     const input::KeyCode key = input::hidUsageToKeyCode(hid_usage);
     if (key == input::KeyCode::Unknown) {
-        return;
+        return false;
     }
 
     const uint8_t modifiers = input::normalizeHidModifiers(hid_modifier);
@@ -136,12 +141,16 @@ void submitKeyEvent(uint8_t hid_modifier, uint8_t hid_usage, input::KeyAction ac
             .action = action,
         })) {
         ESP_LOGW(kTag, "input event queue full");
+        return false;
     }
+    return true;
 }
 
-void maybeSubmitRepeat(uint8_t modifier, const uint8_t *keys)
+void maybeSubmitRepeat(uint8_t modifier)
 {
-    if (!isValidBootKey(keyboard.repeat_key) || !keyFound(keys, keyboard.repeat_key)) {
+    if (!keyboard.connected
+        || !isSupportedBootKey(keyboard.repeat_key)
+        || !keyFound(keyboard.previous_keys, keyboard.repeat_key)) {
         return;
     }
 
@@ -155,6 +164,16 @@ void maybeSubmitRepeat(uint8_t modifier, const uint8_t *keys)
     keyboard.next_repeat_ms = now + kRepeatIntervalMs;
 }
 
+void releaseActiveKeys()
+{
+    for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
+        const uint8_t key = keyboard.previous_keys[i];
+        if (isValidBootKey(key)) {
+            submitKeyEvent(keyboard.previous_modifier, key, input::KeyAction::Release);
+        }
+    }
+}
+
 void processKeyboardReport(const uint8_t *data, int length)
 {
     if (length < kBootKeyboardReportBytes) {
@@ -163,7 +182,6 @@ void processKeyboardReport(const uint8_t *data, int length)
 
     const uint8_t modifier = data[0];
     const uint8_t *keys = &data[2];
-    bool pressed_new_key = false;
 
     for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
         const uint8_t key = keyboard.previous_keys[i];
@@ -178,22 +196,20 @@ void processKeyboardReport(const uint8_t *data, int length)
     for (uint8_t i = 0; i < kBootKeyboardKeyCount; ++i) {
         const uint8_t key = keys[i];
         if (isValidBootKey(key) && !keyFound(keyboard.previous_keys, key)) {
-            submitKeyEvent(modifier, key, input::KeyAction::Press);
-            armRepeat(modifier, key, kRepeatDelayMs);
-            pressed_new_key = true;
+            if (submitKeyEvent(modifier, key, input::KeyAction::Press)) {
+                armRepeat(modifier, key, kRepeatDelayMs);
+            }
         }
     }
 
-    if (!pressed_new_key) {
-        if (isValidBootKey(keyboard.repeat_key) && keyFound(keys, keyboard.repeat_key)) {
-            maybeSubmitRepeat(modifier, keys);
+    if (isSupportedBootKey(keyboard.repeat_key) && keyFound(keys, keyboard.repeat_key)) {
+        keyboard.repeat_modifier = modifier;
+    } else {
+        const uint8_t key = firstSupportedActiveKey(keys);
+        if (isSupportedBootKey(key)) {
+            armRepeat(modifier, key, kRepeatDelayMs);
         } else {
-            const uint8_t key = firstActiveKey(keys);
-            if (isValidBootKey(key)) {
-                armRepeat(modifier, key, kRepeatDelayMs);
-            } else {
-                clearRepeat();
-            }
+            clearRepeat();
         }
     }
 
@@ -391,6 +407,8 @@ void closeKeyboardDevice()
     }
 
     keyboard.connected = false;
+    releaseActiveKeys();
+    clearRepeat();
 
     if (keyboard.report_transfer != nullptr) {
         usb_host_transfer_free(keyboard.report_transfer);
@@ -597,10 +615,14 @@ void usbKeyboardClientTask(void *arg)
             closeKeyboardDevice();
         }
 
+        maybeSubmitRepeat(keyboard.previous_modifier);
+
         err = usb_host_client_handle_events(keyboard.client, kClientPollInterval);
         if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
             ESP_LOGW(kTag, "client event error: %s", esp_err_to_name(err));
         }
+
+        maybeSubmitRepeat(keyboard.previous_modifier);
     }
 }
 } // namespace

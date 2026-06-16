@@ -342,8 +342,13 @@ try {
             }
             Start-Sleep -Milliseconds 300
 
+            $bootLogSeconds = if ($PSBoundParameters.ContainsKey("DurationSeconds")) {
+                $DurationSeconds
+            } else {
+                5
+            }
             Invoke-LoggedCommand -Label "Capture boot log on $Port" -LogPath $log -Command {
-                & $python $script --port $Port --duration 5
+                & $python $script --port $Port --duration $bootLogSeconds
             }
 
             Select-String -Path $log -Pattern "Tab5|tab5-kbd|Login UART|keyboard" |

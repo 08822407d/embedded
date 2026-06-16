@@ -1081,6 +1081,45 @@ production inputs: reconnect validation, modifier coverage, software repeat
 behavior, rollover limitations, full-screen application behavior, and the
 default-firmware enablement/coexistence decision.
 
+USB input hardening started on 2026-06-16. The USB repeat timer now runs from
+the USB client task while it polls host events, so held keys can repeat even if
+the keyboard only reports state changes. Disconnect clears active repeat state
+and submits release events before resetting the probe state. `tools/tab5.ps1
+boot-log` accepts `-DurationSeconds` for longer USB-A attach/detach log
+captures.
+
+2026-06-16 hardening validation: extended boot-log capture recorded USB
+keyboard connect, disconnect, and reconnect events for VID `0x046a` PID
+`0x00b7`. `tools/send_login_shell_demo.py --demo catv` starts an interactive
+`cat -v` capture and sends Ctrl+C at the end; the captured shell mirror showed
+`Aa!`, left/right arrow escape sequences, repeated Backspace erase echo, and
+`^C` from the physical USB keyboard. Rollover behavior, full-screen app control,
+and default-firmware enablement remain unresolved.
+
+Later on 2026-06-16, `less-usb` validated a full-screen `less /etc/os-release`
+session: the user pressed `q` on the USB keyboard and the shell marker returned
+`rc=0`. A simultaneous-key `catv` capture produced `asd...jkl`, so at least
+3-key printable groups work through the current boot-keyboard report path; do
+not claim full NKRO. `platformio.ini` now has
+`tab5_min_uart_terminal_usb_keyboard`, an opt-in formal-terminal build that
+keeps A164 enabled while enabling USB keyboard input for coexistence testing.
+
+The opt-in coexistence build was built and flashed on 2026-06-16. Its boot log
+confirmed A164 startup (`addr=0x6D fw=0x01 mode=HID irq=G50`) and USB keyboard
+enumeration for VID `0x046a` PID `0x00b7`; the login shell probe still reached
+`m5stack-LLM`. A `catv` capture in this build recorded physical USB-keyboard
+input `usb` and `^C`. Default `tab5_min_uart_terminal` still leaves USB
+keyboard disabled until the user accepts the default production policy change.
+Later in the same session the user reported that Tab5 was black-screened. The
+preceding coexistence boot log had shown `M5Tab5 display panel was not
+detected`. The recovery path was to rebuild and flash the normal
+`tab5_min_uart_terminal` firmware; its 10s boot log showed normal
+`board_M5Tab5` autodetect, no panel-detection error, A164 ready, and login UART
+`baud=921600 persisted=saved`. The strict shell probe again returned
+`shell-path-ok: m5stack-LLM`. Do not treat
+`tab5_min_uart_terminal_usb_keyboard` as a safe default until this display-init
+risk is investigated.
+
 ## Terminal Font Decision
 
 On 2026-06-05, the user reported that the terminal font looked rough, like a

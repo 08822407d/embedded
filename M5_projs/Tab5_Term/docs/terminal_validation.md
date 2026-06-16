@@ -195,6 +195,52 @@ Validation sequence on the real login shell:
   those modifiers.
 - Unplug and replug the keyboard, then repeat the simple `printf` test.
 
+Low-photo key capture:
+
+```powershell
+python tools/send_login_shell_demo.py --port COM3 --demo catv --capture-window 25
+```
+
+The helper starts `cat -v` on the login shell, captures the UART mirror for the
+window, and sends Ctrl+C at the end. During the capture window, press a short
+sequence on the USB keyboard such as `Aa!`, Left, Right, hold Backspace, then
+Ctrl+C. The captured byte representation should show printable text, escape
+sequences such as `^[[D` / `^[[C`, repeated `^?` for Backspace, and `^C`.
+
+Reconnect log capture:
+
+```powershell
+.\tools\tab5.ps1 boot-log tab5_usb_keyboard_probe -Port COM3 -DurationSeconds 30
+```
+
+During the capture window, unplug and replug the USB-A keyboard. Expected log
+highlights include `keyboard disconnected` followed by `keyboard connected`.
+This complements the visual shell test and avoids hand-copying serial logs.
+
+USB full-screen app check:
+
+```powershell
+python tools/send_login_shell_demo.py --port COM3 --demo less-usb --capture-window 35
+```
+
+The helper starts `less /etc/os-release`; press `q` on the USB keyboard. The
+test passes only if the shell marker returns `rc=0`.
+
+USB keyboard optional formal build:
+
+```powershell
+.\tools\tab5.ps1 build tab5_min_uart_terminal_usb_keyboard
+.\tools\tab5.ps1 flash tab5_min_uart_terminal_usb_keyboard -Port COM3
+.\tools\tab5.ps1 boot-log tab5_min_uart_terminal_usb_keyboard -Port COM3
+```
+
+This environment keeps the official A164 keyboard enabled and also enables USB
+keyboard input. Use it to validate coexistence before changing the default
+`tab5_min_uart_terminal` policy. A 2026-06-16 coexistence test later produced a
+black-screen report and an earlier boot log for that firmware showed
+`M5Tab5 display panel was not detected`; use this environment only for targeted
+USB coexistence debugging until that display-init risk is resolved.
+
 After USB probe testing, restore the normal firmware:
 
 ```powershell
@@ -560,6 +606,20 @@ USB keyboard validation record:
 - Remaining before declaring USB keyboard support complete: reconnect,
   modifier keys, software repeat, rollover limitations, and at least one
   full-screen application.
+- 2026-06-16: after moving software repeat into the USB client task, extended
+  boot-log capture recorded USB keyboard disconnect and reconnect events. The
+  `catv` helper captured `Aa!`, left/right arrow sequences, Backspace repeat
+  echo, and `^C` from the physical USB keyboard. Rollover and full-screen app
+  behavior are still unvalidated.
+- 2026-06-16: `less-usb` confirmed a USB keyboard can exit a full-screen
+  `less` session with `q` and return `rc=0`. A `catv` capture of simultaneous
+  printable key groups produced `asd...jkl`; record this as at least 3-key
+  printable rollover through the current boot-keyboard path, not as full NKRO.
+- 2026-06-16: `tab5_min_uart_terminal_usb_keyboard` was built and flashed as
+  an opt-in coexistence environment. Boot log confirmed both USB host and A164
+  startup, USB keyboard enumeration, and A164 `addr=0x6D fw=0x01 mode=HID
+  irq=G50`. Shell probe still reached `m5stack-LLM`. A `catv` capture in this
+  build recorded physical USB keyboard input `usb` and `^C`.
 
 Official Tab5 Keyboard first-pass check:
 

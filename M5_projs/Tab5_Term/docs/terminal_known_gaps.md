@@ -31,10 +31,17 @@ implementation and regression tests pass.
   non-modifier rollover is not guaranteed.
 - USB-A keyboard support is currently probe-only. It builds in the
   `tab5_usb_keyboard_probe` environment and uses the shared input mapper. Basic
-  physical input through the Tab5 USB-A port has passed, but reconnect, repeat,
-  rollover, modifier coverage, and full-screen-app behavior have not yet been
-  fully validated. Formal firmware does not enable USB keyboard input by
-  default.
+  physical input through the Tab5 USB-A port, reconnect, Shift/Ctrl-direction
+  cases, Backspace repeat, a `less` full-screen exit, and at least 3-key
+  printable groups have passed. Full NKRO is not claimed, broader TUI
+  application coverage remains limited, and default formal firmware does not
+  enable USB keyboard input yet. The opt-in
+  `tab5_min_uart_terminal_usb_keyboard` coexistence build enables USB keyboard
+  without disabling the official A164 keyboard, but a black-screen incident was
+  observed after testing it. The preceding log for that build showed an M5GFX
+  panel-detection failure, and the board was recovered by flashing the normal
+  `tab5_min_uart_terminal` firmware. Do not promote the coexistence build to
+  default until this display-init risk is resolved.
 - Only terminal queries and private modes covered by the Stage 1-4 corpus and
   real-application smoke are currently claimed.
 
