@@ -78,6 +78,36 @@ For each incident record:
 - retry action and result;
 - confidence level of any proposed cause.
 
+## Observation 2026-06-16: Long Rebuild After Build-Flag Refactor
+
+Context:
+
+- `platformio.ini` was refactored to split common, formal, and debug build
+  flags while promoting USB keyboard support into the formal firmware.
+- The first two affected environment builds were run through
+  `tools/tab5.ps1 build`, so the detached worker and file-backed logs were in
+  use.
+
+Observed evidence:
+
+- `tab5_min_uart_terminal` succeeded in 640.1 seconds wrapper time
+  (638.63 seconds PlatformIO time).
+- `tab5_terminal_cdc_inject` succeeded in 647.7 seconds wrapper time
+  (646.34 seconds PlatformIO time).
+- After the cache was warm, a source-only USB disconnect-path hardening rebuild
+  of `tab5_min_uart_terminal` succeeded in 32.5 seconds.
+- The compatibility alias `tab5_min_uart_terminal_usb_keyboard` later succeeded
+  in 381.1 seconds wrapper time because it is still a distinct PlatformIO
+  environment with separate build artifacts even though it now extends the
+  default formal configuration.
+
+Conclusion:
+
+- A several-minute rebuild after changing common build flags can be normal if
+  PlatformIO invalidates many dependency objects. Treat it as suspicious only
+  if logs and compiler process activity stop according to the triage procedure
+  above.
+
 ## Known Nonfatal Output
 
 The following warning is from the installed ESP-IDF headers and has not blocked

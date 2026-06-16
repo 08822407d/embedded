@@ -41,6 +41,10 @@ TAB5VT
 SHELL_PROBE = r"""printf 'shell-path-ok: %s\r\n' "$(uname -n 2>/dev/null || hostname)"
 """
 
+RECOVER_DEMO = """\x11\x03
+stty sane -ixon -ixoff 2>/dev/null; printf 'recover-ok: %s\\r\\n' "$(uname -n 2>/dev/null || hostname)"
+"""
+
 SGR_DEMO = r"""sh <<'TAB5SGR'
 ESC=$(printf '\033')
 printf "${ESC}[2J${ESC}[H"
@@ -71,6 +75,7 @@ DEMOS = {
     "htop-usb": "htop",
     "less-usb": "less /etc/os-release",
     "probe": SHELL_PROBE,
+    "recover": RECOVER_DEMO,
     "scroll": SCROLL_DEMO,
     "sgr": SGR_DEMO,
     "vt102": VT102_DEMO,
@@ -171,6 +176,11 @@ def main() -> int:
         rb"[\r\n]shell-path-ok: [A-Za-z0-9._-]+", response
     ):
         print("probe failed: no executed shell-path-ok marker was captured")
+        return 1
+    if args.demo == "recover" and not re.search(
+        rb"[\r\n]recover-ok: [A-Za-z0-9._-]+", response
+    ):
+        print("recover failed: no executed recover-ok marker was captured")
         return 1
     if interactive_app:
         rc_match = re.search(app_marker_re, response)

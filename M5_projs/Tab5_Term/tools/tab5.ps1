@@ -7,6 +7,7 @@ param(
         "build-wait",
         "flash",
         "probe",
+        "recover",
         "boot-log",
         "app-smoke",
         "terminal-regression",
@@ -323,6 +324,19 @@ try {
 
             Invoke-LoggedCommand -Label "Login shell probe on $Port" -LogPath $log -Command {
                 & $python $script --port $Port --demo probe
+            }
+
+            Get-Content -Path $log | Select-Object -Last 20
+        }
+
+        "recover" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "send_login_shell_demo.py"
+            $log = Join-Path $logRoot "recover-$timestamp.log"
+
+            Invoke-LoggedCommand -Label "Login shell recovery on $Port" -LogPath $log -Command {
+                & $python $script --port $Port --demo recover
             }
 
             Get-Content -Path $log | Select-Object -Last 20

@@ -151,12 +151,13 @@ the 180-degree keyboard-mounted display orientation, `64x32` geometry,
 official A164 input, and 921600 login UART.
 
 USB keyboard support was deferred by explicit user request on 2026-06-12, then
-resumed on 2026-06-15. It is currently probe-only: `tab5_usb_keyboard_probe`
-builds, flashes, waits for a HID boot keyboard, and basic physical input via
-Tab5 USB-A has passed. The USB-A keyboard probe first-pass stage is closed.
-Do not treat USB keyboard as complete production input until reconnect,
-modifier, repeat, rollover, full-screen app behavior, and default-firmware
-enablement have been decided and validated in a later hardening stage.
+resumed on 2026-06-15. On 2026-06-16 it was promoted into the default formal
+`tab5_min_uart_terminal` firmware after coexistence, reconnect, `catv`,
+full-screen `less`, and shell-probe validation with the official A164 keyboard
+path still enabled. Keep the remaining limitations explicit: full NKRO is not
+claimed, broader TUI application coverage remains limited, and a
+display-autodetect race is mitigated by `display_boot_guard` but not
+root-caused.
 
 Module LLM ttyS1 terminal-environment integration was completed on 2026-06-12.
 The ttyS1-only login profile now survives reboot with
@@ -297,7 +298,7 @@ Terminal validation input strategy:
 
 - PlatformIO environment: `tab5_min_uart_terminal`
 - Terminal validation environment: `tab5_terminal_cdc_inject`
-- Experimental keyboard environment: `tab5_usb_keyboard_probe`
+- USB keyboard diagnostic environment: `tab5_usb_keyboard_probe`
 - Platform: `pioarduino/platform-espressif32` at tag `54.03.21`
 - Framework: Arduino
 - Board setting: `esp32-p4-evboard`
@@ -317,9 +318,13 @@ Terminal validation input strategy:
   - default env keeps `ENABLE_TERMINAL_CDC_INJECTION=0`
   - `tab5_terminal_cdc_inject` builds with `ENABLE_TERMINAL_CDC_INJECTION=1`
   - when enabled, USB CDC input is not forwarded to the login UART
-- USB-A keyboard probe is compile-time gated:
-  - default env keeps `ENABLE_USB_KEYBOARD_PROBE=0`
-  - `tab5_usb_keyboard_probe` builds with `ENABLE_USB_KEYBOARD_PROBE=1`
+- USB-A keyboard input is enabled in the default formal firmware:
+  - formal envs set `ENABLE_USB_KEYBOARD_PROBE=1`
+  - CDC injection and power-detect debug envs keep
+    `ENABLE_USB_KEYBOARD_PROBE=0`
+  - `tab5_usb_keyboard_probe` remains an isolated diagnostic build
+  - `tab5_min_uart_terminal_usb_keyboard` is a compatibility alias for the
+    default formal firmware
 - The status bar renders a themed battery area at the right edge. For Tab5,
   `M5.Power.getBatteryLevel()` uses the board's INA226 reading and estimates
   level as a 2S Li-Po pack. The battery icon shows a lightning mark when the
@@ -904,6 +909,19 @@ terminal path. It does not create a file on the LLM module. This was run on
 scroll-region demo sequences. A later `--demo probe` run sent 70 bytes and
 captured `shell-path-ok: m5stack-LLM`.
 
+If a probe sends bytes but captures zero bytes after an interrupted interactive
+test, run:
+
+```powershell
+.\tools\tab5.ps1 recover -Port COM3
+.\tools\tab5.ps1 probe -Port COM3
+```
+
+The recovery wrapper uses `tools/send_login_shell_demo.py --demo recover` to
+send `Ctrl+Q`, `Ctrl+C`, and `stty sane -ixon -ixoff`, then requires a
+`recover-ok: <hostname>` marker. This is a shell/tty recovery helper and does
+not change the Tab5 firmware.
+
 Do not include terminal query sequences such as `CSI 6 n` in real shell demos
 unless the LLM shell input side is prepared for the reply. In the formal build,
 terminal replies are correctly sent back to `LoginSerial`, which means a query
@@ -1062,9 +1080,9 @@ Build verification completed on the Windows checkout:
 & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e tab5_usb_keyboard_probe
 ```
 
-First-pass runtime validation with an actual USB keyboard on Tab5 USB-A has
-passed, closing the USB-A keyboard probe first-pass stage. The probe is not yet
-the default terminal input path.
+First-pass runtime validation with an actual USB keyboard on Tab5 USB-A passed,
+closing the USB-A keyboard probe first-pass stage. Later hardening promoted the
+same shared input path into the default formal firmware.
 
 Current validation status:
 
@@ -1076,10 +1094,9 @@ Current validation status:
 - The user connected a USB keyboard to the Tab5 USB-A port and confirmed
   successful input.
 
-Remaining before treating USB and the official keyboard as supported
-production inputs: reconnect validation, modifier coverage, software repeat
-behavior, rollover limitations, full-screen application behavior, and the
-default-firmware enablement/coexistence decision.
+At that point, remaining production work was reconnect validation, modifier
+coverage, software repeat behavior, rollover limitations, full-screen
+application behavior, and the default-firmware enablement/coexistence decision.
 
 USB input hardening started on 2026-06-16. The USB repeat timer now runs from
 the USB client task while it polls host events, so held keys can repeat even if
@@ -1093,23 +1110,24 @@ keyboard connect, disconnect, and reconnect events for VID `0x046a` PID
 `0x00b7`. `tools/send_login_shell_demo.py --demo catv` starts an interactive
 `cat -v` capture and sends Ctrl+C at the end; the captured shell mirror showed
 `Aa!`, left/right arrow escape sequences, repeated Backspace erase echo, and
-`^C` from the physical USB keyboard. Rollover behavior, full-screen app control,
-and default-firmware enablement remain unresolved.
+`^C` from the physical USB keyboard. At that point, rollover behavior,
+full-screen app control, and default-firmware enablement still needed follow-up.
 
 Later on 2026-06-16, `less-usb` validated a full-screen `less /etc/os-release`
 session: the user pressed `q` on the USB keyboard and the shell marker returned
 `rc=0`. A simultaneous-key `catv` capture produced `asd...jkl`, so at least
 3-key printable groups work through the current boot-keyboard report path; do
 not claim full NKRO. `platformio.ini` now has
-`tab5_min_uart_terminal_usb_keyboard`, an opt-in formal-terminal build that
-keeps A164 enabled while enabling USB keyboard input for coexistence testing.
+`tab5_min_uart_terminal_usb_keyboard`, then an opt-in formal-terminal build
+that kept A164 enabled while enabling USB keyboard input for coexistence
+testing. It is now retained as a compatibility alias.
 
 The opt-in coexistence build was built and flashed on 2026-06-16. Its boot log
 confirmed A164 startup (`addr=0x6D fw=0x01 mode=HID irq=G50`) and USB keyboard
 enumeration for VID `0x046a` PID `0x00b7`; the login shell probe still reached
 `m5stack-LLM`. A `catv` capture in this build recorded physical USB-keyboard
-input `usb` and `^C`. Default `tab5_min_uart_terminal` still leaves USB
-keyboard disabled until the user accepts the default production policy change.
+input `usb` and `^C`. At that moment, default `tab5_min_uart_terminal` still
+left USB keyboard disabled pending the default production policy change.
 Later in the same session the user reported that Tab5 was black-screened. The
 preceding coexistence boot log had shown `M5Tab5 display panel was not
 detected`. The recovery path was to rebuild and flash the normal
@@ -1141,9 +1159,22 @@ USB-keyboard `q` and `rc=0`, and passed a final shell probe. A deliberate
 USB-A unplug/replug still logged `ESP_ERR_INVALID_STATE` while the endpoint was
 going away, but the keyboard re-enumerated. `usb_keyboard_probe` now defers
 report-transfer resubmission from the USB callback to the client task and adds
-short retry handling before closing repeated submit failures. Default
-`tab5_min_uart_terminal` still keeps USB keyboard disabled; the remaining
-decision is whether to promote USB keyboard into the formal default firmware.
+short retry handling before closing repeated submit failures.
+
+Final default-firmware promotion on 2026-06-16: `platformio.ini` now separates
+common, formal, and debug build flags. Formal builds, including
+`tab5_min_uart_terminal`, enable `ENABLE_USB_KEYBOARD_PROBE=1`; CDC injection
+and power-detect debug builds keep it disabled. `M5.Power.setExtOutput(true,
+m5::ext_USB)` is also skipped in CDC injection and power-detect debug builds.
+The default formal image rebuilt, flashed to COM3, booted with A164 and USB
+host enabled, passed the login shell probe, captured physical USB keyboard
+input through `catv`, exited `less /etc/os-release` with USB-keyboard `q` and
+`rc=0`, and passed a final shell probe. A normal `ESP_ERR_INVALID_STATE` report
+submission during disconnect is now treated as device removal by the driver so
+it closes without retry logging from `usb_keyboard_probe`. A later probe
+captured zero bytes because a previous interactive shell command was still
+pending; `tools/tab5.ps1 recover` returned `recover-ok: m5stack-LLM`, after
+which the standard probe again returned `shell-path-ok: m5stack-LLM`.
 
 ## Terminal Font Decision
 

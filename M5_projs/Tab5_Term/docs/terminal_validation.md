@@ -168,7 +168,20 @@ Expected screen highlights:
 - The `BCE:` row keeps a blue background from `blue-to-eol` through the erased
   tail of the row.
 
-USB-A keyboard probe:
+Login shell recovery:
+
+```powershell
+.\tools\tab5.ps1 recover -Port COM3
+.\tools\tab5.ps1 probe -Port COM3
+```
+
+Use this when a login-shell probe sends bytes but captures zero bytes, or after
+an interrupted interactive test leaves the external shell/tty in a questionable
+state. The recovery command sends `Ctrl+Q`, `Ctrl+C`, and `stty sane -ixon
+-ixoff`, then requires a `recover-ok: <hostname>` marker. It is a host-side
+debug helper; it does not change the Tab5 firmware.
+
+USB-A keyboard isolated probe:
 
 ```powershell
 .\tools\tab5.ps1 build tab5_usb_keyboard_probe
@@ -176,9 +189,11 @@ USB-A keyboard probe:
 .\tools\tab5.ps1 boot-log tab5_usb_keyboard_probe -Port COM3
 ```
 
-This is a probe build, not the default formal firmware. It enables USB-A host
-power and disables the official A164 keyboard path so USB keyboard behavior can
-be isolated. Connect a USB HID boot keyboard to the Tab5 USB-A port after the
+This is an isolation build for USB keyboard debugging. It enables USB-A host
+power and disables the official A164 keyboard path so USB behavior can be
+examined without another input device. The default formal firmware also enables
+USB keyboard input now; use this probe only when isolating USB-specific
+failures. Connect a USB HID boot keyboard to the Tab5 USB-A port after the
 firmware starts. Expected debug log highlights include `USB keyboard probe
 enabled`, `waiting for USB HID boot keyboard`, and `keyboard connected`.
 
@@ -226,26 +241,24 @@ python tools/send_login_shell_demo.py --port COM3 --demo less-usb --capture-wind
 The helper starts `less /etc/os-release`; press `q` on the USB keyboard. The
 test passes only if the shell marker returns `rc=0`.
 
-USB keyboard optional formal build:
+USB keyboard formal/default build:
 
 ```powershell
-.\tools\tab5.ps1 build tab5_min_uart_terminal_usb_keyboard
-.\tools\tab5.ps1 flash tab5_min_uart_terminal_usb_keyboard -Port COM3
-.\tools\tab5.ps1 boot-log tab5_min_uart_terminal_usb_keyboard -Port COM3
+.\tools\tab5.ps1 build tab5_min_uart_terminal
+.\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
+.\tools\tab5.ps1 boot-log tab5_min_uart_terminal -Port COM3
 ```
 
-This environment keeps the official A164 keyboard enabled and also enables USB
-keyboard input. Use it to validate coexistence before changing the default
-`tab5_min_uart_terminal` policy. A 2026-06-16 coexistence test later produced a
-black-screen report and an earlier boot log for that firmware showed
-`M5Tab5 display panel was not detected`; use this environment only for targeted
-USB coexistence debugging until that display-init risk is resolved. Current
-firmware includes a startup display guard: if boot-log shows
-`[display] unusable after M5.begin`, the device should automatically restart up
-to two times. A valid test run must end with a visible screen, no repeated
-display-guard exhaustion, and a passing shell probe.
+The default formal firmware keeps the official A164 keyboard enabled and also
+enables USB keyboard input. The older
+`tab5_min_uart_terminal_usb_keyboard` environment remains as a compatibility
+alias for scripts or notes that still name it. Current firmware includes a
+startup display guard: if boot-log shows `[display] unusable after M5.begin`,
+the device should automatically restart up to two times. A valid test run must
+end with a visible screen, no repeated display-guard exhaustion, and a passing
+shell probe.
 
-After USB probe testing, restore the normal firmware:
+After isolated probe or diagnostic testing, restore the normal firmware:
 
 ```powershell
 .\tools\tab5.ps1 build tab5_min_uart_terminal
@@ -607,7 +620,7 @@ USB keyboard validation record:
   USB host task was waiting for a HID boot keyboard, the login shell probe
   still reached `m5stack-LLM`, and the user connected a USB keyboard to the
   Tab5 USB-A port and successfully performed an input test.
-- Remaining before declaring USB keyboard support complete: reconnect,
+- At that point, remaining hardening before default enablement was reconnect,
   modifier keys, software repeat, rollover limitations, and at least one
   full-screen application.
 - 2026-06-16: after moving software repeat into the USB client task, extended
@@ -631,6 +644,14 @@ USB keyboard validation record:
   report-resubmission hardening, guarded coexistence validation passed a 45s
   boot/replug log, `catv` captured `usb^C`, `less-usb` exited with USB-keyboard
   `q` and returned `rc=0`, and a final shell probe passed.
+- 2026-06-16: USB-A keyboard input was promoted into the default
+  `tab5_min_uart_terminal` firmware. The default image rebuilt, flashed, booted
+  with A164 and USB host enabled, passed `shell-path-ok: m5stack-LLM`, captured
+  physical USB keyboard input through `catv`, exited full-screen `less` through
+  USB-keyboard `q` with `rc=0`, and passed a final shell probe. The previous
+  `tab5_min_uart_terminal_usb_keyboard` environment is now only a compatibility
+  alias for the default formal build. Full NKRO and broad application coverage
+  remain unclaimed limitations.
 
 Official Tab5 Keyboard first-pass check:
 

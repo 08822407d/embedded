@@ -250,6 +250,13 @@ bool submitKeyboardReportTransfer()
 
     const esp_err_t err = usb_host_transfer_submit(transfer);
     if (err != ESP_OK) {
+        if (err == ESP_ERR_INVALID_STATE) {
+            keyboard.connected = false;
+            keyboard.report_submit_requested = false;
+            keyboard.report_in_flight = false;
+            close_requested = true;
+            return false;
+        }
         ESP_LOGW(kTag, "submit keyboard report failed: %s", esp_err_to_name(err));
         keyboard.report_in_flight = false;
         ++keyboard.report_submit_failures;

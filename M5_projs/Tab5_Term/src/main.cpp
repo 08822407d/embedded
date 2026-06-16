@@ -170,7 +170,7 @@ void setup()
     auto cfg = M5.config();
     M5.begin(cfg);
     display_boot_guard::restartIfDisplayUnusable();
-#if ENABLE_USB_KEYBOARD_PROBE
+#if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     M5.Power.setExtOutput(true, m5::ext_USB);
 #endif
 
