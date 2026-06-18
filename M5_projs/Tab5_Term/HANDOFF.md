@@ -185,6 +185,17 @@ For source-level onboarding, module boundaries, and extension rules, start with
 future coding agents before they modify `terminal_core`, input drivers, build
 profiles, or diagnostic tools.
 
+Stage 10 opened on 2026-06-18 as render performance and interaction latency
+work. The first milestone is deliberately narrow: batch UART input spans through
+`terminal::writeBytes()` so cursor erase/draw happens once per bounded burst
+instead of once per byte. Keep this stage focused on measured responsiveness
+and do not start SSH/Telnet/PPP transport work inside it.
+
+Stage 10 P1 implementation on 2026-06-18 updated `terminal::writeBytes()` and
+the formal login-UART drain path. Build verification passed for
+`tab5_min_uart_terminal` in 56.2s and `tab5_terminal_regression` in 317.7s.
+No P1 hardware visual comparison has been run yet; that belongs to P2.
+
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
 remaining physical A164 and integration tests. Its accepted baseline includes
 the 180-degree keyboard-mounted display orientation, `64x32` geometry,

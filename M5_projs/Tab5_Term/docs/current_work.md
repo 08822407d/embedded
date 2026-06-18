@@ -156,12 +156,54 @@ the synchronized summaries in `terminal_validation.md`, `terminal_known_gaps.md`
 and `HANDOFF.md`. No hidden manual requirement remains; uninstalled Linux
 programs and A164-unavailable keys are explicitly recorded.
 
-## Pending Mainline Selection
+## Active Mainline Stage: Stage 10 Render Performance And Interaction Latency
 
-No active mainline stage is open after Stage 9. Deferred or future work remains
-available, including mature-login transport research, touch/mouse reporting,
-broader Unicode glyph coverage, and any future official/USB/BLE keyboard
-transport expansion. Start the next stage only after selecting scope.
+Goal: improve the accepted UART terminal's human-visible responsiveness before
+starting larger transport features such as SSH/Telnet/PPP. The current user
+experience concern is that long output can still look like slow per-character
+painting even after raising the login UART baud rate.
+
+Scope:
+
+- Keep the formal fixed-cell DejaVu18 renderer as the performance baseline.
+- Prefer small renderer/input batching changes that preserve existing terminal
+  semantics and regression coverage.
+- Add measurement or repeatable test hooks before deeper redraw refactors.
+- Do not reopen font selection, terminal identity, or advanced network
+  transports in this stage.
+
+### Milestone P1: Batch Input Without Per-Byte Cursor Repaint
+
+- Make `terminal::writeBytes()` process a byte span with one cursor erase/draw
+  pair instead of calling `writeByte()` for every byte.
+- Have the login-UART drain path send each bounded UART burst to the terminal
+  core as one span and mirror the same span to the debug CDC port.
+
+Exit condition: the formal firmware builds, existing terminal byte semantics
+remain unchanged, and this first optimization is recorded for later hardware
+comparison.
+
+Status: implemented and build-checked on 2026-06-18. `terminal::writeBytes()`
+now erases/draws the cursor once around a byte span, and the formal login-UART
+drain path batches each bounded UART burst before sending it to the terminal
+core and USB debug mirror. Build verification passed for
+`tab5_min_uart_terminal` and `tab5_terminal_regression`. Hardware visual
+comparison remains part of P2.
+
+### Milestone P2: Measure And Compare
+
+- Add or reuse a host-side workload that sends/receives a burst large enough to
+  expose redraw latency, such as `dmesg`, `ls -laR`, or a scripted colored text
+  burst.
+- Record before/after observations where possible. If exact timing cannot be
+  captured from the device yet, record the manual observation boundary clearly.
+
+### Milestone P3: Dirty-Region Renderer Planning
+
+- If P1 is not enough, design dirty-row/dirty-rectangle rendering around the
+  existing cell model rather than rewriting terminal parsing.
+- Keep wide-cell repair, cursor rendering, alternate screen, and framebuffer
+  diagnostics intact.
 
 ## Completed Mainline Stage: Stage 6 Test And Regression Harness
 

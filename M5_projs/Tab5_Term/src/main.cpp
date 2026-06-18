@@ -104,34 +104,27 @@ void setupDisplay()
     });
 }
 
-void writeToDisplay(uint8_t byte)
-{
-    terminal::writeByte(byte);
-}
-
-void writeToDebug(uint8_t byte)
-{
-    Serial.write(byte);
-}
-
 void readLoginUartToDisplayAndDebug()
 {
 #if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
-    size_t processed = 0;
     HardwareSerial& serial = login_uart::serial();
+    uint8_t buffer[kMaxBytesPerLoop];
+    size_t length = 0;
 
     // Keep each loop bounded so status refresh, USB tasks, keyboard events, and
     // M5.update() continue to run even during large UART bursts.
-    while (serial.available() > 0 && processed < kMaxBytesPerLoop) {
+    while (serial.available() > 0 && length < kMaxBytesPerLoop) {
         const int value = serial.read();
         if (value < 0) {
             break;
         }
 
-        const auto byte = static_cast<uint8_t>(value);
-        writeToDisplay(byte);
-        writeToDebug(byte);
-        ++processed;
+        buffer[length++] = static_cast<uint8_t>(value);
+    }
+
+    if (length > 0) {
+        terminal::writeBytes(buffer, length);
+        Serial.write(buffer, length);
     }
 #endif
 }

@@ -354,3 +354,28 @@ Confirmed cause and fix:
   `$LASTEXITCODE`.
 - This preserves detached build lifetime while avoiding `Start-Process`
   environment normalization.
+
+## Note 2026-06-18: Long Regression Build Can Outlive Caller Timeout
+
+Context:
+
+- Environment: `tab5_terminal_regression`.
+- Trigger: Stage 10 P1 changed `terminal_core` and the UART drain path, so the
+  regression diagnostic environment was build-checked after the formal firmware
+  build.
+
+Observed evidence:
+
+- `.\tools\tab5.ps1 build tab5_terminal_regression` started detached worker
+  `7908` and the foreground command timed out after 120 seconds.
+- `build-status` reported the same worker still running with recent log
+  activity.
+- A later `build-wait` rejoined that worker and the build succeeded in 317.7
+  seconds.
+
+Conclusion:
+
+- A foreground timeout during a detached build is not enough evidence of a
+  stuck compiler. Check `build-status` for worker id, elapsed time, and
+  `log_idle` first; use `build-wait` to rejoin the existing build instead of
+  starting another one.

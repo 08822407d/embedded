@@ -2749,13 +2749,15 @@ void writeByte(uint8_t byte)
 
 void writeBytes(const uint8_t *data, size_t length)
 {
-    if (data == nullptr) {
+    if (!state.initialized || data == nullptr || length == 0) {
         return;
     }
 
+    eraseCursor();
     for (size_t i = 0; i < length; ++i) {
-        writeByte(data[i]);
+        processByte(data[i]);
     }
+    drawCursor();
 }
 
 uint16_t columns()

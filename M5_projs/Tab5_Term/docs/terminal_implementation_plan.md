@@ -285,3 +285,21 @@ printable/control/arrow/Delete/Ctrl/Alt behavior. No accepted real failure
 required a firmware or script fix. A164 Home/End/PageUp/PageDown/Insert/F1-F4
 are recorded as unavailable on stock A164 firmware unless future official
 documentation or firmware adds a combo.
+
+## Stage 10: Render Performance And Interaction Latency
+
+Goal: improve human-visible responsiveness of the accepted raw UART terminal
+before opening larger network/PTY transport work.
+
+Initial deliverables:
+
+- Batch host-output spans through the terminal core without repainting the
+  cursor around every byte.
+- Keep UART draining bounded so USB, keyboard input, status refresh, and
+  `M5.update()` continue to run.
+- Establish repeatable output workloads for later before/after comparison.
+- Plan dirty-row or dirty-rectangle rendering only if the first batching change
+  is insufficient.
+
+Status on 2026-06-18: opened. P1 starts with `terminal::writeBytes()` and the
+login-UART drain path.
