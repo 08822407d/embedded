@@ -259,3 +259,29 @@ PTY-backed integration consumes this API.
 Stage 8 completion status on 2026-06-15: complete. T1 is hardware-regression
 tested. T2 is preparatory API work, so its hardware validation is intentionally
 deferred under the project rule for advanced-feature groundwork.
+
+## Stage 9: TUI And Input Compatibility Hardening
+
+Goal: make the accepted `xterm-256color`, `64x32`, 921600 UART terminal more
+trustworthy with common Linux text user interfaces and both physical keyboard
+paths, without prematurely starting SSH/Telnet/PPP transport work.
+
+Deliverables:
+
+- A replayable TUI matrix command for installed shell and full-screen tools,
+  with missing programs reported as skipped rather than terminal failures.
+- Physical USB-A and A164 keyboard semantic captures through `cat -vET`.
+- Explicit records for transport-specific differences, unavailable keys, and
+  skipped applications.
+- No speculative terminal-core broadening: only real failures found by the
+  matrix should create fixes.
+
+Status on 2026-06-18: complete. `tools/tab5.ps1 tui-matrix` passed installed
+`clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and `whiptail`; `tmux`,
+`screen`, `dialog`, `btop`, and `nano` were skipped because they were not
+installed on the current Module LLM image. `tools/tab5.ps1 key-capture`
+captured USB-A printable/control/navigation/function-key behavior and A164
+printable/control/arrow/Delete/Ctrl/Alt behavior. No accepted real failure
+required a firmware or script fix. A164 Home/End/PageUp/PageDown/Insert/F1-F4
+are recorded as unavailable on stock A164 firmware unless future official
+documentation or firmware adds a combo.

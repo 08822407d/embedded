@@ -631,6 +631,9 @@ Validation record:
   usages for stock A164. Treat them as unavailable unless future official
   docs/firmware prove a combo. Final shell probe returned
   `shell-path-ok: m5stack-LLM`.
+- 2026-06-18: Stage 9 V3/V4 close-out completed with no accepted firmware or
+  script fix required. The validated behaviors, skipped applications, and
+  unavailable A164 keys are recorded here and in `terminal_known_gaps.md`.
 
 For correctness testing, flash `tab5_min_uart_terminal_fixed_debug`. Use
 `tab5_min_uart_terminal` only when checking the approved proportional

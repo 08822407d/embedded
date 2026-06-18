@@ -145,12 +145,12 @@ box-drawing and block-element renderer fallbacks. U3 passed hardware
 regression and framebuffer capture, and the formal firmware was restored. The
 canonical stage state is in `docs/current_work.md`.
 
-Stage 8 terminal protocol readiness is complete. Stage 9 is now active as TUI
-and input compatibility hardening. Its first increment is local automation:
-`tools/tab5.ps1 tui-matrix` runs a broader installed-program matrix while
-skipping missing packages. Any later work that requires the user to connect a
-USB keyboard or press USB/A164 keys must announce that before the capture
-window starts.
+Stage 8 terminal protocol readiness is complete. Stage 9 TUI and input
+compatibility hardening is also complete as of 2026-06-18. Its first increment
+was local automation: `tools/tab5.ps1 tui-matrix` runs a broader
+installed-program matrix while skipping missing packages. Any later work that
+requires the user to connect a USB keyboard or press USB/A164 keys must
+announce that before the capture window starts.
 
 Stage 9 V1 validation on 2026-06-18 passed on the default formal firmware:
 `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and `whiptail`
@@ -172,6 +172,13 @@ special combo keys, and the local M5Unit-KEYBOARD HID table does not include
 F1-F4 or Home/Page/Insert usages, so treat these as unavailable on stock A164
 firmware unless future official docs/firmware add a combo. Final probe returned
 `shell-path-ok: m5stack-LLM`.
+
+Stage 9 V3/V4 close-out on 2026-06-18 found no accepted TUI/input failure that
+requires a code fix. The exit record is synchronized across
+`docs/current_work.md`, `docs/terminal_validation.md`,
+`docs/terminal_known_gaps.md`, and this handoff. No active mainline stage is
+open after Stage 9; choose a new scope before starting advanced transport,
+touch/mouse, broader Unicode, or further keyboard work.
 
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
 remaining physical A164 and integration tests. Its accepted baseline includes
@@ -426,8 +433,8 @@ Current fixed settings:
   size, and logical rows/columns. This is preparatory work for SSH/Telnet/PTY
   integration, not a raw UART resize mechanism. It is locally build-checked but
   not hardware-validated.
-- Stage 8 is complete as of 2026-06-15. Stage 9 is active as TUI and input
-  compatibility hardening.
+- Stage 8 is complete as of 2026-06-15. Stage 9 TUI and input compatibility
+  hardening is complete as of 2026-06-18. No active mainline stage is open.
 - proportional renderer: retained in `tab5_terminal_font_prop_preview`
 - Screen orientation: `SCREEN_ORIENTATION_KEYBOARD_MOUNTED`; this maps the
   original landscape rotation `1` to opposite landscape rotation `3`, matching

@@ -35,7 +35,7 @@ user-visible UI/input behavior, and high-regression-risk changes.
 
 ## Completed Checkpoint
 
-Completed through Stage 8; Stage 9 is active:
+Completed through Stage 9:
 
 - Stages 1 through 4 of `terminal_implementation_plan.md`.
 - Deterministic CDC tests for the implemented parser/screen features.
@@ -56,18 +56,25 @@ Completed through Stage 8; Stage 9 is active:
   `tab5_min_uart_terminal` firmware after coexistence, reconnect, `catv`,
   full-screen `less`, and shell-probe validation with the official A164
   keyboard path still enabled.
+- Stage 9 TUI and input compatibility hardening is complete at the documented
+  validation level. No terminal-core or input-mapper fix was required by the
+  Stage 9 matrix.
 
-Do not restart completed font selection or Stage 1-4 deterministic tests unless
-new work causes a regression.
+Do not restart completed font selection, Stage 1-4 deterministic tests, or
+Stage 9 keyboard capture unless new work causes a regression or a new keyboard
+transport is added.
 
-## Active Mainline Stage: Stage 9 TUI And Input Compatibility Hardening
+## Completed Mainline Stage: Stage 9 TUI And Input Compatibility Hardening
 
 Goal: make the accepted `xterm-256color`, `64x32`, 921600 UART terminal more
 trustworthy with common Linux text user interfaces and both physical keyboard
 paths, without prematurely starting SSH/Telnet/PPP transport work.
 
-Status: in progress. V1 and V2 are complete at first-pass validation level. Any
-future validation window that needs physical keyboard input must be announced
+Status: completed on 2026-06-18. V1 and V2 are complete at first-pass
+validation level. V3 found no real failure requiring a firmware or script fix.
+V4 records the validated and unavailable behaviors in this file,
+`terminal_validation.md`, `terminal_known_gaps.md`, and `HANDOFF.md`. Any future
+validation window that needs physical keyboard input must still be announced
 before the command starts.
 
 ### Milestone V1: TUI Validation Matrix
@@ -130,6 +137,10 @@ captures. Follow-up shell probes returned `shell-path-ok: m5stack-LLM`.
 Exit condition: every accepted Stage 9 fix has a replayable script or
 diagnostic check.
 
+Status: completed on 2026-06-18 with no accepted fix required. The TUI matrix
+and keyboard semantic captures did not expose raw escape leakage, bad screen
+restore, wrong mapper output, or stuck TTY state that needed code changes.
+
 ### Milestone V4: Stage 9 Exit Record
 
 - Update `terminal_known_gaps.md` with exactly which TUI and keyboard behaviors
@@ -139,6 +150,18 @@ diagnostic check.
 
 Exit condition: Stage 9 has a concise validation record and no hidden manual
 requirements.
+
+Status: completed on 2026-06-18. The exit record is this Stage 9 section plus
+the synchronized summaries in `terminal_validation.md`, `terminal_known_gaps.md`,
+and `HANDOFF.md`. No hidden manual requirement remains; uninstalled Linux
+programs and A164-unavailable keys are explicitly recorded.
+
+## Pending Mainline Selection
+
+No active mainline stage is open after Stage 9. Deferred or future work remains
+available, including mature-login transport research, touch/mouse reporting,
+broader Unicode glyph coverage, and any future official/USB/BLE keyboard
+transport expansion. Start the next stage only after selecting scope.
 
 ## Completed Mainline Stage: Stage 6 Test And Regression Harness
 
