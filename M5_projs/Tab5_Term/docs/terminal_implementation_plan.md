@@ -301,5 +301,76 @@ Initial deliverables:
 - Plan dirty-row or dirty-rectangle rendering only if the first batching change
   is insufficient.
 
-Status on 2026-06-18: opened. P1 starts with `terminal::writeBytes()` and the
-login-UART drain path.
+Status on 2026-06-18: completed. P1 implemented bounded byte-span batching through
+`terminal::writeBytes()` and the login-UART drain path. P2 added
+`tools/tab5.ps1 render-latency`, a repeatable real login-shell burst workload
+that records timing and line-integrity JSON logs. The first P2 measurements
+showed that a 64-line burst is complete but slow, while 120-line and 240-line
+bursts expose output loss/corruption.
+
+P3 first implementation added deferred dirty-row rendering inside
+`terminal::writeBytes()`, increased the login-UART hardware RX buffer to 32
+KiB, and added a 32 KiB software RX ring so the main loop can drain UART input
+faster than it renders. Hardware measurements recovered the 120-line workload
+to `120/120` unique lines and improved the 240-line workload to `239/240`, but
+render throughput remains slow and a later raw CDC mirror capture showed a
+corrupted early line. The next Stage 10 work should separate CDC mirror
+integrity from final framebuffer/render evidence, then continue throughput
+optimization from that cleaner measurement boundary.
+
+P4 isolated the measurement path and fixed a real UART receive failure. The
+firmware now exposes `TAB5PIPE` counters, exact-line host assertions, expected
+marker-bounded byte counts, actual HardwareSerial RX buffer size, and UART
+driver error counters. A failing run showed `uart_fifo_ovf=1`, so the login
+UART is now drained from `HardwareSerial.onReceive(..., false)` into the 32
+KiB software RX ring. Final `64x64`, `120x64`, and `240x64` workloads passed
+exact-line checks with expected-byte delta `0`, no UART errors, and no software
+drops.
+
+P5 separated optional CDC debug mirroring from firmware render-pipeline timing.
+The firmware now supports runtime `render-mirror?` and `render-mirror=0/1`;
+`tools/tab5.ps1 render-latency` defaults to mirror-disabled counter polling and
+uses `-EnableMirror` only for explicit CDC mirror integrity checks. Disabling
+the mirror did not materially improve the `240x64` metric, which still became
+pipeline-quiescent in about `17.9s`. Heavy mirror-enabled workloads exposed a
+separate `HWCDC` diagnostic risk, so the next milestone should improve row
+rendering/LCD update cost rather than CDC throughput.
+
+The planned row-rendering throughput milestone became P6 and is now complete.
+The accepted `240x64` burst remains correct and now reaches pipeline
+quiescence in about `1.1s` with clean counters.
+
+P6 first increment made the formal render batch configurable as
+`LOGIN_UART_RENDER_BYTES_PER_LOOP` and raised the default to `256` bytes. The
+second increment added fixed-cell row background prefill through
+`TERMINAL_FIXED_ROW_BACKGROUND_PREFILL`, so common same-background rows are
+filled in contiguous runs before glyph drawing instead of filling every cell
+individually. The third increment added
+`TERMINAL_TRANSPARENT_TEXT_AFTER_ROW_PREFILL`, avoiding opaque text-background
+fills after row prefill while preserving anti-aliased edge blending through
+M5GFX base color. A mirror-disabled `240x64` run now reaches pipeline
+quiescence in `16.250s` with no UART errors or software drops. The fourth
+increment added `TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES`, so batched scrolls
+update the logical cell buffer and dirty the final visible region instead of
+moving the physical framebuffer for every line. A mirror-disabled `240x64` run
+reached pipeline quiescence in `8.078s` with no UART errors or software drops.
+The fifth increment retuned the batch size to a conservative `320` bytes:
+`384`, `512`, and `1024` were faster in some runs but each exposed UART FIFO
+overflow in at least one validation path after stricter pipeline-error
+checking. With `320`, `120x64` completed twice in `3.359s` and `3.453s`, and
+`240x64` completed in `6.782s` with clean counters; the regression corpus still
+passes. Further work should be more selective and should preserve the clean
+receive counters and regression results.
+
+The sixth increment added terminal write transactions and formal-login
+backlog-aware render deferral. The UART bridge can now parse multiple software
+RX batches into the logical screen while delaying physical row flushes until
+the backlog clears or `LOGIN_UART_RENDER_DEFER_MAX_MS` expires. This avoids
+repainting the same scrolled region for every 320-byte batch. With this change,
+`120x64` reached pipeline quiescence in `0.640s`, `240x64` in `1.094s`, and
+short mirror-enabled `64x64` passed exact integrity in `0.156s`; the regression
+corpus still passes.
+
+Stage 10 is closed after the sixth increment. No Stage 10 P7 is currently
+planned; further renderer or transport work should be opened under a new stage
+unless a regression or fresh performance target explicitly reopens this one.

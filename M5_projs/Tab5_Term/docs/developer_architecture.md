@@ -34,8 +34,10 @@ a display demo:
 ```text
 external login UART bytes
   -> login_uart::serial()
-  -> main.cpp bounded UART drain
-  -> terminal::writeByte()
+  -> HardwareSerial onReceive callback in main.cpp
+  -> main.cpp bounded UART drain into the software RX ring
+  -> main.cpp bounded RX-ring pop
+  -> terminal::writeBytes()
   -> terminal_core parser/screen model
   -> M5GFX drawing in the terminal viewport
 
@@ -52,14 +54,43 @@ work, status-bar refresh, and `M5.update()` all get regular time. Avoid adding
 unbounded loops there. Heavy or blocking work should move into a module with a
 clear update function or FreeRTOS task.
 
+For the formal UART path, `src/main.cpp` deliberately separates UART draining
+from rendering. Arduino `HardwareSerial.onReceive(..., false)` drains available
+hardware-UART bytes into a software RX ring, and the main loop later pops a
+smaller render batch for `terminal::writeBytes()`. This keeps the UART FIFO
+serviced while long screen updates are still slow. The render batch size is
+`LOGIN_UART_RENDER_BYTES_PER_LOOP`; the current default is `320` bytes after
+Stage 10 P6. Do not raise it blindly: larger batches reduce flush/cursor
+overhead but also delay status/input/M5 update work while a batch is rendered,
+and `384`/`512`/`1024` byte experiments exposed UART FIFO overflow in at least
+one validation path.
+The formal UART bridge also uses terminal write transactions while the software
+RX ring still has backlog (`LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG=1`). Bytes
+are parsed into the logical terminal model promptly, but physical row flushes
+are delayed until the backlog clears or `LOGIN_UART_RENDER_DEFER_MAX_MS`
+expires. Keep this distinction clear when interpreting `TAB5PIPE rendered`
+counters: they mean bytes have been parsed and accounted for, while the final
+batch path flushes the screen before the quiescent validation point.
+The fixed-cell renderer also uses
+`TERMINAL_FIXED_ROW_BACKGROUND_PREFILL` by default, filling same-background row
+runs before glyph drawing so common shell/TUI rows avoid per-cell background
+fills. `TERMINAL_TRANSPARENT_TEXT_AFTER_ROW_PREFILL` then draws text over that
+prefilled row without asking M5GFX to fill each glyph box, while setting the
+M5GFX base color for correct anti-aliased edge blending.
+`TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES` defers physical framebuffer scrolls
+inside `terminal::writeBytes()` spans; it updates the logical screen model and
+redraws the final dirty scroll region at the end of the batch. Row text-style
+caching avoids repeating identical font/color setup while a row is being
+redrawn. Keep the single-byte path immediate for interactive output.
+
 ## Source Layout
 
 ### Orchestration
 
 - `src/main.cpp`: startup order and main loop. It initializes M5Unified,
   display orientation, display boot guard, login UART, terminal viewport,
-  optional debug modes, input queue, official A164 keyboard, and USB-A keyboard
-  support. It should stay thin.
+  optional debug modes, input queue, official A164 keyboard, USB-A keyboard
+  support, and the formal login-UART software RX ring. It should stay thin.
 - `include/app_config.h`: default compile-time configuration shared by all
   environments. Most feature flags can be overridden from `platformio.ini`.
 - `src/display_boot_guard.cpp`: detects unusable display dimensions after
@@ -126,6 +157,13 @@ mapper is being deliberately bypassed for a documented reason.
 - `src/screen_capture.cpp` implements debug-only framebuffer capture.
 - `src/terminal_debug_input.cpp` implements CDC injection and terminal state
   diagnostics for regression builds.
+- `include/render_pipeline_diagnostics.h` exposes diagnostic snapshots for the
+  formal login-UART receive/render/mirror pipeline, plus the runtime CDC
+  mirror enable switch used by Stage 10 tests. The implementation lives in
+  `src/main.cpp` because it reports main-loop software RX state.
+- `src/login_uart.cpp` owns the external login UART, supported runtime baud
+  rates, delayed switching, optional NVS state, actual RX buffer reporting, and
+  UART driver error counters.
 - `src/power_detect_probe.cpp` is an isolated diagnostic firmware path for
   charging-state research.
 
@@ -136,6 +174,10 @@ mapper is being deliberately bypassed for a documented reason.
 - `tools/run_terminal_regression.py` and `tools/run_stage6_regression.ps1`:
   deterministic parser/screen regression entry points.
 - `tools/send_login_shell_app_smoke.py`: real UART login-shell app/TUI matrix.
+- `tools/measure_render_latency.py`: Stage 10 real login-shell burst workload;
+  records mirror-disabled pipeline timing by default, optional CDC mirror
+  exact-line integrity, expected byte counts, and `TAB5PIPE`
+  receive/render/mirror counters for performance comparisons.
 - `tools/capture_keyboard_semantics.py`: `cat -vET` keyboard sequence capture.
 - `tools/capture_screen.py`: debug framebuffer capture and optional pixel
   comparison.
@@ -189,5 +231,9 @@ feature work:
   compatibility aliases and documentation can be updated safely.
 - Add a generated source-map or Doxygen pass if external contributors start
   browsing APIs through generated docs.
-- Add performance counters before changing the renderer; the current user-visible
-  bottleneck is likely redraw cost, so changes should be measured.
+- Use the Stage 10 render-latency workload before changing the renderer. The
+  default wrapper path disables CDC mirroring and relies on `TAB5PIPE`
+  counters; use `-EnableMirror` only for short CDC mirror integrity checks.
+  Current P6 evidence shows deferred hardware scroll is valuable, but future
+  renderer changes still need clean `TAB5PIPE` receive counters and regression
+  runs before they are treated as accepted.

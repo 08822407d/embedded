@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <M5Unified.h>
+#include <freertos/FreeRTOS.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "app_config.h"
 #include "display_boot_guard.h"
@@ -9,6 +11,7 @@
 #include "input_mapper.h"
 #include "login_uart.h"
 #include "power_detect_probe.h"
+#include "render_pipeline_diagnostics.h"
 #include "status_bar.h"
 #include "tab5_keyboard_input.h"
 #include "terminal_core.h"
@@ -18,11 +21,30 @@
 #include "usb_keyboard_probe.h"
 
 namespace {
-constexpr size_t kMaxBytesPerLoop = 96;
+constexpr size_t kMaxBytesPerLoop = LOGIN_UART_RENDER_BYTES_PER_LOOP;
+static_assert(kMaxBytesPerLoop > 0, "LOGIN_UART_RENDER_BYTES_PER_LOOP must be positive");
+constexpr size_t kMaxUartDrainBytesPerLoop = 4096;
+constexpr size_t kUartDrainChunkBytes = 256;
 constexpr size_t kMaxInputEventsPerLoop = 64;
 constexpr uint32_t kM5UpdateIntervalMs = 20;
 
 uint32_t lastM5UpdateMs = 0;
+portMUX_TYPE loginRxMux = portMUX_INITIALIZER_UNLOCKED;
+uint8_t loginRxBuffer[LOGIN_UART_SOFTWARE_RX_BUFFER_SIZE];
+size_t loginRxHead = 0;
+size_t loginRxTail = 0;
+size_t loginRxCount = 0;
+uint32_t loginUartReadBytes = 0;
+uint32_t loginRxBufferedBytes = 0;
+uint32_t loginRxDroppedBytes = 0;
+uint32_t loginRenderedBytes = 0;
+uint32_t loginMirroredBytes = 0;
+uint32_t loginRenderBatches = 0;
+size_t loginRxMaxDepth = 0;
+bool loginRxDrainTaskStarted = false;
+bool loginMirrorEnabled = true;
+bool loginRenderTransactionActive = false;
+uint32_t loginRenderTransactionStartMs = 0;
 
 void formatStatusTitle(char *buffer, size_t buffer_size)
 {
@@ -104,27 +126,196 @@ void setupDisplay()
     });
 }
 
+void pushLoginRxByteLocked(uint8_t value)
+{
+    if (loginRxCount >= sizeof(loginRxBuffer)) {
+        ++loginRxDroppedBytes;
+        return;
+    }
+
+    loginRxBuffer[loginRxHead] = value;
+    loginRxHead = (loginRxHead + 1) % sizeof(loginRxBuffer);
+    ++loginRxCount;
+    ++loginRxBufferedBytes;
+    if (loginRxCount > loginRxMaxDepth) {
+        loginRxMaxDepth = loginRxCount;
+    }
+}
+
+void pushLoginRxBytes(const uint8_t *data, size_t length)
+{
+    if (data == nullptr || length == 0) {
+        return;
+    }
+
+    portENTER_CRITICAL(&loginRxMux);
+    for (size_t index = 0; index < length; ++index) {
+        pushLoginRxByteLocked(data[index]);
+    }
+    portEXIT_CRITICAL(&loginRxMux);
+}
+
+size_t popLoginRxBytes(uint8_t *buffer, size_t capacity)
+{
+    if (buffer == nullptr || capacity == 0) {
+        return 0;
+    }
+
+    size_t length = 0;
+    portENTER_CRITICAL(&loginRxMux);
+    while (loginRxCount > 0 && length < capacity) {
+        buffer[length++] = loginRxBuffer[loginRxTail];
+        loginRxTail = (loginRxTail + 1) % sizeof(loginRxBuffer);
+        --loginRxCount;
+    }
+    portEXIT_CRITICAL(&loginRxMux);
+    return length;
+}
+
+size_t loginRxDepth()
+{
+    portENTER_CRITICAL(&loginRxMux);
+    const size_t depth = loginRxCount;
+    portEXIT_CRITICAL(&loginRxMux);
+    return depth;
+}
+
+void drainLoginUartToSoftwareBuffer(HardwareSerial& serial)
+{
+    size_t drained = 0;
+    uint8_t buffer[kUartDrainChunkBytes];
+    while (serial.available() > 0 && drained < kMaxUartDrainBytesPerLoop) {
+        size_t length = 0;
+        while (
+            length < sizeof(buffer) &&
+            drained + length < kMaxUartDrainBytesPerLoop &&
+            serial.available() > 0) {
+            const int value = serial.read();
+            if (value < 0) {
+                break;
+            }
+            buffer[length++] = static_cast<uint8_t>(value);
+        }
+
+        if (length == 0) {
+            break;
+        }
+
+        pushLoginRxBytes(buffer, length);
+        portENTER_CRITICAL(&loginRxMux);
+        loginUartReadBytes += static_cast<uint32_t>(length);
+        portEXIT_CRITICAL(&loginRxMux);
+        drained += length;
+    }
+}
+
+void loginUartReceiveCallback()
+{
+    drainLoginUartToSoftwareBuffer(login_uart::serial());
+}
+
+void startLoginUartAsyncDrain()
+{
+#if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    login_uart::serial().onReceive(loginUartReceiveCallback, false);
+    loginRxDrainTaskStarted = true;
+#endif
+}
+
+size_t mirrorLoginBytesToDebug(const uint8_t *data, size_t length)
+{
+    if (data == nullptr || length == 0) {
+        return 0;
+    }
+    if (!render_pipeline::mirrorEnabled()) {
+        return 0;
+    }
+
+    static uint8_t mirrorBuffer[kMaxBytesPerLoop];
+    const size_t boundedLength =
+        length > sizeof(mirrorBuffer) ? sizeof(mirrorBuffer) : length;
+    memcpy(mirrorBuffer, data, boundedLength);
+    const size_t written = Serial.write(mirrorBuffer, boundedLength);
+    Serial.flush();
+    return written;
+}
+
+void beginLoginRenderTransactionIfNeeded()
+{
+#if LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG
+    if (loginRenderTransactionActive) {
+        return;
+    }
+    terminal::beginWriteTransaction();
+    loginRenderTransactionActive = true;
+    loginRenderTransactionStartMs = millis();
+#endif
+}
+
+void finishLoginRenderTransactionIfNeeded()
+{
+#if LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG
+    if (!loginRenderTransactionActive) {
+        return;
+    }
+    terminal::endWriteTransaction();
+    loginRenderTransactionActive = false;
+#endif
+}
+
+bool loginRenderTransactionExpired()
+{
+#if LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG
+    return loginRenderTransactionActive
+        && millis() - loginRenderTransactionStartMs >= LOGIN_UART_RENDER_DEFER_MAX_MS;
+#else
+    return false;
+#endif
+}
+
 void readLoginUartToDisplayAndDebug()
 {
 #if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     HardwareSerial& serial = login_uart::serial();
     uint8_t buffer[kMaxBytesPerLoop];
-    size_t length = 0;
 
-    // Keep each loop bounded so status refresh, USB tasks, keyboard events, and
-    // M5.update() continue to run even during large UART bursts.
-    while (serial.available() > 0 && length < kMaxBytesPerLoop) {
-        const int value = serial.read();
-        if (value < 0) {
-            break;
-        }
-
-        buffer[length++] = static_cast<uint8_t>(value);
+    if (!loginRxDrainTaskStarted) {
+        drainLoginUartToSoftwareBuffer(serial);
     }
+
+    // Keep rendering bounded so status refresh, USB tasks, keyboard events, and
+    // M5.update() continue to run even during large UART bursts. The software
+    // RX buffer above drains the hardware UART quickly before rendering starts.
+    const size_t length = popLoginRxBytes(buffer, sizeof(buffer));
+    if (length == 0) {
+        finishLoginRenderTransactionIfNeeded();
+        return;
+    }
+
+#if LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG
+    if (loginRxDepth() > 0) {
+        beginLoginRenderTransactionIfNeeded();
+    }
+#endif
 
     if (length > 0) {
         terminal::writeBytes(buffer, length);
-        Serial.write(buffer, length);
+#if LOGIN_UART_DEFER_RENDER_WHILE_BACKLOG
+        const bool shouldFinishTransaction =
+            loginRenderTransactionActive &&
+            (loginRxDepth() == 0 || loginRenderTransactionExpired());
+        if (shouldFinishTransaction) {
+            finishLoginRenderTransactionIfNeeded();
+        }
+#endif
+        portENTER_CRITICAL(&loginRxMux);
+        loginRenderedBytes += static_cast<uint32_t>(length);
+        ++loginRenderBatches;
+        portEXIT_CRITICAL(&loginRxMux);
+        const size_t mirrored = mirrorLoginBytesToDebug(buffer, length);
+        portENTER_CRITICAL(&loginRxMux);
+        loginMirroredBytes += static_cast<uint32_t>(mirrored);
+        portEXIT_CRITICAL(&loginRxMux);
     }
 #endif
 }
@@ -157,6 +348,57 @@ void bridgeInputEventsToLoginUart()
 }
 } // namespace
 
+namespace render_pipeline {
+
+Stats stats()
+{
+    portENTER_CRITICAL(&loginRxMux);
+    const Stats snapshot = {
+        .uart_read_bytes = loginUartReadBytes,
+        .software_buffered_bytes = loginRxBufferedBytes,
+        .software_dropped_bytes = loginRxDroppedBytes,
+        .rendered_bytes = loginRenderedBytes,
+        .mirrored_bytes = loginMirroredBytes,
+        .render_batches = loginRenderBatches,
+        .mirror_enabled = loginMirrorEnabled,
+        .software_rx_depth = loginRxCount,
+        .software_rx_capacity = sizeof(loginRxBuffer),
+        .software_rx_max_depth = loginRxMaxDepth,
+    };
+    portEXIT_CRITICAL(&loginRxMux);
+    return snapshot;
+}
+
+void resetStats()
+{
+    portENTER_CRITICAL(&loginRxMux);
+    loginUartReadBytes = 0;
+    loginRxBufferedBytes = 0;
+    loginRxDroppedBytes = 0;
+    loginRenderedBytes = 0;
+    loginMirroredBytes = 0;
+    loginRenderBatches = 0;
+    loginRxMaxDepth = loginRxCount;
+    portEXIT_CRITICAL(&loginRxMux);
+}
+
+bool mirrorEnabled()
+{
+    portENTER_CRITICAL(&loginRxMux);
+    const bool enabled = loginMirrorEnabled;
+    portEXIT_CRITICAL(&loginRxMux);
+    return enabled;
+}
+
+void setMirrorEnabled(bool enabled)
+{
+    portENTER_CRITICAL(&loginRxMux);
+    loginMirrorEnabled = enabled;
+    portEXIT_CRITICAL(&loginRxMux);
+}
+
+} // namespace render_pipeline
+
 void setup()
 {
     Serial.begin(USB_DEBUG_BAUD);
@@ -171,6 +413,7 @@ void setup()
 
 #if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     login_uart::begin();
+    startLoginUartAsyncDrain();
 #endif
     setupDisplay();
 
@@ -205,11 +448,15 @@ void setup()
 #if !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     const login_uart::State uartState = login_uart::state();
     Serial.printf(
-        "Login UART: baud=%lu persisted=%s 8N1 RX=G%d TX=G%d\r\n",
+        "Login UART: baud=%lu persisted=%s rx_buffer=%u 8N1 RX=G%d TX=G%d\r\n",
         static_cast<unsigned long>(uartState.active_baud),
         uartState.persisted_baud == 0 ? "default" : "saved",
+        static_cast<unsigned>(uartState.rx_buffer_size),
         LOGIN_UART_RX_PIN,
         LOGIN_UART_TX_PIN);
+    Serial.printf(
+        "Login UART async RX drain: %s\r\n",
+        loginRxDrainTaskStarted ? "enabled" : "loop-fallback");
 #endif
 }
 

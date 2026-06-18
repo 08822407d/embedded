@@ -6,6 +6,7 @@
 
 #include "app_config.h"
 #include "login_uart.h"
+#include "render_pipeline_diagnostics.h"
 #include "screen_capture.h"
 
 namespace usb_management {
@@ -39,8 +40,9 @@ void printState()
 {
     const login_uart::State state = login_uart::state();
     Serial.printf(
-        "TAB5CFG STATE active=%lu persisted=",
-        static_cast<unsigned long>(state.active_baud));
+        "TAB5CFG STATE active=%lu rx_buffer=%u persisted=",
+        static_cast<unsigned long>(state.active_baud),
+        static_cast<unsigned>(state.rx_buffer_size));
     if (state.persisted_baud == 0) {
         Serial.print("default");
     } else {
@@ -56,6 +58,36 @@ void printState()
         Serial.print(" pending=none");
     }
     Serial.println(" supported=115200,230400,460800,921600");
+}
+
+void printRenderPipelineStats()
+{
+    const render_pipeline::Stats stats = render_pipeline::stats();
+    const login_uart::State uartState = login_uart::state();
+    const login_uart::ErrorStats errors = login_uart::errorStats();
+    Serial.printf(
+        "TAB5PIPE v=1 uart_read=%lu sw_buffered=%lu sw_dropped=%lu "
+        "rendered=%lu mirrored=%lu batches=%lu mirror_enabled=%u "
+        "sw_depth=%u sw_capacity=%u sw_max_depth=%u uart_rx_buffer=%u uart_break=%lu "
+        "uart_buffer_full=%lu uart_fifo_ovf=%lu uart_frame=%lu "
+        "uart_parity=%lu uart_other=%lu\r\n",
+        static_cast<unsigned long>(stats.uart_read_bytes),
+        static_cast<unsigned long>(stats.software_buffered_bytes),
+        static_cast<unsigned long>(stats.software_dropped_bytes),
+        static_cast<unsigned long>(stats.rendered_bytes),
+        static_cast<unsigned long>(stats.mirrored_bytes),
+        static_cast<unsigned long>(stats.render_batches),
+        stats.mirror_enabled ? 1U : 0U,
+        static_cast<unsigned>(stats.software_rx_depth),
+        static_cast<unsigned>(stats.software_rx_capacity),
+        static_cast<unsigned>(stats.software_rx_max_depth),
+        static_cast<unsigned>(uartState.rx_buffer_size),
+        static_cast<unsigned long>(errors.break_errors),
+        static_cast<unsigned long>(errors.buffer_full_errors),
+        static_cast<unsigned long>(errors.fifo_overflow_errors),
+        static_cast<unsigned long>(errors.frame_errors),
+        static_cast<unsigned long>(errors.parity_errors),
+        static_cast<unsigned long>(errors.other_errors));
 }
 
 bool parseBooleanOption(const char *value, bool *result)
@@ -80,6 +112,37 @@ void handleFrame()
 
     if (strcmp(command, "login-uart?") == 0) {
         printState();
+        return;
+    }
+
+    if (strcmp(command, "render-pipeline?") == 0) {
+        printRenderPipelineStats();
+        return;
+    }
+
+    if (strcmp(command, "render-pipeline-reset") == 0) {
+        render_pipeline::resetStats();
+        login_uart::resetErrorStats();
+        Serial.println("TAB5PIPE OK reset");
+        return;
+    }
+
+    if (strcmp(command, "render-mirror?") == 0) {
+        Serial.printf(
+            "TAB5PIPE MIRROR enabled=%u\r\n",
+            render_pipeline::mirrorEnabled() ? 1U : 0U);
+        return;
+    }
+
+    constexpr char kMirrorPrefix[] = "render-mirror=";
+    if (strncmp(command, kMirrorPrefix, sizeof(kMirrorPrefix) - 1) == 0) {
+        bool enabled = false;
+        if (!parseBooleanOption(command + sizeof(kMirrorPrefix) - 1, &enabled)) {
+            Serial.println("TAB5PIPE ERR invalid-mirror");
+            return;
+        }
+        render_pipeline::setMirrorEnabled(enabled);
+        Serial.printf("TAB5PIPE MIRROR enabled=%u\r\n", enabled ? 1U : 0U);
         return;
     }
 

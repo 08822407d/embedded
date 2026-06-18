@@ -1,6 +1,7 @@
 #include "login_uart.h"
 
 #include <Preferences.h>
+#include <freertos/FreeRTOS.h>
 
 #include "app_config.h"
 
@@ -16,11 +17,14 @@ constexpr uint32_t kSupportedBauds[] = {
 HardwareSerial loginSerial(1);
 uint32_t activeBaud = LOGIN_UART_DEFAULT_BAUD;
 uint32_t persistedBaud = 0;
+size_t actualRxBufferSize = 0;
 bool started = false;
 bool pending = false;
 uint32_t pendingBaud = 0;
 uint32_t pendingDueMs = 0;
 PersistenceAction pendingPersistence = PersistenceAction::Keep;
+portMUX_TYPE errorStatsMux = portMUX_INITIALIZER_UNLOCKED;
+ErrorStats receiveErrors = {};
 
 bool writePersistedBaud(uint32_t baud)
 {
@@ -61,6 +65,32 @@ uint32_t readPersistedBaud()
     preferences.end();
     return baud;
 }
+
+void handleReceiveError(hardwareSerial_error_t error)
+{
+    portENTER_CRITICAL(&errorStatsMux);
+    switch (error) {
+    case UART_BREAK_ERROR:
+        ++receiveErrors.break_errors;
+        break;
+    case UART_BUFFER_FULL_ERROR:
+        ++receiveErrors.buffer_full_errors;
+        break;
+    case UART_FIFO_OVF_ERROR:
+        ++receiveErrors.fifo_overflow_errors;
+        break;
+    case UART_FRAME_ERROR:
+        ++receiveErrors.frame_errors;
+        break;
+    case UART_PARITY_ERROR:
+        ++receiveErrors.parity_errors;
+        break;
+    default:
+        ++receiveErrors.other_errors;
+        break;
+    }
+    portEXIT_CRITICAL(&errorStatsMux);
+}
 } // namespace
 
 bool begin()
@@ -73,7 +103,8 @@ bool begin()
 
     activeBaud =
         persistedBaud == 0 ? LOGIN_UART_DEFAULT_BAUD : persistedBaud;
-    loginSerial.setRxBufferSize(LOGIN_UART_RX_BUFFER_SIZE);
+    actualRxBufferSize = loginSerial.setRxBufferSize(LOGIN_UART_RX_BUFFER_SIZE);
+    loginSerial.onReceiveError(handleReceiveError);
     loginSerial.begin(
         activeBaud,
         SERIAL_8N1,
@@ -115,10 +146,26 @@ State state()
     return {
         .active_baud = activeBaud,
         .persisted_baud = persistedBaud,
+        .rx_buffer_size = actualRxBufferSize,
         .pending = pending,
         .pending_baud = pendingBaud,
         .pending_delay_ms = delay,
     };
+}
+
+ErrorStats errorStats()
+{
+    portENTER_CRITICAL(&errorStatsMux);
+    const ErrorStats snapshot = receiveErrors;
+    portEXIT_CRITICAL(&errorStatsMux);
+    return snapshot;
+}
+
+void resetErrorStats()
+{
+    portENTER_CRITICAL(&errorStatsMux);
+    receiveErrors = {};
+    portEXIT_CRITICAL(&errorStatsMux);
 }
 
 bool scheduleBaud(

@@ -14,7 +14,7 @@ import serial
 FRAME_PREFIX = b"\x1b]777;"
 FRAME_TERMINATOR = b"\x07"
 STATE_RE = re.compile(
-    r"TAB5CFG STATE active=(\d+) persisted=(default|\d+)"
+    r"TAB5CFG STATE active=(\d+)(?: rx_buffer=\d+)? persisted=(default|\d+)"
     r" pending=(none|\d+)"
 )
 SUPPORTED_BAUDS = (115200, 230400, 460800, 921600)

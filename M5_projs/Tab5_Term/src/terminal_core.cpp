@@ -134,6 +134,9 @@ struct TerminalState {
     bool mouse_tracking_mode = false;
     bool cursor_visible = true;
     bool cursor_drawn = false;
+    bool render_deferred = false;
+    uint8_t write_transaction_depth = 0;
+    bool dirty_rows[kMaxRows] = {};
     bool tab_stops[kMaxColumns] = {};
     bool using_alternate_screen = false;
     RuntimeSnapshot primary_runtime_snapshot = {};
@@ -156,6 +159,23 @@ Cell (*cells)[kMaxColumns] = primary_cells;
 
 constexpr uint32_t kFnv1aOffset = 2166136261u;
 constexpr uint32_t kFnv1aPrime = 16777619u;
+
+struct VisualStyle {
+    uint16_t fg;
+    uint16_t bg;
+    bool hidden;
+    bool bold;
+};
+
+struct TextStyleCache {
+    uint16_t fg = 0;
+    uint16_t bg = 0;
+    bool opaque_background = true;
+    bool valid = false;
+    bool active = false;
+};
+
+TextStyleCache text_style_cache;
 
 constexpr uint16_t rgb565(uint8_t red, uint8_t green, uint8_t blue)
 {
@@ -250,10 +270,69 @@ void applyDisplayFont()
     M5.Display.setTextSize(state.config.text_size);
 }
 
-void applyDisplayTextStyle(uint16_t fg, uint16_t bg)
+void beginTextStyleCache()
 {
+#if TERMINAL_CACHE_TEXT_STYLE_DURING_ROW_RENDER
+    text_style_cache.active = true;
+    text_style_cache.valid = false;
+#endif
+}
+
+void endTextStyleCache()
+{
+#if TERMINAL_CACHE_TEXT_STYLE_DURING_ROW_RENDER
+    text_style_cache.active = false;
+    text_style_cache.valid = false;
+#endif
+}
+
+bool textStyleCacheMatches(uint16_t fg, uint16_t bg, bool opaque_background)
+{
+#if TERMINAL_CACHE_TEXT_STYLE_DURING_ROW_RENDER
+    return text_style_cache.active
+        && text_style_cache.valid
+        && text_style_cache.fg == fg
+        && text_style_cache.bg == bg
+        && text_style_cache.opaque_background == opaque_background;
+#else
+    (void)fg;
+    (void)bg;
+    (void)opaque_background;
+    return false;
+#endif
+}
+
+void rememberTextStyle(uint16_t fg, uint16_t bg, bool opaque_background)
+{
+#if TERMINAL_CACHE_TEXT_STYLE_DURING_ROW_RENDER
+    if (!text_style_cache.active) {
+        return;
+    }
+    text_style_cache.fg = fg;
+    text_style_cache.bg = bg;
+    text_style_cache.opaque_background = opaque_background;
+    text_style_cache.valid = true;
+#else
+    (void)fg;
+    (void)bg;
+    (void)opaque_background;
+#endif
+}
+
+void applyDisplayTextStyle(uint16_t fg, uint16_t bg, bool opaque_background = true)
+{
+    if (textStyleCacheMatches(fg, bg, opaque_background)) {
+        return;
+    }
+
     applyDisplayFont();
-    M5.Display.setTextColor(fg, bg);
+    if (opaque_background) {
+        M5.Display.setTextColor(fg, bg);
+    } else {
+        M5.Display.setBaseColor(bg);
+        M5.Display.setTextColor(fg);
+    }
+    rememberTextStyle(fg, bg, opaque_background);
 }
 
 bool isUtf8CellText(const char *text)
@@ -663,9 +742,10 @@ void drawAsciiCellText(
     uint16_t fg,
     uint16_t bg,
     bool bold,
-    bool center_in_box)
+    bool center_in_box,
+    bool opaque_background)
 {
-    applyDisplayTextStyle(fg, bg);
+    applyDisplayTextStyle(fg, bg, opaque_background);
     const int32_t text_width = M5.Display.textWidth(text) + (bold ? 1 : 0);
     const int32_t text_height = M5.Display.fontHeight();
     const int32_t text_x = center_in_box ? x + maxInt(0, (box_width - text_width) / 2) : x;
@@ -676,7 +756,15 @@ void drawAsciiCellText(
     }
 }
 
-void drawCellText(const char *text, int32_t x, int32_t y, int32_t box_width, uint16_t fg, uint16_t bg, bool bold)
+void drawCellText(
+    const char *text,
+    int32_t x,
+    int32_t y,
+    int32_t box_width,
+    uint16_t fg,
+    uint16_t bg,
+    bool bold,
+    bool opaque_background)
 {
     if (text == nullptr || text[0] == '\0') {
         return;
@@ -687,15 +775,15 @@ void drawCellText(const char *text, int32_t x, int32_t y, int32_t box_width, uin
     uint32_t base_codepoint = 0xfffd;
     uint8_t base_length = 0;
     if (!decodeUtf8Sequence(text, text_length, &base_codepoint, &base_length)) {
-        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box);
+        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box, opaque_background);
         return;
     }
 
     if (base_codepoint < 0x80) {
         char base_text[2] = {static_cast<char>(base_codepoint), '\0'};
-        drawAsciiCellText(base_text, x, y, box_width, fg, bg, bold, center_in_box);
+        drawAsciiCellText(base_text, x, y, box_width, fg, bg, bold, center_in_box, opaque_background);
     } else if (!drawUnicodeFallbackCell(base_codepoint, x, y, box_width, fg, bold)) {
-        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box);
+        drawAsciiCellText("?", x, y, box_width, fg, bg, false, center_in_box, opaque_background);
     }
 
     size_t offset = base_length;
@@ -933,17 +1021,8 @@ int32_t rowXForColumn(uint16_t row, uint16_t col)
     return x;
 }
 
-void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool cursor)
+VisualStyle visualStyleForCell(const Cell& cell, bool cursor)
 {
-    if (!state.initialized || row >= state.rows || col >= state.cols) {
-        return;
-    }
-
-    const Cell& cell = cells[row][col];
-    if (isWideContinuation(cell)) {
-        return;
-    }
-    box_width = maxInt(1, box_width);
     uint16_t fg = cell.fg;
     uint16_t bg = cell.bg;
     if ((cell.attrs & kAttrDim) != 0) {
@@ -954,6 +1033,7 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
         fg = bg;
         bg = swapped;
     }
+
     const uint16_t cursor_fg = bg;
     const uint16_t cursor_bg = fg;
     const bool hidden = (cell.attrs & kAttrHidden) != 0;
@@ -966,6 +1046,95 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
         bg = cursor_bg;
     }
 
+    return {
+        .fg = fg,
+        .bg = bg,
+        .hidden = hidden,
+        .bold = bold,
+    };
+}
+
+bool cursorCoversFixedColumn(uint16_t row, uint16_t col, uint16_t cursor_col)
+{
+    if (row != state.cursor_row || col >= state.cols) {
+        return false;
+    }
+    if (col == cursor_col) {
+        return true;
+    }
+    return cursor_col + 1 < state.cols &&
+        isWideLead(cells[row][cursor_col]) &&
+        col == cursor_col + 1;
+}
+
+uint16_t visualBackgroundForFixedColumn(
+    uint16_t row,
+    uint16_t col,
+    bool include_cursor,
+    uint16_t cursor_col)
+{
+    const bool cursor =
+        include_cursor && cursorCoversFixedColumn(row, col, cursor_col);
+    const uint16_t style_col = cursor ? cursor_col : col;
+    return visualStyleForCell(cells[row][style_col], cursor).bg;
+}
+
+void fillFixedRowBackgroundRuns(
+    uint16_t row,
+    bool include_cursor,
+    uint16_t cursor_col)
+{
+    if (row >= state.rows || state.cols == 0) {
+        return;
+    }
+
+    const int32_t y = state.config.y + row * state.cell_height;
+    uint16_t run_start = 0;
+    uint16_t run_bg = visualBackgroundForFixedColumn(
+        row,
+        0,
+        include_cursor,
+        cursor_col);
+
+    for (uint16_t col = 1; col <= state.cols; ++col) {
+        const bool at_end = col == state.cols;
+        const uint16_t bg = at_end
+            ? run_bg
+            : visualBackgroundForFixedColumn(row, col, include_cursor, cursor_col);
+        if (!at_end && bg == run_bg) {
+            continue;
+        }
+
+        M5.Display.fillRect(
+            state.config.x + run_start * state.cell_width,
+            y,
+            (col - run_start) * state.cell_width,
+            state.cell_height,
+            run_bg);
+        run_start = col;
+        run_bg = bg;
+    }
+}
+
+void renderCellAt(
+    uint16_t row,
+    uint16_t col,
+    int32_t x,
+    int32_t box_width,
+    bool cursor,
+    bool fill_background)
+{
+    if (!state.initialized || row >= state.rows || col >= state.cols) {
+        return;
+    }
+
+    const Cell& cell = cells[row][col];
+    if (isWideContinuation(cell)) {
+        return;
+    }
+    box_width = maxInt(1, box_width);
+    const VisualStyle style = visualStyleForCell(cell, cursor);
+
     const int32_t y = state.config.y + row * state.cell_height;
     const int32_t render_right = state.config.x + terminalRenderWidth();
     if (x >= render_right) {
@@ -973,8 +1142,16 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
     }
     const int32_t clipped_width = minInt(box_width, render_right - x);
     box_width = clipped_width;
-    M5.Display.fillRect(x, y, clipped_width, state.cell_height, bg);
-    if (!hidden && cell.charset == CharacterSet::DecSpecialGraphics && cell.ch != ' ') {
+    if (fill_background) {
+        M5.Display.fillRect(x, y, clipped_width, state.cell_height, style.bg);
+    }
+    const bool opaque_text_background =
+#if TERMINAL_TRANSPARENT_TEXT_AFTER_ROW_PREFILL
+        fill_background;
+#else
+        true;
+#endif
+    if (!style.hidden && cell.charset == CharacterSet::DecSpecialGraphics && cell.ch != ' ') {
         const int32_t left = x + 1;
         const int32_t right = x + box_width - 2;
         const int32_t top = y + 1;
@@ -984,12 +1161,12 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
         const int32_t thickness = minInt(2, maxInt(1, minInt(box_width, state.cell_height) / 8));
         const auto draw_horizontal_segment = [&](int32_t x0, int32_t x1) {
             for (int32_t offset = 0; offset < thickness; ++offset) {
-                M5.Display.drawFastHLine(x0, mid_y + offset, x1 - x0 + 1, fg);
+                M5.Display.drawFastHLine(x0, mid_y + offset, x1 - x0 + 1, style.fg);
             }
         };
         const auto draw_vertical_segment = [&](int32_t y0, int32_t y1) {
             for (int32_t offset = 0; offset < thickness; ++offset) {
-                M5.Display.drawFastVLine(mid_x + offset, y0, y1 - y0 + 1, fg);
+                M5.Display.drawFastVLine(mid_x + offset, y0, y1 - y0 + 1, style.fg);
             }
         };
         const auto draw_horizontal = [&]() {
@@ -1043,47 +1220,96 @@ void renderCellAt(uint16_t row, uint16_t col, int32_t x, int32_t box_width, bool
             break;
         case '`': // diamond
         case '~': // bullet
-            M5.Display.fillCircle(mid_x, mid_y, maxInt(1, minInt(box_width, state.cell_height) / 5), fg);
+            M5.Display.fillCircle(mid_x, mid_y, maxInt(1, minInt(box_width, state.cell_height) / 5), style.fg);
             break;
         case 'a': // checkerboard
             for (int32_t py = top; py <= bottom; py += 2) {
                 for (int32_t px = left + ((py - top) & 2); px <= right; px += 4) {
-                    M5.Display.drawPixel(px, py, fg);
+                    M5.Display.drawPixel(px, py, style.fg);
                 }
             }
             break;
         case 'o':
-            M5.Display.drawFastHLine(left, y + state.cell_height * 1 / 4, right - left + 1, fg);
+            M5.Display.drawFastHLine(left, y + state.cell_height * 1 / 4, right - left + 1, style.fg);
             break;
         case 'p':
-            M5.Display.drawFastHLine(left, y + state.cell_height * 2 / 5, right - left + 1, fg);
+            M5.Display.drawFastHLine(left, y + state.cell_height * 2 / 5, right - left + 1, style.fg);
             break;
         case 'r':
-            M5.Display.drawFastHLine(left, y + state.cell_height * 3 / 5, right - left + 1, fg);
+            M5.Display.drawFastHLine(left, y + state.cell_height * 3 / 5, right - left + 1, style.fg);
             break;
         case 's':
-            M5.Display.drawFastHLine(left, y + state.cell_height * 3 / 4, right - left + 1, fg);
+            M5.Display.drawFastHLine(left, y + state.cell_height * 3 / 4, right - left + 1, style.fg);
             break;
         default:
             char fallback_text[2] = {};
-            drawCellText(cellText(cell, fallback_text), x, y, box_width, fg, bg, bold);
+            drawCellText(
+                cellText(cell, fallback_text),
+                x,
+                y,
+                box_width,
+                style.fg,
+                style.bg,
+                style.bold,
+                opaque_text_background);
             break;
         }
-    } else if (!hidden && cell.ch != ' ') {
+    } else if (!style.hidden && cell.ch != ' ') {
         char fallback_text[2] = {};
-        drawCellText(cellText(cell, fallback_text), x, y, box_width, fg, bg, bold);
+        drawCellText(
+            cellText(cell, fallback_text),
+            x,
+            y,
+            box_width,
+            style.fg,
+            style.bg,
+            style.bold,
+            opaque_text_background);
     }
 
-    if (!hidden && (cell.attrs & kAttrUnderline) != 0) {
+    if (!style.hidden && (cell.attrs & kAttrUnderline) != 0) {
         const int32_t underline_y = y + maxInt(0, state.cell_height - 2);
-        M5.Display.drawFastHLine(x + 1, underline_y, maxInt(1, box_width - 2), fg);
+        M5.Display.drawFastHLine(x + 1, underline_y, maxInt(1, box_width - 2), style.fg);
     }
 }
 
 void renderRowWithCursor(uint16_t row, bool include_cursor);
 
+void markDirtyRow(uint16_t row)
+{
+    if (row < state.rows) {
+        state.dirty_rows[row] = true;
+    }
+}
+
+void markDirtyRows(uint16_t top, uint16_t bottom)
+{
+    if (state.rows == 0 || top >= state.rows || bottom >= state.rows || top > bottom) {
+        return;
+    }
+
+    for (uint16_t row = top; row <= bottom; ++row) {
+        state.dirty_rows[row] = true;
+        if (row == UINT16_MAX) {
+            break;
+        }
+    }
+}
+
+void clearDirtyRows()
+{
+    for (uint16_t row = 0; row < kMaxRows; ++row) {
+        state.dirty_rows[row] = false;
+    }
+}
+
 void renderCell(uint16_t row, uint16_t col, bool cursor)
 {
+    if (state.render_deferred) {
+        markDirtyRow(row);
+        return;
+    }
+
     col = glyphLeadColumn(row, col);
     if (proportionalRenderingEnabled()) {
         renderRowWithCursor(row, cursor && row == state.cursor_row);
@@ -1095,7 +1321,8 @@ void renderCell(uint16_t row, uint16_t col, bool cursor)
         col,
         state.config.x + col * state.cell_width,
         state.cell_width * cellColumnWidth(cells[row][col]),
-        cursor);
+        cursor,
+        true);
 }
 
 void eraseCursor()
@@ -1154,6 +1381,10 @@ void clearAllCells(bool render)
     }
 
     if (render) {
+        if (state.render_deferred) {
+            markDirtyRows(0, state.rows == 0 ? 0 : static_cast<uint16_t>(state.rows - 1));
+            return;
+        }
         M5.Display.fillRect(
             state.config.x,
             state.config.y,
@@ -1168,6 +1399,10 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
     if (row >= state.rows) {
         return;
     }
+    if (state.render_deferred) {
+        markDirtyRow(row);
+        return;
+    }
 
     const int32_t y = state.config.y + row * state.cell_height;
     const uint16_t cursor_col =
@@ -1179,6 +1414,7 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
         const int32_t render_right = state.config.x + render_width;
         M5.Display.fillRect(state.config.x, y, render_width, state.cell_height, state.default_bg);
         int32_t x = state.config.x;
+        beginTextStyleCache();
         for (uint16_t col = 0; col < state.cols && x < render_right; ++col) {
             const int32_t advance = cellAdvance(cells[row][col]);
             renderCellAt(
@@ -1186,20 +1422,33 @@ void renderRowWithCursor(uint16_t row, bool include_cursor)
                 col,
                 x,
                 advance,
-                include_cursor && row == state.cursor_row && col == cursor_col);
+                include_cursor && row == state.cursor_row && col == cursor_col,
+                true);
             x += advance;
         }
+        endTextStyleCache();
         return;
     }
 
+#if TERMINAL_FIXED_ROW_BACKGROUND_PREFILL
+    fillFixedRowBackgroundRuns(row, include_cursor && row == state.cursor_row, cursor_col);
+#endif
+    beginTextStyleCache();
     for (uint16_t col = 0; col < state.cols; ++col) {
         renderCellAt(
             row,
             col,
             state.config.x + col * state.cell_width,
             state.cell_width * cellColumnWidth(cells[row][col]),
-            include_cursor && row == state.cursor_row && col == cursor_col);
+            include_cursor && row == state.cursor_row && col == cursor_col,
+#if TERMINAL_FIXED_ROW_BACKGROUND_PREFILL
+            false
+#else
+            true
+#endif
+            );
     }
+    endTextStyleCache();
 }
 
 void renderRow(uint16_t row)
@@ -1212,6 +1461,10 @@ void renderRows(uint16_t top, uint16_t bottom)
     if (state.rows == 0 || top >= state.rows || bottom >= state.rows || top > bottom) {
         return;
     }
+    if (state.render_deferred) {
+        markDirtyRows(top, bottom);
+        return;
+    }
 
     for (uint16_t row = top; row <= bottom; ++row) {
         renderRow(row);
@@ -1221,11 +1474,33 @@ void renderRows(uint16_t top, uint16_t bottom)
     }
 }
 
+void flushDeferredRows()
+{
+    const bool was_deferred = state.render_deferred;
+    state.render_deferred = false;
+    for (uint16_t row = 0; row < state.rows; ++row) {
+        if (!state.dirty_rows[row]) {
+            continue;
+        }
+        state.dirty_rows[row] = false;
+        renderRowWithCursor(row, false);
+    }
+    state.render_deferred = was_deferred;
+}
+
 void scrollUpRegion(uint16_t top, uint16_t bottom)
 {
     if (state.rows == 0 || state.cols == 0 || top >= state.rows || bottom >= state.rows || top > bottom) {
         return;
     }
+#if TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES
+    const bool defer_display_scroll = state.render_deferred;
+#else
+    const bool defer_display_scroll = false;
+    if (state.render_deferred) {
+        flushDeferredRows();
+    }
+#endif
 
     for (uint16_t row = top + 1; row <= bottom; ++row) {
         for (uint16_t col = 0; col < state.cols; ++col) {
@@ -1237,6 +1512,11 @@ void scrollUpRegion(uint16_t top, uint16_t bottom)
     }
     for (uint16_t col = 0; col < state.cols; ++col) {
         cells[bottom][col] = blankCell();
+    }
+
+    if (defer_display_scroll) {
+        markDirtyRows(top, bottom);
+        return;
     }
 
     setScrollRectForRows(top, bottom);
@@ -1255,6 +1535,14 @@ void scrollDownRegion(uint16_t top, uint16_t bottom)
     if (state.rows == 0 || state.cols == 0 || top >= state.rows || bottom >= state.rows || top > bottom) {
         return;
     }
+#if TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES
+    const bool defer_display_scroll = state.render_deferred;
+#else
+    const bool defer_display_scroll = false;
+    if (state.render_deferred) {
+        flushDeferredRows();
+    }
+#endif
 
     for (uint16_t row = bottom; row > top; --row) {
         for (uint16_t col = 0; col < state.cols; ++col) {
@@ -1263,6 +1551,11 @@ void scrollDownRegion(uint16_t top, uint16_t bottom)
     }
     for (uint16_t col = 0; col < state.cols; ++col) {
         cells[top][col] = blankCell();
+    }
+
+    if (defer_display_scroll) {
+        markDirtyRows(top, bottom);
+        return;
     }
 
     setScrollRectForRows(top, bottom);
@@ -2709,6 +3002,8 @@ void begin(const TerminalConfig& config)
     state.rows = static_cast<uint16_t>(
         minInt(rowLimit, maxInt(1, config.height / state.cell_height)));
     state.initialized = true;
+    state.render_deferred = false;
+    clearDirtyRows();
     setTerminalScrollRect();
     fullReset();
     drawCursor();
@@ -2742,6 +3037,11 @@ void writeByte(uint8_t byte)
         return;
     }
 
+    if (state.write_transaction_depth > 0) {
+        processByte(byte);
+        return;
+    }
+
     eraseCursor();
     processByte(byte);
     drawCursor();
@@ -2753,11 +3053,45 @@ void writeBytes(const uint8_t *data, size_t length)
         return;
     }
 
-    eraseCursor();
+    const bool owns_transaction = state.write_transaction_depth == 0;
+    if (owns_transaction) {
+        beginWriteTransaction();
+    }
     for (size_t i = 0; i < length; ++i) {
         processByte(data[i]);
     }
-    drawCursor();
+    if (owns_transaction) {
+        endWriteTransaction();
+    }
+}
+
+void beginWriteTransaction()
+{
+    if (!state.initialized) {
+        return;
+    }
+
+    if (state.write_transaction_depth == 0) {
+        eraseCursor();
+        state.render_deferred = true;
+    }
+    if (state.write_transaction_depth != UINT8_MAX) {
+        ++state.write_transaction_depth;
+    }
+}
+
+void endWriteTransaction()
+{
+    if (!state.initialized || state.write_transaction_depth == 0) {
+        return;
+    }
+
+    --state.write_transaction_depth;
+    if (state.write_transaction_depth == 0) {
+        flushDeferredRows();
+        state.render_deferred = false;
+        drawCursor();
+    }
 }
 
 uint16_t columns()

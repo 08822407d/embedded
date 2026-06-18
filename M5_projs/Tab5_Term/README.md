@@ -290,11 +290,36 @@ The same test can be run with concise logging:
 .\tools\tab5.ps1 app-smoke -Port COM3
 ```
 
+For Stage 10 render/receive latency comparisons through the formal UART bridge:
+
+```powershell
+.\tools\tab5.ps1 render-latency -Port COM3 -BurstLines 64 -LineWidth 64
+```
+
+The command writes detailed raw and JSON output under `.logs\render-latency-*`.
+The wrapper defaults to temporarily disabling the login-UART CDC mirror and
+polling `TAB5PIPE` counters, because heavy CDC mirror traffic can perturb the
+ESP32-P4 Arduino `HWCDC` path. Pass `-EnableMirror` only when checking the CDC
+mirror byte stream itself. Current JSON output includes mirror mode, pipeline
+timing, optional exact-line assertions, expected byte counts, `TAB5PIPE`
+receive/render/mirror counters, actual UART RX buffer size, and UART driver
+error counters. The current Stage 10 P6 `240x64` mirror-disabled metric is
+about `1.1s` to pipeline quiescence; this is the accepted Stage 10 close-out
+baseline for future comparisons.
+
 The normal `tab5_min_uart_terminal` now uses fixed 18x20 cells to avoid
 whole-row redraws for every received character. It keeps the approved
 M5GFX `DejaVu18` font face; only character positioning changes. Use
 `tab5_terminal_font_prop_preview` when the retained true-proportional renderer
-must be inspected.
+must be inspected. Fixed-cell rows prefill background-color runs before drawing
+glyphs, then draw text transparently over that prefilled background. This helps
+common shell/TUI output. During batched `terminal::writeBytes()` spans, hardware scroll is
+also deferred and the final visible rows are redrawn once at the end of the
+batch.
+When the login UART software RX ring still has backlog, the formal firmware
+keeps a terminal write transaction open and delays physical row flushes until
+the backlog clears or a short timeout is reached. This avoids dozens of
+redundant scroll-region redraws during large shell bursts.
 
 ## Continue On Another Machine
 

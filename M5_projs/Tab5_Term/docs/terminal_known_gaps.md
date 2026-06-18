@@ -68,6 +68,32 @@ implementation and regression tests pass.
 
 - Formal firmware uses fixed-cell DejaVu18 rendering for interactive
   performance. Proportional rendering remains a preview/debug option.
+- Stage 10 P4 fixed the measured long-burst receive loss by draining the login
+  UART from `HardwareSerial.onReceive(..., false)` into the 32 KiB software RX
+  ring. The final `64x64`, `120x64`, and `240x64` `render-latency` runs passed
+  exact-line checks with expected-byte delta `0`, no UART driver errors, and
+  no software drops. The remaining performance gap is throughput: the accepted
+  `240x64` burst still took `17.234s` end-to-end through UART receive,
+  rendering, and CDC mirroring. This is not pure LCD draw time.
+- Stage 10 P5 showed that CDC debug mirroring is not the dominant throughput
+  bottleneck. The default `tools/tab5.ps1 render-latency` path now disables
+  the mirror and uses `TAB5PIPE` counters; a `240x64` run still took about
+  `17.9s` to become pipeline-quiescent. Heavy `-EnableMirror` runs are a known
+  diagnostic risk on the current ESP32-P4 Arduino `HWCDC` path: one `240x64`
+  run crashed in `hw_cdc_isr_handler()`, and one `120x64` run lost mirrored
+  bytes. Use `-EnableMirror` only for short mirror-integrity checks, not as the
+  main performance metric.
+- Stage 10 P6 reduced render overhead in several increments: the default
+  bounded render batch is now `320` bytes, fixed-cell row rendering now prefills
+  contiguous background-color runs before drawing glyphs, that row-prefill
+  path now uses transparent text drawing, hardware scroll is deferred during
+  batched `terminal::writeBytes()` spans, and the formal UART bridge keeps a
+  write transaction open while the software RX ring has backlog. The measured
+  mirror-disabled `240x64` quiescent time is now about `1.1s` with no UART
+  errors or software drops. `384`, `512`, and `1024` byte batches were rejected
+  for now because they produced UART FIFO overflow in at least one validation
+  path. Long-output latency is much improved but can still be visible on very
+  large or continuous output.
 - Capture-enabled debug firmware can verify final logical framebuffer pixels,
   including font rasterization and status-bar placement. It cannot verify
   backlight brightness, panel color cast, viewing angle, ghosting, bad pixels,

@@ -14,6 +14,7 @@ param(
         "key-capture",
         "terminal-regression",
         "screenshot",
+        "render-latency",
         "baud",
         "power-detect"
     )]
@@ -36,6 +37,10 @@ param(
     [string]$Baseline = "",
     [int]$ChannelTolerance = 0,
     [int]$DurationSeconds = 180,
+    [int]$BurstLines = 240,
+    [int]$LineWidth = 64,
+    [switch]$DisableMirror,
+    [switch]$EnableMirror,
     [ValidateSet("usb", "a164")]
     [string]$KeyboardDevice = "usb",
     [ValidateSet("normal", "app-cursor")]
@@ -467,6 +472,46 @@ try {
             }
 
             Get-Content -Path $log | Select-Object -Last 12
+        }
+
+        "render-latency" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "measure_render_latency.py"
+            $rawOutput = Join-Path $logRoot "render-latency-$timestamp.raw.bin"
+            $jsonOutput = Join-Path $logRoot "render-latency-$timestamp.json"
+            $log = Join-Path $logRoot "render-latency-$timestamp.log"
+            $timeoutSeconds = if ($PSBoundParameters.ContainsKey("DurationSeconds")) {
+                $DurationSeconds
+            } else {
+                45
+            }
+            $arguments = @(
+                "--port", $Port,
+                "--rows", "32",
+                "--cols", "64",
+                "--lines", "$BurstLines",
+                "--line-width", "$LineWidth",
+                "--timeout", "$timeoutSeconds",
+                "--raw-output", $rawOutput,
+                "--json-output", $jsonOutput
+            )
+            $disableMirrorForLatency = -not $EnableMirror
+            if ($DisableMirror) {
+                $disableMirrorForLatency = $true
+            }
+            if ($disableMirrorForLatency) {
+                $arguments += "--disable-mirror"
+            }
+
+            Invoke-LoggedCommand -Label "Stage 10 render latency workload on $Port" -LogPath $log -Command {
+                & $python $script @arguments
+            }
+
+            Get-Content -Path $log | Select-Object -Last 20
+            if (Test-Path -LiteralPath $jsonOutput) {
+                Get-Content -Path $jsonOutput
+            }
         }
 
         "baud" {

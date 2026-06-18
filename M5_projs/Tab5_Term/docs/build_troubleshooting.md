@@ -379,3 +379,29 @@ Conclusion:
   stuck compiler. Check `build-status` for worker id, elapsed time, and
   `log_idle` first; use `build-wait` to rejoin the existing build instead of
   starting another one.
+
+## Observation 2026-06-18: Stage 10 P4 Dependency Rebuilds
+
+Context:
+
+- Stage 10 P4 added render-pipeline diagnostics, UART error reporting, and
+  receive-path changes touching `main.cpp`, `login_uart.cpp`, shared headers,
+  and host scripts.
+- Builds were run through the detached worker.
+
+Observed evidence:
+
+- `tab5_min_uart_terminal` initially appeared quiet but later showed active
+  M5GFX/M5Unified/FrameworkArduino compilation and succeeded in `367.3s`.
+- A source-only follow-up formal build succeeded in `30s`.
+- `tab5_terminal_regression` then compiled a full dependency graph and
+  succeeded in `435.7s`.
+- After the cache was warm, the final callback-drain source builds succeeded
+  in `55.8s` for `tab5_min_uart_terminal` and `30.3s` for
+  `tab5_terminal_regression`.
+
+Interpretation:
+
+- These were long but healthy builds: logs advanced and compiler CPU was
+  active. The correct response was to rejoin the detached worker rather than
+  restarting or killing processes.

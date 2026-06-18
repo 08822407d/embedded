@@ -156,7 +156,7 @@ the synchronized summaries in `terminal_validation.md`, `terminal_known_gaps.md`
 and `HANDOFF.md`. No hidden manual requirement remains; uninstalled Linux
 programs and A164-unavailable keys are explicitly recorded.
 
-## Active Mainline Stage: Stage 10 Render Performance And Interaction Latency
+## Completed Mainline Stage: Stage 10 Render Performance And Interaction Latency
 
 Goal: improve the accepted UART terminal's human-visible responsiveness before
 starting larger transport features such as SSH/Telnet/PPP. The current user
@@ -171,6 +171,19 @@ Scope:
 - Add measurement or repeatable test hooks before deeper redraw refactors.
 - Do not reopen font selection, terminal identity, or advanced network
   transports in this stage.
+
+Status: completed on 2026-06-18. P1-P6 are implemented, recorded, and
+hardware-validated on COM3. The final accepted formal firmware uses
+event-callback UART draining, a 32 KiB software RX ring, `TAB5PIPE` diagnostics,
+mirror-disabled latency measurement by default, fixed-cell row prefill,
+transparent row text drawing, deferred scroll during byte spans, conservative
+320-byte render batches, and backlog-aware write transactions. Final validation
+showed mirror-disabled `120x64` pipeline quiescence in `0.640s`,
+mirror-disabled `240x64` pipeline quiescence in `1.094s`, short
+`64x64 -EnableMirror` exact integrity in `0.156s`, no UART errors, no software
+drops, and `tab5_terminal_regression` passing 7/7. No active Stage 10
+implementation item remains; future work should open a new stage or explicitly
+reopen Stage 10 if a new performance issue is observed.
 
 ### Milestone P1: Batch Input Without Per-Byte Cursor Repaint
 
@@ -198,12 +211,332 @@ comparison remains part of P2.
 - Record before/after observations where possible. If exact timing cannot be
   captured from the device yet, record the manual observation boundary clearly.
 
-### Milestone P3: Dirty-Region Renderer Planning
+Status: implemented and hardware-measured on 2026-06-18. Added
+`tools/measure_render_latency.py` and `tools/tab5.ps1 render-latency`. The
+workload sends a scripted colored text burst through the current USB CDC bridge
+to the real Module LLM login shell, then times the returned Tab5 CDC mirror
+from start marker to end marker. This measures end-to-end login-UART receive,
+terminal rendering, and CDC mirroring; it is not pure LCD draw time.
+
+Current P1 baseline on COM3:
+
+- 64 lines x 64 printable body columns: completed, line integrity `ok`
+  (`64/64` unique lines), start-to-end `4.438s`, burst `5547` bytes,
+  approximately `1249.9 bytes/s`.
+- 120 lines x 64 printable body columns: timed out without the end marker.
+  The raw mirror showed output reaching about line `0096` before returning to
+  the shell prompt, so this workload exposed burst loss before completion.
+- 240 lines x 64 printable body columns: completed marker-wise, but line
+  integrity was `loss-or-corruption` (`100/240` unique lines, `140` missing),
+  start-to-end `6.500s`, burst `8776` bytes, approximately `1350.2 bytes/s`.
+
+A follow-up `tools/tab5.ps1 probe -Port COM3` passed with
+`shell-path-ok: m5stack-LLM`, so the timeout run did not leave the shell stuck.
+No pre-P1 timing exists in the current logs; future renderer or receive-path
+changes should compare against the JSON files in `.logs/render-latency-*.json`.
+
+### Milestone P3: Dirty-Region Rendering And Receive Decoupling
 
 - If P1 is not enough, design dirty-row/dirty-rectangle rendering around the
   existing cell model rather than rewriting terminal parsing.
+- Include UART receive buffering/backpressure in the analysis. P2 showed that
+  large host bursts can lose or corrupt bytes before the renderer catches up,
+  so reducing draw cost alone may not be sufficient.
 - Keep wide-cell repair, cursor rendering, alternate screen, and framebuffer
   diagnostics intact.
+
+Status: first implementation completed and hardware-measured on 2026-06-18.
+`terminal::writeBytes()` now defers cell repainting while a span is parsed,
+marks dirty rows, flushes those rows once at the end of the span, and preserves
+scroll behavior by flushing pending rows before hardware scroll operations.
+The formal login-UART path now uses a 32 KiB hardware RX buffer plus a 32 KiB
+main-loop software RX ring; each loop drains up to 4096 UART bytes into the
+software ring and renders/mirrors up to 96 bytes.
+
+Verification:
+
+- `tab5_min_uart_terminal` built in `43.3s` after the software RX ring change
+  and used `48068/512000` RAM bytes.
+- `tab5_terminal_regression` built in `40.7s`.
+- The formal firmware was flashed to COM3, and a follow-up shell probe returned
+  `shell-path-ok: m5stack-LLM`.
+- The final P3 `render-latency` run completed `16x64` cleanly in `0.328s` and
+  `120x64` cleanly with `120/120` unique lines in `8.172s`.
+- `240x64` improved from the P2 `100/240` result to `239/240` unique lines in
+  `17.250s`, but one line was still missing from the CDC mirror.
+- A later `64x64` run unexpectedly reported `63/64` unique lines and random
+  binary bytes in the raw CDC mirror around an early line. This result is a
+  measurement-path caveat: `render-latency` line integrity currently checks the
+  Tab5 CDC mirror stream, not final framebuffer pixels, so it must not be
+  treated as proof of visible screen corruption without a screenshot/state
+  diagnostic.
+
+P3 conclusion: the receive/render pipeline is materially better than the P2
+baseline, especially for the 120-line workload, but Stage 10 is not complete.
+The next step is to separate CDC mirror integrity from final-screen/render
+measurement, then continue renderer throughput optimization from that cleaner
+evidence.
+
+### Milestone P4: Isolate Measurement Path
+
+- Determine whether the corrupted raw bytes seen in the P3 CDC mirror are from
+  USB CDC mirroring, login-UART receive loss, shell output, or terminal
+  rendering.
+- Avoid using CDC mirror line integrity as final-screen proof. If the question
+  is visible output, use framebuffer/state diagnostics or a dedicated
+  diagnostic summary.
+- Consider a diagnostic-only mirror path that reports counters/hashes or
+  mirrors bytes before expensive rendering, so host-side scripts can separate
+  input integrity from draw throughput.
+- Keep the formal user-visible behavior unchanged unless the investigation
+  identifies a real receive-path bug.
+
+Exit condition: Stage 10 has one trusted measurement for receive integrity and
+one trusted measurement for visible/framebuffer correctness, or the remaining
+uncertainty is explicitly documented with the exact unsupported claim.
+
+Status: completed on 2026-06-18. Added
+`include/render_pipeline_diagnostics.h`, firmware-side `TAB5PIPE` counters,
+USB management commands `OSC 777 ; render-pipeline? BEL` and
+`OSC 777 ; render-pipeline-reset BEL`, and host-side collection in
+`tools/measure_render_latency.py`. The workload now records exact-line checks,
+expected marker-bounded byte counts, software RX depth, the actual Arduino
+HardwareSerial RX buffer size, and UART driver error counters.
+
+P4 found a real pre-software-ring receive problem. The P3 software RX ring did
+not drop bytes, but bad runs showed bytes missing before they entered that
+ring. After adding Arduino `onReceiveError` counters, a failing `120x64`
+measurement reported `uart_fifo_ovf=1`, confirming UART FIFO overflow. The
+fix was to drain `HardwareSerial` from the Arduino `onReceive(..., false)`
+event callback into the 32 KiB software RX ring instead of waiting for the
+main render loop or a 1 ms polling task.
+
+Final P4 validation on COM3 after the event-callback drain:
+
+- `tab5_min_uart_terminal` built in `55.8s`, flashed successfully, and a shell
+  probe returned `shell-path-ok: m5stack-LLM`.
+- `tools/tab5.ps1 baud -Port COM3` still parsed the extended
+  `login-uart?` response and reported active/persisted `921600`.
+- `64x64`: `ok`, exact `64/64`, expected-byte delta `0`, no UART errors,
+  `3.953s`.
+- `120x64`: `ok`, exact `120/120`, expected-byte delta `0`, no UART errors,
+  `8.172s`.
+- `240x64`: `ok`, exact `240/240`, expected-byte delta `0`, no UART errors,
+  `17.234s`; software RX max depth was `20925/32768`.
+- `tab5_terminal_regression` built in `30.3s` after the final source changes.
+
+P4 conclusion: receive integrity for the measured `240x64` burst is now
+trusted through firmware counters and exact CDC mirror checks. The remaining
+Stage 10 problem is throughput: long output still takes many seconds because
+row rendering and CDC mirroring are slow, not because bytes are being lost.
+
+### Milestone P5: Render Throughput After Receive Integrity
+
+- Keep the P4 event-callback UART drain and `TAB5PIPE` counters as regression
+  evidence.
+- Optimize display/mirror throughput only after checking `sw_dropped=0`,
+  `uart_fifo_ovf=0`, `burst_byte_delta_from_expected=0`, and exact-line
+  matches on the workload under comparison.
+- Candidate work includes reducing full-row redraw cost, separating optional
+  USB CDC mirror cost from screen rendering cost, and adding a final
+  framebuffer/state check for screens that remain visible after long output.
+
+Exit condition: the same trusted receive-integrity measurements remain clean,
+and at least one user-visible or measured long-output latency metric improves
+without breaking terminal-core regression builds.
+
+Status: diagnostic work completed on 2026-06-18; throughput optimization
+continues in P6. Added runtime CDC mirror control through
+`render_pipeline::mirrorEnabled()/setMirrorEnabled()`, `TAB5PIPE
+mirror_enabled`, and USB management commands `render-mirror?` plus
+`render-mirror=0/1`. `tools/measure_render_latency.py --disable-mirror` now
+times firmware render counters without mirroring login output back over CDC,
+and `tools/tab5.ps1 render-latency` defaults to that safer mirror-disabled
+mode. Use `-EnableMirror` only when the CDC mirror byte stream itself is being
+validated.
+
+P5 validation on COM3:
+
+- `tab5_min_uart_terminal` built in `31.1s`, flashed successfully, and the
+  shell probe returned `shell-path-ok: m5stack-LLM`.
+- Mirror-disabled `240x64` default run completed with `rendered=21407`,
+  `sw_dropped=0`, no UART driver errors, software RX max depth
+  `20922/32768`, and pipeline quiescent time `17.906s`
+  (`.logs/render-latency-20260618-142634.json`).
+- Mirror-enabled `64x64` integrity check still passed exactly (`64/64`,
+  expected-byte delta `0`) and took `3.969s` from start marker to end marker.
+- Heavy mirror-enabled runs are no longer trusted as routine performance
+  tests. One `240x64` run triggered an ESP32-P4 Arduino `HWCDC` Store access
+  fault in `hw_cdc_isr_handler()` around line `0209` and rebooted the board
+  (`.logs/render-latency-20260618-142248.raw.bin`). A later `120x64`
+  mirror-enabled run reached the end marker but lost `28` mirrored bytes, so
+  the host script now treats mirror-mode line-integrity failure as a test
+  failure instead of marker-only success.
+- `tab5_terminal_regression` built in `26.5s` after the final source/script
+  changes.
+
+P5 conclusion: disabling the CDC debug mirror did not materially reduce the
+`240x64` latency compared with the P4 `17.234s` mirror-enabled baseline. The
+dominant remaining delay is therefore in terminal parsing, row redraw, LCD
+update, or their scheduling, not in USB CDC mirror throughput. The next
+optimization must attack rendering work directly while retaining P4/P5 receive
+counters.
+
+### Milestone P6: Row Rendering Throughput
+
+- Profile or estimate the per-row redraw cost in the current fixed-cell
+  DejaVu18 renderer.
+- Reduce unnecessary full-row work where possible without weakening wide-cell,
+  fallback-glyph, cursor, scroll, alternate-screen, or color behavior.
+- Keep mirror-disabled `render-latency` as the default performance metric and
+  use short `-EnableMirror` runs only for CDC mirror sanity checks.
+
+Exit condition: a repeatable mirror-disabled long-output metric improves while
+`TAB5PIPE` still reports no UART errors or software drops, and
+`tab5_terminal_regression` continues to build.
+
+Status: first throughput increment completed on 2026-06-18. The main-loop
+render batch size is now configurable as `LOGIN_UART_RENDER_BYTES_PER_LOOP`
+and defaults to `256` instead of the prior hard-coded `96`. This keeps the P4
+event-callback UART drain unchanged, but reduces the number of
+parse/flush/cursor cycles needed to consume a long software-RX burst.
+
+P6 first-increment validation on COM3:
+
+- `tab5_min_uart_terminal` built in `51.3s`, flashed successfully, and the
+  shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `17.078s`,
+  `rendered=21407`, no UART errors, no software drops, and render batches
+  reduced to `97` from the previous roughly `234`.
+- Default mirror-disabled `120x64`: `ok`, pipeline quiescent time `8.438s`,
+  `rendered=10992`, no UART errors, no software drops, `57` batches.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `3.687s`, no UART errors, no software drops, `38`
+  batches.
+- `tab5_terminal_regression` built in `47.5s`.
+
+Second increment on 2026-06-18: fixed-cell row rendering now uses
+`TERMINAL_FIXED_ROW_BACKGROUND_PREFILL=1` by default. A dirty fixed-cell row
+prefills contiguous background-color runs, then draws glyphs without doing a
+full-cell background `fillRect` per cell. This mainly helps the common
+black-background, colored-foreground shell/TUI case. The per-cell path remains
+available for immediate single-cell updates and for disabling the optimization.
+
+Second-increment validation on COM3:
+
+- `tab5_min_uart_terminal` built in `51.2s`, flashed successfully, and a
+  follow-up shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `16.984s`,
+  `rendered=21407`, no UART errors, no software drops, `97` batches.
+- Default mirror-disabled `120x64`: `ok`, pipeline quiescent time `8.360s`,
+  `rendered=10992`, no UART errors, no software drops, `57` batches.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `3.641s`, no UART errors, no software drops.
+- `tab5_terminal_regression` built in `55.2s`.
+- `tools/measure_render_latency.py` now waits for complete command-specific
+  management replies, so fragmented `TAB5PIPE v=1` lines cannot be parsed as
+  partial stats.
+
+Third increment on 2026-06-18: fixed-cell rows that already prefilled their
+background now draw text with a transparent background
+(`TERMINAL_TRANSPARENT_TEXT_AFTER_ROW_PREFILL=1`). Before this change the code
+removed the explicit per-cell `fillRect`, but M5GFX text drawing could still
+fill the glyph box because text color was set with foreground and background.
+The transparent path sets the M5GFX base color to the cell background before
+drawing, so anti-aliased edges still blend against the intended background.
+
+Third-increment validation on COM3:
+
+- `tab5_min_uart_terminal` built in `56.9s`, flashed successfully, and a
+  follow-up shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `16.250s`,
+  `rendered=21407`, no UART errors, no software drops, `97` batches.
+- Default mirror-disabled `120x64`: `ok`, pipeline quiescent time `8.032s`,
+  `rendered=10992`, no UART errors, no software drops, `57` batches.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `3.484s`, no UART errors, no software drops.
+- `tab5_terminal_regression` built in `62.8s`.
+
+Fourth increment on 2026-06-18: hardware scroll is now deferred only while
+`terminal::writeBytes()` is parsing a byte span
+(`TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES=1`). During the batch, scroll
+operations update the logical cell buffer and mark the affected scroll region
+dirty; the final visible rows are rendered once at the end of the batch. The
+single-byte interactive path keeps the immediate hardware-scroll behavior.
+
+Fourth-increment validation on COM3:
+
+- `tab5_min_uart_terminal` built in `53.9s`, flashed successfully, and the
+  shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `8.078s`,
+  `rendered=21407`, no UART errors, no software drops, `97` batches.
+- Default mirror-disabled `120x64`: `ok`, pipeline quiescent time `4.125s`,
+  `rendered=10992`, no UART errors, no software drops, `57` batches. A prior
+  parallel test attempt showed `uart_fifo_ovf=1`; rerunning the same workload
+  serially was clean, so keep render-latency tests single-owner on the COM port.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `1.703s`, no UART errors, no software drops.
+- `tab5_terminal_regression` rebuilt in `49.6s`, flashed, and passed 7/7
+  after a short post-flash wait. An earlier immediate post-flash attempt hit a
+  USB CDC write timeout; waiting about five seconds and rerunning passed. The
+  formal firmware was then flashed back and the shell probe passed.
+
+Fifth increment on 2026-06-18: after deferred scrolling changed the fixed
+cost per batch, `LOGIN_UART_RENDER_BYTES_PER_LOOP` was retuned. `512` bytes
+produced better single-run numbers (`240x64` around `4.5s`) but produced one
+`uart_fifo_ovf=1` during repeated testing. `1024` improved a mirror-disabled
+`240x64` run to `3.610s`, but failed the short `64x64 -EnableMirror`
+integrity check with `uart_fifo_ovf=1`. After
+`tools/measure_render_latency.py` was tightened to treat software RX drops and
+UART driver errors as `pipeline-error` failures instead of allowing
+`status=ok`, repeated `384` tests also failed with `uart_fifo_ovf=1`. The
+accepted default is therefore `320`, which keeps a wider scheduling margin
+while still improving on `256`.
+
+Fifth-increment validation on COM3 with the accepted `320` default:
+
+- `tab5_min_uart_terminal` built in `48.7s`, flashed successfully, and the
+  shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `120x64` was run twice: `3.359s` and `3.453s`
+  quiescent, `rendered=10992`, no UART errors, no software drops, `48`
+  batches.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `6.782s`,
+  `rendered=21407`, no UART errors, no software drops, `81` batches.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `1.422s`, no UART errors, no software drops.
+- `tab5_terminal_regression` rebuilt in `42.6s`, flashed, and passed 7/7. The
+  formal firmware was restored and the shell probe passed.
+
+P6 conclusion so far: larger render batches, fixed-row background prefill,
+transparent text over prefilled rows, deferred hardware scroll during batched
+writes, conservative batch retuning, and backlog-aware write transactions give
+a large measured improvement, taking `240x64` from P5 `17.906s` to about
+`1.1s` with clean counters. Long-output latency is now much closer to the
+human-interactive target; further work should be selective and must preserve
+the clean receive counters and regression results.
+
+Sixth increment on 2026-06-18: added terminal write transactions and
+formal-login backlog-aware render deferral. `terminal::beginWriteTransaction()`
+and `terminal::endWriteTransaction()` let the UART bridge parse multiple
+software-RX batches into the logical screen model while delaying physical row
+flushes until the RX backlog clears or `LOGIN_UART_RENDER_DEFER_MAX_MS`
+expires. `TERMINAL_CACHE_TEXT_STYLE_DURING_ROW_RENDER` was also added, but
+style caching alone did not materially improve the measured `240x64` case
+(`6.797s` vs the prior `6.782s`); the effective optimization was avoiding
+redundant full-scroll-region redraws between queued batches.
+
+Sixth-increment validation on COM3:
+
+- `tab5_min_uart_terminal` built in `47.8s`, flashed successfully, and the
+  shell probe returned `shell-path-ok: m5stack-LLM`.
+- Default mirror-disabled `120x64`: `ok`, pipeline quiescent time `0.640s`,
+  `rendered=10992`, no UART errors, no software drops, `48` batches.
+- Default mirror-disabled `240x64`: `ok`, pipeline quiescent time `1.094s`,
+  `rendered=21407`, no UART errors, no software drops, `81` batches.
+- Short mirror-enabled `64x64 -EnableMirror`: exact `64/64`, expected-byte
+  delta `0`, start-to-end `0.156s`, no UART errors, no software drops.
+- `tab5_terminal_regression` rebuilt in `46.1s`, flashed, and passed 7/7. The
+  formal firmware was restored and the shell probe passed.
 
 ## Completed Mainline Stage: Stage 6 Test And Regression Harness
 
@@ -609,6 +942,118 @@ enabled in the formal firmware by default.
 
 ## Progress Log
 
+- 2026-06-18: Stage 10 P6 sixth throughput increment added terminal write
+  transactions and formal-login backlog-aware render deferral. Standalone row
+  text-style caching was low impact (`240x64` stayed about `6.8s`), but
+  keeping the logical parser ahead of the physical row flush reduced
+  mirror-disabled `120x64` to `0.640s` and `240x64` to `1.094s` with clean
+  `TAB5PIPE` counters. Short `64x64 -EnableMirror` passed exact integrity in
+  `0.156s` start-to-end. `tab5_terminal_regression` rebuilt in `46.1s`,
+  flashed, and passed 7/7; the formal firmware was restored and shell probe
+  passed.
+- 2026-06-18: Stage 10 P6 fifth throughput increment retuned
+  `LOGIN_UART_RENDER_BYTES_PER_LOOP` after deferred scroll made batch count a
+  dominant cost. `512` bytes was faster but produced one `uart_fifo_ovf=1`;
+  `1024` reached `3.610s` on mirror-disabled `240x64` but failed short
+  mirror-integrity with `uart_fifo_ovf=1`; stricter `pipeline-error` handling
+  then showed repeated `384` runs also hit `uart_fifo_ovf=1`. The accepted
+  default is `320`. With `320`, mirror-disabled `120x64` completed twice in
+  `3.359s` and `3.453s` quiescent with clean counters and `48` batches;
+  mirror-disabled `240x64` completed in `6.782s` with clean counters and `81`
+  batches; short `64x64 -EnableMirror` passed exact integrity in `1.422s`.
+  `tab5_terminal_regression` rebuilt in `42.6s`, flashed, and passed 7/7; the
+  formal firmware was restored and shell probe passed.
+- 2026-06-18: Stage 10 P6 fourth throughput increment deferred hardware scroll
+  during `terminal::writeBytes()` spans
+  (`TERMINAL_DEFER_SCROLL_DURING_WRITE_BYTES=1`). Batched scrolls now update
+  the logical cell buffer and mark the scroll region dirty; only the final
+  visible rows are rendered at the end of the byte span. Formal firmware built
+  in `53.9s`, flashed to COM3, and shell probe passed. Mirror-disabled
+  `240x64` completed in `8.078s` quiescent with `rendered=21407`, no UART
+  errors, no software drops, and `97` batches. Mirror-disabled `120x64`
+  completed in `4.125s` quiescent with clean counters after a serial rerun;
+  short `64x64 -EnableMirror` passed exact line integrity with expected-byte
+  delta `0` and start-to-end `1.703s`. `tab5_terminal_regression` rebuilt in
+  `49.6s`, flashed, and passed 7/7 after a short post-flash wait; one earlier
+  immediate post-flash CDC write-timeout was resolved by waiting and rerunning.
+  The formal firmware was flashed back and shell probe passed.
+- 2026-06-18: Stage 10 P6 third throughput increment changed the fixed-cell
+  row-prefill path to draw text transparently over the already-filled row
+  background (`TERMINAL_TRANSPARENT_TEXT_AFTER_ROW_PREFILL=1`). The code sets
+  M5GFX base color to the cell background before transparent text drawing so
+  anti-aliased edges blend correctly. Formal firmware built in `56.9s`,
+  flashed to COM3, and shell probe passed. Mirror-disabled `240x64` completed
+  in `16.250s` quiescent with `rendered=21407`, no UART errors, no software
+  drops, and `97` batches. `120x64` completed in `8.032s`; short
+  `64x64 -EnableMirror` passed exact line integrity with expected-byte delta
+  `0` and start-to-end `3.484s`. `tab5_terminal_regression` built in `62.8s`.
+- 2026-06-18: Stage 10 P6 second throughput increment added fixed-cell
+  row-background prefill (`TERMINAL_FIXED_ROW_BACKGROUND_PREFILL=1`). Fixed
+  rows now fill contiguous background-color runs once before drawing glyphs,
+  avoiding a full-cell background `fillRect` for every cell in common
+  black-background colored text. Formal firmware built in `51.2s`, flashed to
+  COM3, and a follow-up shell probe passed. Mirror-disabled `240x64` completed
+  in `16.984s` quiescent with `rendered=21407`, no UART errors, no software
+  drops, and `97` batches. `120x64` completed in `8.360s`; short
+  `64x64 -EnableMirror` passed exact line integrity with expected-byte delta
+  `0`. `tab5_terminal_regression` built in `55.2s`. The render-latency tool
+  also now waits for complete command-specific management replies so fragmented
+  `TAB5PIPE` stats are not parsed as partial values.
+- 2026-06-18: Stage 10 P6 first throughput increment made the formal
+  main-loop render batch configurable (`LOGIN_UART_RENDER_BYTES_PER_LOOP`) and
+  raised the default from hard-coded `96` to `256`. Formal firmware built in
+  `51.3s`, flashed to COM3, and the shell probe passed. Mirror-disabled
+  `240x64` improved from P5 `17.906s` quiescent to `17.078s`, with
+  `rendered=21407`, no UART errors, no software drops, and render batches
+  reduced to `97`. Mirror-disabled `120x64` completed in `8.438s`; short
+  `64x64 -EnableMirror` passed exact line integrity with expected-byte delta
+  `0`. `tab5_terminal_regression` built in `47.5s`. This is a small scheduling
+  improvement, not a full row-rendering solution; LCD/row draw cost remains.
+- 2026-06-18: Stage 10 P5 separated CDC debug mirroring from firmware
+  render-pipeline timing. Added runtime `render-mirror?` / `render-mirror=0/1`
+  management, `TAB5PIPE mirror_enabled`, `measure_render_latency.py
+  --disable-mirror`, and changed the common `tools/tab5.ps1 render-latency`
+  wrapper to default to mirror-disabled performance measurement. COM3
+  mirror-disabled `240x64` completed with `rendered=21407`, `sw_dropped=0`, no
+  UART errors, software RX max depth `20922/32768`, and pipeline quiescent
+  time `17.906s`. This did not materially improve on the P4 `17.234s`
+  mirror-enabled baseline, so the remaining bottleneck is terminal
+  parse/render/LCD work rather than CDC mirror throughput. Heavy CDC mirror
+  testing is now a known diagnostic risk: one `240x64` `-EnableMirror` run
+  crashed in Arduino ESP32-P4 `HWCDC` ISR with Store access fault, and a
+  later `120x64` mirror run lost `28` mirrored bytes. Short `64x64
+  -EnableMirror` still passed exact integrity. The next Stage 10 milestone is
+  row-rendering throughput.
+- 2026-06-18: Stage 10 P4 isolated and fixed a pre-software-ring receive
+  failure. Added `TAB5PIPE` firmware counters and exact-line/expected-byte
+  checks to `render-latency`. Bad runs showed the software RX ring did not
+  drop bytes, but `uart_fifo_ovf=1` appeared on a failing `120x64` workload.
+  Switching UART drain to `HardwareSerial.onReceive(..., false)` fixed the
+  measured FIFO overflow. Final COM3 runs after flashing the formal firmware:
+  `64x64`, `120x64`, and `240x64` all passed exact-line checks with expected
+  byte delta `0`, no UART errors, and no software drops. The `240x64` run took
+  `17.234s`, so the remaining Stage 10 work is render/mirror throughput, not
+  receive integrity. `tab5_min_uart_terminal`, `tab5_terminal_regression`, the
+  shell probe, and the baud query all passed.
+- 2026-06-18: Stage 10 P3 first implementation added deferred dirty-row
+  rendering in `terminal::writeBytes()`, a 32 KiB login-UART hardware RX
+  buffer, and a 32 KiB main-loop software RX ring. `tab5_min_uart_terminal`
+  built in `43.3s`, `tab5_terminal_regression` built in `40.7s`, the formal
+  firmware was flashed, and the follow-up shell probe returned
+  `shell-path-ok: m5stack-LLM`. Final P3 measurements recovered `120x64` to
+  `120/120` unique lines in `8.172s` and improved `240x64` to `239/240` unique
+  lines in `17.250s`, but a later `64x64` raw CDC mirror showed one corrupted
+  early line with random binary bytes. Treat this as a measurement-path caveat
+  until CDC mirror integrity is separated from final framebuffer/render
+  evidence.
+- 2026-06-18: Stage 10 P2 added `tools/measure_render_latency.py` and
+  `tools/tab5.ps1 render-latency`. Syntax checks passed, and live COM3 runs on
+  the formal P1 firmware established the current baseline: `64x64` completed
+  with `64/64` unique lines in `4.438s`; `120x64` timed out after raw output
+  reached about line `0096`; `240x64` returned an end marker but only
+  `100/240` unique lines were intact. The follow-up shell probe returned
+  `shell-path-ok: m5stack-LLM`. P3 must include receive/buffering/backpressure
+  analysis, not only draw-region planning.
 - 2026-06-18: Stage 9 opened as TUI and input compatibility hardening. Added a
   Stage 9 TUI matrix profile to `tools/send_login_shell_app_smoke.py` and a
   `tools/tab5.ps1 tui-matrix` wrapper. The command requires no physical

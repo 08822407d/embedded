@@ -87,6 +87,8 @@ void reset();
 void redraw();
 void writeByte(uint8_t byte);
 void writeBytes(const uint8_t *data, size_t length);
+void beginWriteTransaction();
+void endWriteTransaction();
 uint16_t columns();
 uint16_t rows();
 bool getGeometry(TerminalGeometry *geometry);
