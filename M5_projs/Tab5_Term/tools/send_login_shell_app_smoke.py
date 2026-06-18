@@ -14,6 +14,22 @@ import serial
 
 DEFAULT_APPS = ("clear", "reset", "tput", "less", "nano", "vim", "htop")
 
+STAGE9_TUI_APPS = (
+    "clear",
+    "reset",
+    "tput",
+    "less",
+    "vim",
+    "htop",
+    "top",
+    "tmux",
+    "screen",
+    "dialog",
+    "whiptail",
+    "btop",
+    "nano",
+)
+
 
 @dataclass(frozen=True)
 class AppTest:
@@ -73,6 +89,54 @@ APP_TESTS = {
     "htop": AppTest(
         name="htop",
         command="htop",
+        exit_bytes=b"q",
+        view_time=2.5,
+        timeout=8.0,
+    ),
+    "top": AppTest(
+        name="top",
+        command="top",
+        exit_bytes=b"q",
+        view_time=2.0,
+        timeout=8.0,
+    ),
+    "tmux": AppTest(
+        name="tmux",
+        command=(
+            "tmux -L tab5-smoke kill-server >/dev/null 2>&1; "
+            "tmux -L tab5-smoke new-session -x {cols} -y {rows} "
+            "'printf \"Tab5 tmux smoke\\n\"; sleep 2'"
+        ),
+        view_time=0.5,
+        timeout=10.0,
+    ),
+    "screen": AppTest(
+        name="screen",
+        command=(
+            "screen -wipe >/dev/null 2>&1; "
+            "screen -q -S tab5-smoke sh -c "
+            "'printf \"Tab5 screen smoke\\n\"; sleep 2'"
+        ),
+        view_time=0.5,
+        timeout=10.0,
+    ),
+    "dialog": AppTest(
+        name="dialog",
+        command="dialog --no-shadow --title 'Tab5 dialog smoke' --msgbox 'Tab5 dialog smoke' 8 42",
+        exit_bytes=b"\r",
+        view_time=1.2,
+        timeout=8.0,
+    ),
+    "whiptail": AppTest(
+        name="whiptail",
+        command="whiptail --title 'Tab5 whiptail smoke' --msgbox 'Tab5 whiptail smoke' 8 42",
+        exit_bytes=b"\r",
+        view_time=1.2,
+        timeout=8.0,
+    ),
+    "btop": AppTest(
+        name="btop",
+        command="btop",
         exit_bytes=b"q",
         view_time=2.5,
         timeout=8.0,
@@ -185,12 +249,15 @@ def run_app_test(
     app: AppTest,
     nonce: str,
     index: int,
+    rows: int,
+    cols: int,
     chunk_size: int,
     chunk_delay: float,
 ) -> tuple[str, str, int | None, bytes]:
     marker = marker_text("APP", nonce, index)
+    app_command = app.command.format(rows=rows, cols=cols)
     command = (
-        f"stty clocal 2>/dev/null; {app.command}; rc=$?; "
+        f"stty clocal 2>/dev/null; {app_command}; rc=$?; "
         "stty echo clocal 2>/dev/null; "
         f"printf '\\r\\nAPP_DONE:{app.name}:rc=%s\\r\\n' \"$rc\""
     )
@@ -221,6 +288,12 @@ def main() -> int:
     parser.add_argument("--rows", type=int, default=32)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--apps", default=",".join(DEFAULT_APPS))
+    parser.add_argument(
+        "--profile",
+        choices=("stage4", "stage9"),
+        default="stage4",
+        help="Preset app list to use when --apps is not supplied",
+    )
     parser.add_argument("--open-delay", type=float, default=2.0)
     parser.add_argument("--startup-timeout", type=float, default=6.0)
     parser.add_argument("--chunk-size", type=int, default=64)
@@ -232,7 +305,11 @@ def main() -> int:
     if args.chunk_delay < 0:
         parser.error("--chunk-delay must be non-negative")
 
-    app_names = [name.strip() for name in args.apps.split(",") if name.strip()]
+    apps_argument = args.apps
+    if apps_argument == ",".join(DEFAULT_APPS) and args.profile == "stage9":
+        apps_argument = ",".join(STAGE9_TUI_APPS)
+
+    app_names = [name.strip() for name in apps_argument.split(",") if name.strip()]
     unknown = [name for name in app_names if name not in APP_TESTS]
     if unknown:
         parser.error(f"unknown app tests: {', '.join(unknown)}")
@@ -298,17 +375,22 @@ def main() -> int:
                 APP_TESTS[name],
                 nonce,
                 index,
+                args.rows,
+                args.cols,
                 args.chunk_size,
                 args.chunk_delay,
             )
             results.append(app_result[:3])
             captured.extend(app_result[3])
 
-        summary = "\x1b[2J\x1b[HStage4 real app smoke result\r\n"
+        is_stage9 = args.profile == "stage9"
+        summary_title = "Stage9 TUI matrix result" if is_stage9 else "Stage4 real app smoke result"
+        summary_tail = "End of Stage9 TUI matrix" if is_stage9 else "End of Stage4 real app smoke"
+        summary = f"\x1b[2J\x1b[H{summary_title}\r\n"
         summary += f"TERM={args.term} rows={args.rows} cols={args.cols}\r\n\r\n"
         for result in results:
             summary += result_line(result) + "\r\n"
-        summary += "\r\nEnd of Stage4 real app smoke\r\n"
+        summary += f"\r\n{summary_tail}\r\n"
 
         summary_marker = marker_text("SUMMARY", nonce, 99)
         summary_command = f"{printf_escape(summary)}; stty echo 2>/dev/null"
@@ -324,7 +406,8 @@ def main() -> int:
             )
         )
 
-    print(f"ran Stage4 app smoke on {args.port}")
+    run_label = "Stage9 TUI matrix" if args.profile == "stage9" else "Stage4 app smoke"
+    print(f"ran {run_label} on {args.port}")
     for result in results:
         print(result_line(result))
     print(f"captured {len(captured)} bytes from login shell")

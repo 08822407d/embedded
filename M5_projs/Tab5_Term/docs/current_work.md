@@ -35,7 +35,7 @@ user-visible UI/input behavior, and high-regression-risk changes.
 
 ## Completed Checkpoint
 
-Completed through Stage 8:
+Completed through Stage 8; Stage 9 is active:
 
 - Stages 1 through 4 of `terminal_implementation_plan.md`.
 - Deterministic CDC tests for the implemented parser/screen features.
@@ -59,6 +59,71 @@ Completed through Stage 8:
 
 Do not restart completed font selection or Stage 1-4 deterministic tests unless
 new work causes a regression.
+
+## Active Mainline Stage: Stage 9 TUI And Input Compatibility Hardening
+
+Goal: make the accepted `xterm-256color`, `64x32`, 921600 UART terminal more
+trustworthy with common Linux text user interfaces and both physical keyboard
+paths, without prematurely starting SSH/Telnet/PPP transport work.
+
+Status: in progress. V1 documentation, local automation, and first hardware
+run are complete. The next increment is V2 keyboard semantic capture. Any
+future validation window that needs physical keyboard input must be announced
+before the command starts.
+
+### Milestone V1: TUI Validation Matrix
+
+- Keep the existing Stage 6 `app-smoke` behavior stable.
+- Add a separate Stage 9 TUI matrix command that tests a broader set of
+  installed applications and skips missing programs.
+- Include known-safe automated candidates first: `clear`, `reset`, `tput`,
+  `less`, `vim`, `htop`, `top`, `tmux`, `screen`, `dialog`, `whiptail`,
+  `btop`, and `nano`.
+- Record pass, skip, fail, and timeout explicitly so missing packages are not
+  confused with terminal failures.
+
+Exit condition: one local command runs the Stage 9 TUI matrix against the
+current formal firmware and leaves the shell recoverable.
+
+Status: completed on 2026-06-18. `tools/tab5.ps1 tui-matrix -Port COM3`
+passed on the default formal firmware. Installed applications `clear`,
+`reset`, `tput`, `less`, `vim`, `htop`, `top`, and `whiptail` returned
+`ok rc=0`. Missing candidates `tmux`, `screen`, `dialog`, `btop`, and `nano`
+were reported as skipped. A final shell probe returned
+`shell-path-ok: m5stack-LLM`.
+
+### Milestone V2: Keyboard Semantic Matrix
+
+- Capture important key sequences from both USB-A keyboard and official A164
+  keyboard through `cat -v`.
+- Cover printable keys, Enter, Backspace, Tab, Escape, arrows, Home/End,
+  Page Up/Down, Delete, Insert, F1-F12 where available, Ctrl/Alt/Shift
+  combinations, and application cursor mode.
+- Keep manual involvement explicit. If a test needs the user to press physical
+  keys, tell the user at the start of that work.
+
+Exit condition: key behavior differences are documented, and any mapper fixes
+gain deterministic regression coverage.
+
+### Milestone V3: Fix Only Real Failures
+
+- Do not broaden terminal-core scope speculatively.
+- If the Stage 9 matrix exposes raw escape leakage, bad screen restore, wrong
+  key sequences, or stuck TTY state, fix that specific behavior and add a
+  regression case.
+
+Exit condition: every accepted Stage 9 fix has a replayable script or
+diagnostic check.
+
+### Milestone V4: Stage 9 Exit Record
+
+- Update `terminal_known_gaps.md` with exactly which TUI and keyboard behaviors
+  are validated.
+- Keep uninstalled applications and untested input combinations explicit.
+- Commit and push the checkpoint after the stage is accepted.
+
+Exit condition: Stage 9 has a concise validation record and no hidden manual
+requirements.
 
 ## Completed Mainline Stage: Stage 6 Test And Regression Harness
 
@@ -284,8 +349,8 @@ when one of those advanced features is implemented.
 Stage completion result: satisfied on 2026-06-15. Stage 8 is complete because
 all defined deliverables are implemented at the documented validation level:
 T1 was hardware-regression tested, and T2 is preparatory API work intentionally
-left for later validation with its future transport consumer. No Stage 9 scope
-is active yet.
+left for later validation with its future transport consumer. Stage 9 was later
+opened as TUI and input compatibility hardening.
 
 ## Completed Mainline Stage: Stage 5 Input And Integration
 
@@ -463,6 +528,15 @@ enabled in the formal firmware by default.
 
 ## Progress Log
 
+- 2026-06-18: Stage 9 opened as TUI and input compatibility hardening. Added a
+  Stage 9 TUI matrix profile to `tools/send_login_shell_app_smoke.py` and a
+  `tools/tab5.ps1 tui-matrix` wrapper. The command requires no physical
+  keyboard input and skips missing programs. On the default formal firmware it
+  passed `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and
+  `whiptail`; skipped missing `tmux`, `screen`, `dialog`, `btop`, and `nano`;
+  and the follow-up shell probe returned `shell-path-ok: m5stack-LLM`. Next
+  Stage 9 work is the V2 physical keyboard semantic matrix; any run that needs
+  the user to press USB/A164 keys must announce that before the capture window.
 - 2026-06-16: USB-A keyboard was promoted into the default formal firmware.
   `platformio.ini` now separates common, formal, and debug build flags:
   formal builds enable `ENABLE_USB_KEYBOARD_PROBE=1`, while CDC injection and

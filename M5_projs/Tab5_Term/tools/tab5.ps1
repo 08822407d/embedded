@@ -10,6 +10,7 @@ param(
         "recover",
         "boot-log",
         "app-smoke",
+        "tui-matrix",
         "terminal-regression",
         "screenshot",
         "baud",
@@ -381,6 +382,20 @@ try {
             }
 
             Get-Content -Path $log | Select-Object -Last 30
+        }
+
+        "tui-matrix" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "send_login_shell_app_smoke.py"
+            $log = Join-Path $logRoot "tui-matrix-$timestamp.log"
+
+            Invoke-LoggedCommand -Label "Stage 9 TUI matrix on $Port" -LogPath $log -Command {
+                & $python $script --port $Port --profile stage9 --rows 32 --cols 64 `
+                    --chunk-size 32 --chunk-delay 0.08
+            }
+
+            Get-Content -Path $log | Select-Object -Last 40
         }
 
         "terminal-regression" {

@@ -33,9 +33,12 @@ implementation and regression tests pass.
   shared input mapper alongside the official A164 keyboard. Basic physical
   input through the Tab5 USB-A port, reconnect, Shift/Ctrl-direction cases,
   Backspace repeat, full-screen `less` and `htop` exits, and at least 3-key
-  printable groups have passed. Full NKRO is not claimed, broader TUI
-  application coverage beyond these checks remains limited, and the isolated
-  `tab5_usb_keyboard_probe` environment remains useful for USB-only
+  printable groups have passed. Stage 9 automated TUI coverage has passed for
+  installed `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and
+  `whiptail`; `tmux`, `screen`, `dialog`, `btop`, and `nano` were skipped
+  because they were not installed on the current Module LLM image. Full NKRO is
+  not claimed, physical keyboard semantic coverage is still incomplete, and the
+  isolated `tab5_usb_keyboard_probe` environment remains useful for USB-only
   diagnostics. A previous USB coexistence test exposed an M5GFX panel-detection
   failure that could leave the board black-screened; `display_boot_guard` now
   recovers by restarting after a failed display autodetect, but the underlying

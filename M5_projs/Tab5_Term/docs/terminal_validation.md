@@ -567,6 +567,45 @@ needed because GNU less otherwise blocks while opening `/dev/ttyS1` on this
 serial login environment. On the current LLM image, `nano` is not installed and
 is expected to be skipped.
 
+Stage 9 broader TUI matrix:
+
+```powershell
+.\tools\tab5.ps1 tui-matrix -Port COM3
+```
+
+This uses the same real UART login path as `app-smoke`, but it runs a broader
+candidate list under a separate Stage 9 profile. Missing programs are skipped
+instead of failing the run. The initial automated list is `clear`, `reset`,
+`tput`, `less`, `vim`, `htop`, `top`, `tmux`, `screen`, `dialog`, `whiptail`,
+`btop`, and `nano`.
+
+Expected:
+
+- Installed candidates return `ok rc=0`.
+- Missing candidates are reported as `skipped missing`.
+- A timeout or nonzero return is a Stage 9 compatibility finding, not an
+  automatic terminal-core bug. Inspect the captured log and recover the shell
+  with `.\tools\tab5.ps1 recover -Port COM3` before rerunning.
+- The command does not require the user to press a physical keyboard key; it
+  sends exit keys through the existing debug bridge. Physical USB/A164 keyboard
+  validation is tracked separately.
+
+Stage 9 physical keyboard rule:
+
+- If a validation run needs the user to connect a USB keyboard or press any key
+  on USB/A164 hardware, announce that before starting the capture window.
+- Prefer `cat -v` captures and local scripts over hand-copying screen text.
+- Keep USB-A and A164 keyboard observations separate so transport differences
+  are visible.
+
+Validation record:
+
+- 2026-06-18: `.\tools\tab5.ps1 tui-matrix -Port COM3` passed on the default
+  formal firmware. `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and
+  `whiptail` returned `ok rc=0`; `tmux`, `screen`, `dialog`, `btop`, and
+  `nano` were skipped because they were not installed on the current Module
+  LLM image. A follow-up `probe` returned `shell-path-ok: m5stack-LLM`.
+
 For correctness testing, flash `tab5_min_uart_terminal_fixed_debug`. Use
 `tab5_min_uart_terminal` only when checking the approved proportional
 release-style appearance.

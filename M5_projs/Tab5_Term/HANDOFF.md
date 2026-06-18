@@ -145,6 +145,19 @@ box-drawing and block-element renderer fallbacks. U3 passed hardware
 regression and framebuffer capture, and the formal firmware was restored. The
 canonical stage state is in `docs/current_work.md`.
 
+Stage 8 terminal protocol readiness is complete. Stage 9 is now active as TUI
+and input compatibility hardening. Its first increment is local automation:
+`tools/tab5.ps1 tui-matrix` runs a broader installed-program matrix while
+skipping missing packages. Any later work that requires the user to connect a
+USB keyboard or press USB/A164 keys must announce that before the capture
+window starts.
+
+Stage 9 V1 validation on 2026-06-18 passed on the default formal firmware:
+`clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and `whiptail`
+returned `ok rc=0`; `tmux`, `screen`, `dialog`, `btop`, and `nano` were
+skipped because they were not installed. A follow-up probe returned
+`shell-path-ok: m5stack-LLM`.
+
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
 remaining physical A164 and integration tests. Its accepted baseline includes
 the 180-degree keyboard-mounted display orientation, `64x32` geometry,
@@ -398,8 +411,8 @@ Current fixed settings:
   size, and logical rows/columns. This is preparatory work for SSH/Telnet/PTY
   integration, not a raw UART resize mechanism. It is locally build-checked but
   not hardware-validated.
-- Stage 8 is complete as of 2026-06-15. There is no active Stage 9 scope yet;
-  define the next stage explicitly before starting new compatibility work.
+- Stage 8 is complete as of 2026-06-15. Stage 9 is active as TUI and input
+  compatibility hardening.
 - proportional renderer: retained in `tab5_terminal_font_prop_preview`
 - Screen orientation: `SCREEN_ORIENTATION_KEYBOARD_MOUNTED`; this maps the
   original landscape rotation `1` to opposite landscape rotation `3`, matching
@@ -666,6 +679,7 @@ compact summary. Prefer these commands in future Codex sessions:
 .\tools\tab5.ps1 flash tab5_min_uart_terminal -Port COM3
 .\tools\tab5.ps1 probe -Port COM3
 .\tools\tab5.ps1 app-smoke -Port COM3
+.\tools\tab5.ps1 tui-matrix -Port COM3
 ```
 
 Builds now run in a detached worker whose stdout/stderr go directly to files.
@@ -1178,6 +1192,12 @@ which the standard probe again returned `shell-path-ok: m5stack-LLM`.
 The next USB TUI coverage check also passed: after one missed-`q` attempt was
 recovered, `tools/send_login_shell_demo.py --demo htop-usb` exited `htop`
 through USB-keyboard `q` with `rc=0`, followed by a successful standard probe.
+
+Stage 9 started on 2026-06-18. `tools/send_login_shell_app_smoke.py` now has a
+`--profile stage9` preset and `tools/tab5.ps1 tui-matrix` wraps it. The first
+run passed installed `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`,
+and `whiptail`, skipped missing `tmux`, `screen`, `dialog`, `btop`, and
+`nano`, and left the shell probe healthy.
 
 ## Terminal Font Decision
 
