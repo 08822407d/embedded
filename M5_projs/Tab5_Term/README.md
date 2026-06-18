@@ -15,14 +15,18 @@ See [docs/terminal_implementation_plan.md](docs/terminal_implementation_plan.md)
 and [docs/terminal_validation.md](docs/terminal_validation.md) before extending
 terminal compatibility.
 
+For a source-level overview, module map, and extension guidelines, read
+[docs/developer_architecture.md](docs/developer_architecture.md).
+
 Current mainline stage and checkpoint are recorded in
 [docs/current_work.md](docs/current_work.md). Read it before continuing
 implementation so completed work is not repeated or lost.
 
-Stages 1 through 6 are complete. Stage 7 U1/U2 Unicode width and cell
-integrity and U3 common Unicode graphics fallback are complete.
-Stage 5 official A164 keyboard and integration work and Stage 6 regression
-infrastructure were accepted on 2026-06-12.
+Stages 1 through 9 are complete at the documented validation levels. Stage 5
+official A164 keyboard and integration work and Stage 6 regression
+infrastructure were accepted on 2026-06-12; Stage 7 Unicode width/graphics,
+Stage 8 protocol-readiness, and Stage 9 TUI/input compatibility hardening were
+completed afterward.
 The deterministic Stage 1-4 machine assertions and real-shell application
 smoke are now automated; see [docs/stage6_regression.md](docs/stage6_regression.md).
 Exact final display pixels can also be captured and compared through a
@@ -75,20 +79,22 @@ external login UART.
   the monitor and rendered on the Tab5 display.
 - The Module LLM login shell was verified by sending `id` through the Tab5
   bridge and receiving a root shell response.
-- Terminal output now flows through `src/terminal_core.cpp`, not directly
-  through M5GFX print calls. The first-stage core is intended for basic shell
-  output, `clear`, simple cursor movement, and early ANSI compatibility tests.
-- The experimental USB-A keyboard probe builds successfully, but USB keyboard
-  support is deferred and is not part of the current stage.
+- Terminal output flows through `src/terminal_core.cpp`, not directly through
+  M5GFX print calls.
+- USB-A keyboard input is enabled in the formal firmware and shares the same
+  normalized input mapper as the official A164 keyboard. The historical
+  `tab5_usb_keyboard_probe` environment remains available for USB-only
+  isolation.
 - The formal firmware now enables the official A164 Tab5 Keyboard through
   Ext.Port1 (`SDA=G0`, `SCL=G1`, `INT=G50`) using the official
   `M5Unit-KEYBOARD` 0.1.0 library in HID mode. The tested keyboard reports I2C
   address `0x6D` and firmware `0x01`.
 - The top status bar shows a themed battery area at the right edge. On Tab5 this
   uses M5Unified's INA226-backed 2S Li-Po battery estimate. The battery icon
-  fill uses green/yellow/red level bands. Lightning-mark rendering exists, but
-  dynamic charging-state detection is currently deferred because the observed
-  IP2326 status path did not reliably follow cable insertion and removal.
+  fill uses green/yellow/red level bands. The lightning icon uses a debounced
+  INA226-current heuristic because the observed IP2326 `CHG_STAT` /
+  `M5.Power.isCharging()` path did not reliably follow cable insertion and
+  removal on the tested unit.
 
 ## Build
 

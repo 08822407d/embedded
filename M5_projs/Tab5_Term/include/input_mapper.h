@@ -5,6 +5,10 @@
 
 namespace input {
 
+// Shared input vocabulary. Device drivers translate hardware reports into
+// KeyEvent; input_mapper translates KeyEvent into terminal bytes using the
+// current terminal modes. This keeps A164, USB-A, and future transports from
+// duplicating xterm sequence logic.
 enum Modifier : uint8_t {
     ModifierNone = 0,
     ModifierShift = 1 << 0,
@@ -132,6 +136,9 @@ struct EncodedInput {
     uint8_t length = 0;
 };
 
+// Release events intentionally encode to zero bytes; they are present so
+// drivers can share press/release/repeat state without transport-specific
+// special cases.
 EncodedInput mapKeyEvent(const KeyEvent& event, const TerminalModes& modes);
 
 } // namespace input

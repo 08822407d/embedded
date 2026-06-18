@@ -1,5 +1,9 @@
 #pragma once
 
+// Central firmware defaults. PlatformIO environments override selected values
+// with -D flags, so keep environment-specific policy in platformio.ini and
+// shared hardware/terminal defaults here.
+
 #define USB_DEBUG_BAUD 115200
 
 #define LOGIN_UART_DEFAULT_BAUD 115200
@@ -13,6 +17,9 @@
 #define ENABLE_USB_LOGIN_UART_BRIDGE 1
 #endif
 
+// Feature gates are intentionally compile-time switches. This keeps diagnostic
+// firmware paths from accidentally mixing CDC injection or power probes with
+// the formal login UART and keyboard paths.
 #ifndef ENABLE_USB_BRIDGE_DEBUG_LOG
 #define ENABLE_USB_BRIDGE_DEBUG_LOG 0
 #endif
@@ -83,6 +90,8 @@
 #define SCREEN_ORIENTATION_STANDARD 0
 #define SCREEN_ORIENTATION_KEYBOARD_MOUNTED 1
 
+// Keyboard-mounted orientation is the accepted physical baseline for the
+// official companion keyboard.
 #ifndef SCREEN_ORIENTATION
 #define SCREEN_ORIENTATION SCREEN_ORIENTATION_KEYBOARD_MOUNTED
 #endif
@@ -93,6 +102,8 @@
 #define TERMINAL_RENDER_MODE_FIXED_CELL 0
 #define TERMINAL_RENDER_MODE_PROPORTIONAL 1
 
+// The formal terminal currently forces fixed-cell rendering for predictable
+// terminal geometry and redraw cost while retaining the DejaVu18 font face.
 #ifndef TERMINAL_FONT_FACE
 #define TERMINAL_FONT_FACE TERMINAL_FONT_FACE_DEJAVU18
 #endif

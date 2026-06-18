@@ -76,7 +76,7 @@ implementation and regression tests pass.
   over USB CDC. It is debug instrumentation for stable screens, not a
   production-time display transport.
 
-## Deferred Non-Terminal Issue
+## Power Detection Caveat
 
 - Dynamic charge-state detection cannot rely on `CHG_STAT` /
   `M5.Power.isCharging()` because those signals did not reliably follow cable
@@ -86,5 +86,6 @@ implementation and regression tests pass.
   A debug/programming data cable may not show the lightning icon if the battery
   current is not sufficiently negative. Broader validation across battery
   levels and charger types remains useful.
-- This deferred issue was explicitly excluded from Stage 6 acceptance on
-  2026-06-12. Battery percentage/level refresh remains independently accepted.
+- This issue was explicitly excluded from Stage 6 acceptance on 2026-06-12,
+  then later handled for the tested hardware with the INA226 heuristic. Battery
+  percentage/level refresh remains independently accepted.

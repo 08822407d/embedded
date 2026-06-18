@@ -180,6 +180,11 @@ requires a code fix. The exit record is synchronized across
 open after Stage 9; choose a new scope before starting advanced transport,
 touch/mouse, broader Unicode, or further keyboard work.
 
+For source-level onboarding, module boundaries, and extension rules, start with
+`docs/developer_architecture.md`. It is intended for human contributors and
+future coding agents before they modify `terminal_core`, input drivers, build
+profiles, or diagnostic tools.
+
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
 remaining physical A164 and integration tests. Its accepted baseline includes
 the 180-degree keyboard-mounted display orientation, `64x32` geometry,
@@ -247,7 +252,9 @@ Stage 6 R1-R4 automated work was completed on 2026-06-12:
   successfully on physical hardware and left the formal image installed.
 - The final restored-firmware integration check passed by user observation.
 - Charging-state detection remains explicitly deferred and was not a Stage 6
-  completion requirement.
+  completion requirement. Later power-detect work accepted the current
+  INA226-current heuristic for the production lightning icon on the tested
+  hardware.
 - A later Stage 6 test-infrastructure extension added private OSC 777
   framebuffer capture. `tab5_terminal_regression` captures deterministic
   injected screens, while `tab5_screen_capture` preserves the real login-UART

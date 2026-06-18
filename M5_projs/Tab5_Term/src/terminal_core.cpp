@@ -11,6 +11,16 @@
 
 namespace terminal {
 namespace {
+// Logical sections in this file are:
+// 1. state, cells, colors, and parser data;
+// 2. glyph and fallback rendering helpers;
+// 3. screen-model mutations and cursor movement;
+// 4. escape/CSI dispatch and terminal replies;
+// 5. public diagnostics and API wrappers.
+//
+// It is intentionally still one translation unit so behavior changes remain
+// easy to regression-test. See docs/developer_architecture.md before splitting
+// it into parser/model/renderer modules.
 constexpr uint16_t kMaxColumns = 96;
 constexpr uint16_t kMaxRows = 96;
 constexpr uint8_t kTabWidth = 8;

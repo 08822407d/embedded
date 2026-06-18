@@ -120,6 +120,8 @@ void readLoginUartToDisplayAndDebug()
     size_t processed = 0;
     HardwareSerial& serial = login_uart::serial();
 
+    // Keep each loop bounded so status refresh, USB tasks, keyboard events, and
+    // M5.update() continue to run even during large UART bursts.
     while (serial.available() > 0 && processed < kMaxBytesPerLoop) {
         const int value = serial.read();
         if (value < 0) {

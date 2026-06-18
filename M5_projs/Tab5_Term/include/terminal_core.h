@@ -7,6 +7,9 @@
 
 namespace terminal {
 
+// terminal_core owns terminal parsing, screen state, rendering, and terminal
+// replies. Callers provide bytes and an optional response writer; they should
+// not manipulate cells or write replies directly to a transport.
 using ResponseWriter = void (*)(const uint8_t *data, size_t length);
 
 enum class TerminalCellWidth : uint8_t {
@@ -40,6 +43,8 @@ struct TerminalGeometry {
     uint16_t rows;
 };
 
+// Snapshots are diagnostic and transport-readiness APIs. They expose the
+// terminal state without allowing external modules to mutate the screen model.
 struct TerminalStateSnapshot {
     uint16_t columns;
     uint16_t rows;
@@ -73,6 +78,10 @@ struct TerminalCellSnapshot {
     bool dec_special_graphics;
 };
 
+// Public API used by the firmware, regression tools, and future mature
+// transports. All printable host output should enter through writeByte or
+// writeBytes so parser state, Unicode width, wrapping, and diagnostics remain
+// coherent.
 void begin(const TerminalConfig& config);
 void reset();
 void redraw();

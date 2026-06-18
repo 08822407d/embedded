@@ -187,10 +187,10 @@ Existing groundwork:
 - `tools/tab5.ps1` provides the common build, flash, serial, probe, and test
   entry points.
 
-All R1-R5 milestones are complete. Charging-state detection remains an
-explicitly unresolved known issue and was excluded from Stage 6 acceptance.
-A dedicated automatic probe now exists for collecting evidence, but no
-production charging-state rule has been accepted yet.
+All R1-R5 milestones are complete. Charging-state detection was excluded from
+Stage 6 acceptance at the time; it was later reopened with a dedicated
+automatic probe, and the current production lightning icon uses the accepted
+INA226-current heuristic recorded in the later work log.
 
 ### Milestone R1: Baseline And Manifest
 
@@ -268,8 +268,9 @@ formal image, and runs the shell checks. The complete script was exercised with
 Status: completed. `docs/terminal_known_gaps.md` records the initial gap
 inventory. On 2026-06-12 the user reported no problem with status-bar
 placement, A164 input, battery-level refresh, or display responsiveness.
-Charging-state detection remains deferred because the available status signal
-did not reliably follow cable insertion and removal.
+Charging-state detection was intentionally excluded from Stage 6, but later
+work replaced the unreliable `CHG_STAT`/API signal with a debounced
+INA226-current heuristic for the lightning icon.
 
 Stage 6 completion condition: one local workflow runs deterministic assertions
 and real-shell smoke, produces machine-readable results, and documents any
