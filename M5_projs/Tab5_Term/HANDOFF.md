@@ -167,7 +167,10 @@ USB-A application cursor mode captured application arrows and Home/End. A164
 normal mode captured printable text, Enter, Tab, Backspace, Escape, normal
 arrows, Delete, Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode
 captured application arrows. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were
-not captured on the tested hardware. Final probe returned
+not captured. Official A164 documentation only describes Sym/Aa/Ctrl/Alt as
+special combo keys, and the local M5Unit-KEYBOARD HID table does not include
+F1-F4 or Home/Page/Insert usages, so treat these as unavailable on stock A164
+firmware unless future official docs/firmware add a combo. Final probe returned
 `shell-path-ok: m5stack-LLM`.
 
 Stage 5 completed on 2026-06-12 after the user reported no problem in the

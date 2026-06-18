@@ -625,8 +625,12 @@ Validation record:
   application arrows plus Home/End. A164 normal mode captured printable text,
   Enter, Tab, Backspace, Escape, normal arrows, Delete, Ctrl+A, Ctrl+E, and
   Alt+x. A164 application cursor mode captured application arrows. A164
-  Home/End/PageUp/PageDown/Insert/F1-F4 were not captured on the tested
-  hardware. Final shell probe returned `shell-path-ok: m5stack-LLM`.
+  Home/End/PageUp/PageDown/Insert/F1-F4 were not captured. The official product
+  page/manual only documents Sym/Aa/Ctrl/Alt as special combo keys, and the
+  local M5Unit-KEYBOARD HID table does not include F1-F4 or Home/Page/Insert
+  usages for stock A164. Treat them as unavailable unless future official
+  docs/firmware prove a combo. Final shell probe returned
+  `shell-path-ok: m5stack-LLM`.
 
 For correctness testing, flash `tab5_min_uart_terminal_fixed_debug`. Use
 `tab5_min_uart_terminal` only when checking the approved proportional
@@ -659,9 +663,11 @@ cat -v
 Expected:
 
 - Printable keys appear.
-- Enter, Backspace, Tab, Escape, arrows, Home/End, Page Up/Down, Delete, and
-  function keys emit the expected terminal input sequences for the current
-  mode.
+- Enter, Backspace, Tab, Escape, arrows, and Delete emit the expected terminal
+  input sequences for the current mode. Do not require Home/End,
+  Page Up/Down, Insert, or function keys from stock A164: official
+  documentation and the local HID table do not expose them. Cover those keys
+  with USB keyboards that physically provide them.
 - Shift, Ctrl, and Alt combinations are consistent between transports.
 - Application cursor mode changes arrow-key output as expected.
 - Disconnecting and reconnecting one device does not stop UART receive or the

@@ -112,10 +112,13 @@ Home/End, Delete, Insert, F1-F4, Ctrl+A, Ctrl+E, and Alt+x. USB-A application
 cursor mode captured application arrow sequences and Home/End. A164 normal
 mode captured printable text, Enter, Tab, Backspace, Escape, arrows, Delete,
 Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode captured application
-arrow sequences. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were not captured
-and should be treated as unavailable or not yet mapped on the tested hardware.
-No mapper fix was required by these captures. Follow-up shell probes returned
-`shell-path-ok: m5stack-LLM`.
+arrow sequences. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were not captured.
+The official product page and user manual only document Sym/Aa/Ctrl/Alt as
+special combination keys, and the local M5Unit-KEYBOARD HID table maps Del and
+arrows but does not include F1-F4 or Home/Page/Insert usages. Treat those keys
+as unavailable on stock A164 firmware unless later M5Stack documentation or
+firmware proves an official combo. No mapper fix was required by these
+captures. Follow-up shell probes returned `shell-path-ok: m5stack-LLM`.
 
 ### Milestone V3: Fix Only Real Failures
 
@@ -560,7 +563,10 @@ enabled in the formal firmware by default.
   printable text, Enter, Tab, Backspace, Escape, normal arrows, Delete
   `^[[3~`, Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode captured
   application arrows. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were not
-  captured. Final shell probe returned `shell-path-ok: m5stack-LLM`.
+  captured. Official documentation and the local M5Unit-KEYBOARD HID table do
+  not expose those keys or official combos, so they are a stock A164 limitation
+  rather than an untested user-layout issue. Final shell probe returned
+  `shell-path-ok: m5stack-LLM`.
 - 2026-06-16: USB-A keyboard was promoted into the default formal firmware.
   `platformio.ini` now separates common, formal, and debug build flags:
   formal builds enable `ENABLE_USB_KEYBOARD_PROBE=1`, while CDC injection and

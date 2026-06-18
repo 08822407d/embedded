@@ -31,7 +31,10 @@ implementation and regression tests pass.
   non-modifier rollover is not guaranteed. First-pass semantic capture passed
   printable text, Enter, Tab, Backspace, Escape, arrows, Delete, Ctrl+A,
   Ctrl+E, Alt+x, and application cursor arrows. Home/End/PageUp/PageDown/
-  Insert/F1-F4 were not captured on the tested A164 hardware.
+  Insert/F1-F4 were not captured. Official A164 documentation only describes
+  Sym/Aa/Ctrl/Alt as combo keys, and the local M5Unit-KEYBOARD HID table does
+  not map F1-F4 or Home/Page/Insert usages, so treat those as unavailable on
+  stock A164 firmware unless future official docs/firmware add a combo.
 - USB-A keyboard support is enabled in the default formal firmware and uses the
   shared input mapper alongside the official A164 keyboard. Basic physical
   input through the Tab5 USB-A port, reconnect, Shift/Ctrl-direction cases,
