@@ -66,8 +66,7 @@ Goal: make the accepted `xterm-256color`, `64x32`, 921600 UART terminal more
 trustworthy with common Linux text user interfaces and both physical keyboard
 paths, without prematurely starting SSH/Telnet/PPP transport work.
 
-Status: in progress. V1 documentation, local automation, and first hardware
-run are complete. The next increment is V2 keyboard semantic capture. Any
+Status: in progress. V1 and V2 are complete at first-pass validation level. Any
 future validation window that needs physical keyboard input must be announced
 before the command starts.
 
@@ -104,6 +103,19 @@ were reported as skipped. A final shell probe returned
 
 Exit condition: key behavior differences are documented, and any mapper fixes
 gain deterministic regression coverage.
+
+Status: completed at first-pass level on 2026-06-18. Added
+`tools/capture_keyboard_semantics.py` and `tools/tab5.ps1 key-capture` to run a
+raw `cat -vET` capture with automatic tty restore. USB-A normal mode captured
+printable text, Enter, Tab, Backspace, Escape, arrows, PageUp/PageDown,
+Home/End, Delete, Insert, F1-F4, Ctrl+A, Ctrl+E, and Alt+x. USB-A application
+cursor mode captured application arrow sequences and Home/End. A164 normal
+mode captured printable text, Enter, Tab, Backspace, Escape, arrows, Delete,
+Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode captured application
+arrow sequences. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were not captured
+and should be treated as unavailable or not yet mapped on the tested hardware.
+No mapper fix was required by these captures. Follow-up shell probes returned
+`shell-path-ok: m5stack-LLM`.
 
 ### Milestone V3: Fix Only Real Failures
 
@@ -537,6 +549,18 @@ enabled in the formal firmware by default.
   and the follow-up shell probe returned `shell-path-ok: m5stack-LLM`. Next
   Stage 9 work is the V2 physical keyboard semantic matrix; any run that needs
   the user to press USB/A164 keys must announce that before the capture window.
+- 2026-06-18: Stage 9 V2 physical keyboard semantic capture completed at
+  first-pass level. Added `tools/capture_keyboard_semantics.py` and
+  `tools/tab5.ps1 key-capture`. USB-A normal mode captured `abc123`, Enter
+  `^M`, Tab `^I`, Backspace `^?`, Escape `^[`, normal arrows
+  `^[[A/B/D/C`, PageUp/PageDown `^[[5~/^[[6~`, Home/End `^[[H/^[[F`,
+  Delete/Insert `^[[3~/^[[2~`, F1-F4 `^[OP/OQ/OR/OS`, Ctrl+A `^A`,
+  Ctrl+E `^E`, and Alt+x `^[x`. USB-A application cursor mode captured
+  `^[OA/OB/OD/OC` and Home/End `^[OH/OF`. A164 normal mode captured
+  printable text, Enter, Tab, Backspace, Escape, normal arrows, Delete
+  `^[[3~`, Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode captured
+  application arrows. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were not
+  captured. Final shell probe returned `shell-path-ok: m5stack-LLM`.
 - 2026-06-16: USB-A keyboard was promoted into the default formal firmware.
   `platformio.ini` now separates common, formal, and debug build flags:
   formal builds enable `ENABLE_USB_KEYBOARD_PROBE=1`, while CDC injection and

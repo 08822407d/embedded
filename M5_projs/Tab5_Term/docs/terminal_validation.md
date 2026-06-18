@@ -598,6 +598,19 @@ Stage 9 physical keyboard rule:
 - Keep USB-A and A164 keyboard observations separate so transport differences
   are visible.
 
+Stage 9 physical keyboard capture helper:
+
+```powershell
+.\tools\tab5.ps1 key-capture -Port COM3 -KeyboardDevice usb -KeyMode normal -DurationSeconds 60
+.\tools\tab5.ps1 key-capture -Port COM3 -KeyboardDevice usb -KeyMode app-cursor -DurationSeconds 30
+.\tools\tab5.ps1 key-capture -Port COM3 -KeyboardDevice a164 -KeyMode normal -DurationSeconds 60
+.\tools\tab5.ps1 key-capture -Port COM3 -KeyboardDevice a164 -KeyMode app-cursor -DurationSeconds 30
+```
+
+The helper displays the capture target on Tab5, enters a raw `cat -vET`
+capture for the requested duration, and restores the tty afterward. It should
+be preceded by an explicit user instruction naming the keys to press.
+
 Validation record:
 
 - 2026-06-18: `.\tools\tab5.ps1 tui-matrix -Port COM3` passed on the default
@@ -605,6 +618,15 @@ Validation record:
   `whiptail` returned `ok rc=0`; `tmux`, `screen`, `dialog`, `btop`, and
   `nano` were skipped because they were not installed on the current Module
   LLM image. A follow-up `probe` returned `shell-path-ok: m5stack-LLM`.
+- 2026-06-18: `key-capture` was added and used for USB-A and A164 keyboard
+  semantic captures. USB-A normal mode captured printable text, Enter, Tab,
+  Backspace, Escape, normal arrows, PageUp/PageDown, Home/End, Delete, Insert,
+  F1-F4, Ctrl+A, Ctrl+E, and Alt+x. USB-A application cursor mode captured
+  application arrows plus Home/End. A164 normal mode captured printable text,
+  Enter, Tab, Backspace, Escape, normal arrows, Delete, Ctrl+A, Ctrl+E, and
+  Alt+x. A164 application cursor mode captured application arrows. A164
+  Home/End/PageUp/PageDown/Insert/F1-F4 were not captured on the tested
+  hardware. Final shell probe returned `shell-path-ok: m5stack-LLM`.
 
 For correctness testing, flash `tab5_min_uart_terminal_fixed_debug`. Use
 `tab5_min_uart_terminal` only when checking the approved proportional

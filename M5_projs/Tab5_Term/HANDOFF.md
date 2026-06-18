@@ -158,6 +158,18 @@ returned `ok rc=0`; `tmux`, `screen`, `dialog`, `btop`, and `nano` were
 skipped because they were not installed. A follow-up probe returned
 `shell-path-ok: m5stack-LLM`.
 
+Stage 9 V2 first-pass keyboard semantic capture also completed on 2026-06-18.
+`tools/tab5.ps1 key-capture` wraps a raw `cat -vET` capture and must be started
+only after telling the user exactly which physical keys to press. USB-A normal
+mode captured printable text, Enter, Tab, Backspace, Escape, normal arrows,
+PageUp/PageDown, Home/End, Delete, Insert, F1-F4, Ctrl+A, Ctrl+E, and Alt+x.
+USB-A application cursor mode captured application arrows and Home/End. A164
+normal mode captured printable text, Enter, Tab, Backspace, Escape, normal
+arrows, Delete, Ctrl+A, Ctrl+E, and Alt+x. A164 application cursor mode
+captured application arrows. A164 Home/End/PageUp/PageDown/Insert/F1-F4 were
+not captured on the tested hardware. Final probe returned
+`shell-path-ok: m5stack-LLM`.
+
 Stage 5 completed on 2026-06-12 after the user reported no problem in the
 remaining physical A164 and integration tests. Its accepted baseline includes
 the 180-degree keyboard-mounted display orientation, `64x32` geometry,
@@ -680,6 +692,7 @@ compact summary. Prefer these commands in future Codex sessions:
 .\tools\tab5.ps1 probe -Port COM3
 .\tools\tab5.ps1 app-smoke -Port COM3
 .\tools\tab5.ps1 tui-matrix -Port COM3
+.\tools\tab5.ps1 key-capture -Port COM3 -KeyboardDevice usb -KeyMode normal -DurationSeconds 60
 ```
 
 Builds now run in a detached worker whose stdout/stderr go directly to files.
@@ -1198,6 +1211,13 @@ Stage 9 started on 2026-06-18. `tools/send_login_shell_app_smoke.py` now has a
 run passed installed `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`,
 and `whiptail`, skipped missing `tmux`, `screen`, `dialog`, `btop`, and
 `nano`, and left the shell probe healthy.
+
+Stage 9 V2 then added `tools/capture_keyboard_semantics.py` and
+`tools/tab5.ps1 key-capture`. USB-A captured the expected normal/application
+cursor sequences including F1-F4, Home/End, PageUp/PageDown, Insert/Delete,
+Ctrl+A, Ctrl+E, and Alt+x. A164 captured printable text, Enter, Tab,
+Backspace, Escape, normal/application arrows, Delete, Ctrl+A, Ctrl+E, and
+Alt+x; Home/End/PageUp/PageDown/Insert/F1-F4 were not captured on that device.
 
 ## Terminal Font Decision
 

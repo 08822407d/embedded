@@ -11,6 +11,7 @@ param(
         "boot-log",
         "app-smoke",
         "tui-matrix",
+        "key-capture",
         "terminal-regression",
         "screenshot",
         "baud",
@@ -34,7 +35,11 @@ param(
     [string]$OutputPath = "",
     [string]$Baseline = "",
     [int]$ChannelTolerance = 0,
-    [int]$DurationSeconds = 180
+    [int]$DurationSeconds = 180,
+    [ValidateSet("usb", "a164")]
+    [string]$KeyboardDevice = "usb",
+    [ValidateSet("normal", "app-cursor")]
+    [string]$KeyMode = "normal"
 )
 
 $ErrorActionPreference = "Stop"
@@ -396,6 +401,23 @@ try {
             }
 
             Get-Content -Path $log | Select-Object -Last 40
+        }
+
+        "key-capture" {
+            Assert-CommandPath $python "PlatformIO Python"
+            Assert-PortPresent $Port
+            $script = Join-Path $PSScriptRoot "capture_keyboard_semantics.py"
+            $log = Join-Path $logRoot "key-capture-$KeyboardDevice-$KeyMode-$timestamp.log"
+
+            Invoke-LoggedCommand `
+                -Label "Stage 9 key capture $KeyboardDevice/$KeyMode on $Port" `
+                -LogPath $log `
+                -Command {
+                    & $python $script --port $Port --device $KeyboardDevice --mode $KeyMode `
+                        --duration $DurationSeconds
+                }
+
+            Get-Content -Path $log | Select-Object -Last 30
         }
 
         "terminal-regression" {

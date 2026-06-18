@@ -28,7 +28,10 @@ implementation and regression tests pass.
 - Bracketed-paste mode is tracked, but there is no user-facing paste source in
   the current physical input path.
 - The A164 driver tracks one non-modifier HID key at a time. Full simultaneous
-  non-modifier rollover is not guaranteed.
+  non-modifier rollover is not guaranteed. First-pass semantic capture passed
+  printable text, Enter, Tab, Backspace, Escape, arrows, Delete, Ctrl+A,
+  Ctrl+E, Alt+x, and application cursor arrows. Home/End/PageUp/PageDown/
+  Insert/F1-F4 were not captured on the tested A164 hardware.
 - USB-A keyboard support is enabled in the default formal firmware and uses the
   shared input mapper alongside the official A164 keyboard. Basic physical
   input through the Tab5 USB-A port, reconnect, Shift/Ctrl-direction cases,
@@ -36,13 +39,15 @@ implementation and regression tests pass.
   printable groups have passed. Stage 9 automated TUI coverage has passed for
   installed `clear`, `reset`, `tput`, `less`, `vim`, `htop`, `top`, and
   `whiptail`; `tmux`, `screen`, `dialog`, `btop`, and `nano` were skipped
-  because they were not installed on the current Module LLM image. Full NKRO is
-  not claimed, physical keyboard semantic coverage is still incomplete, and the
-  isolated `tab5_usb_keyboard_probe` environment remains useful for USB-only
-  diagnostics. A previous USB coexistence test exposed an M5GFX panel-detection
-  failure that could leave the board black-screened; `display_boot_guard` now
-  recovers by restarting after a failed display autodetect, but the underlying
-  M5GFX/Tab5 race is not root-caused.
+  because they were not installed on the current Module LLM image. USB-A
+  keyboard first-pass semantic capture passed printable text, Enter, Tab,
+  Backspace, Escape, normal and application arrows, PageUp/PageDown, Home/End,
+  Delete, Insert, F1-F4, Ctrl+A, Ctrl+E, and Alt+x. Full NKRO is not claimed,
+  and the isolated `tab5_usb_keyboard_probe` environment remains useful for
+  USB-only diagnostics. A previous USB coexistence test exposed an M5GFX
+  panel-detection failure that could leave the board black-screened;
+  `display_boot_guard` now recovers by restarting after a failed display
+  autodetect, but the underlying M5GFX/Tab5 race is not root-caused.
 - Only terminal queries and private modes covered by the Stage 1-4 corpus and
   real-application smoke are currently claimed.
 
