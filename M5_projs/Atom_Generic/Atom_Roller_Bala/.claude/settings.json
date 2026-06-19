@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pio *)",
+      "Bash(platformio *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git ls-files *)",
+      "Bash(git rev-parse *)",
+      "Bash(git check-ignore *)"
+    ],
+    "ask": [
+      "Bash(pio run -t upload*)",
+      "Bash(pio run --target upload*)",
+      "Bash(pio run -e * -t upload*)",
+      "Bash(platformio run -t upload*)"
+    ]
+  }
+}
