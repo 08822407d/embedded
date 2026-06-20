@@ -21,6 +21,9 @@
 | F-4 | RollerCAN 用库 `M5Unit-Roller`,I2C 类 `UnitRollerI2C`;**3 控制模式:速度/位置/电流**(另有编码器模式);可读 speed/pos/current 反馈、Vin/Temp/状态/错误码等 | 官方库头文件 `src/unit_rolleri2c.hpp` 查阅 | 2026-06-19 | 有效 |
 | F-5 | 工具链 = PlatformIO Core(`pio`,位于 `/home/cheyh/.local/bin/`) | 本机实测 | 2026-06-19 | 有效（**版本号随官方更新、不固定,不在此钉死**;需要时按用户要求同步) |
 | F-10 | 开发机 ↔ 开发板 = **单条 USB Type-C 有线**;烧录与读数据都经此线。机体**无无线 / 远控需求**;"远程开发"仅指用移动端 app 远控开发机上的 Claude Code,与机体无关 | 用户确认 | 2026-06-19 | 有效 |
+| F-12 | M5Atom(Matrix)Grove 口 I2C 引脚 = **SDA=GPIO26、SCL=GPIO32**(`Wire.begin(26,32)`,须在 `M5.begin()` 之后);`UnitRollerI2C::begin()` 要显式传 sda=26/scl=32,默认 21/22 不适用 | M5Stack 社区 + 多个 M5Atom 示例(`Wire.begin(26,32) // sda,scl`) | 2026-06-20 | 有效 |
+| F-13 | RollerCAN 电机供电 = **外部 12V DC**,接到 RollerCAN 的 **CAN 口**(该口带供电),与 M5Atom 的 I2C(Grove)信号分开。开发 / 测试为**有线供电**(非电池) | 用户确认 | 2026-06-20 | 有效 |
+| F-14 | I2C 总线分配:**IMU(MPU6886)走 `Wire1`**(内部,M5Atom 库 `Wire1.begin(sda=25, scl=21, 100kHz)`);**RollerCAN 走 `Wire`**(Grove,SDA=26/SCL=32)。两条独立总线,不冲突 | M5Atom 库源码 `src/utility/MPU6886.cpp` + 用户策略 | 2026-06-20 | 有效 |
 
 ## B. 机械几何(静态)
 | ID | 事实 | 来源 / 如何验证 | 日期 | 状态 |

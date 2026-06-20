@@ -44,7 +44,9 @@
 来源:`github.com/m5stack/M5Unit-Roller`,`src/unit_rolleri2c.hpp`(MIT)。本项目走 I2C。
 
 - **初始化**:`begin(TwoWire* = &Wire, addr = I2C_ADDR, sda = 21, scl = 22, speed = 4 MHz)`。
-  - ⚠️ Atom 走 Grove 口,SDA/SCL **不是默认 21/22**(ATOM 常见 G26=SDA、G32=SCL),`begin()` 须显式传 Atom 的脚 —— **待核实**;4 MHz 在 Grove 线长上能否稳定也需验证。
+  - Atom 走 Grove 口:**SDA=GPIO26、SCL=GPIO32**(已核实,FACTS F‑12);`begin()` 须显式传 `sda=26, scl=32`(默认 21/22 不适用),且在 `M5.begin()` 之后调用。
+  - 总线分配(已定,FACTS F‑14):**RollerCAN 用 `Wire`**(Grove 26/32);**IMU 用 `Wire1`**(内部 25/21,M5Atom 库默认)—— 两条独立总线,不冲突。故 `roller.begin(&Wire, addr, 26, 32, …)`。
+  - 4 MHz 在 Grove 线上能否稳定仍需实测,必要时降到 400 / 100 kHz。
 - **控制模式**:`setMode(roller_mode_t)` / `getMotorMode()`,值 **1=速度,2=位置,3=电流,4=编码器**(枚举在 `unit_roller_common.hpp`)。平衡用哪种 —— 待后续研究。
 - **作动 setter**:`setOutput(en)` 上/下电;`setSpeed()` / `setPos()` / `setCurrent()`;限流 `setSpeedMaxCurrent()` / `setPosMaxCurrent()`;PID `setSpeedPID()` / `setPosPID()`;堵转保护 `setStallProtection()`。电流量程约 ±120000(单位/标度待核实)。
 - **可读参数(getter)**:
@@ -60,7 +62,9 @@
 `M5.IMU` → θ 估计 → control(θ→τ 命令)→ `UnitRollerI2C` setter;同时读 `getXxxReadback()` 做反馈与飞轮卸荷。
 
 ## 6. 控制律
-（待定:先 PID 还是 LQR?平衡环 + 飞轮卸荷(防转速饱和)。控制模式选型确定后再定。)
+- **先 PID**:把系统先跑起来、能稳;平衡环 + 飞轮卸荷(防转速饱和)。
+- **后 LQR**:项目基本能运转后再评估加入(见 DECISIONS #001)。
+- RollerCAN 的 I2C 控制模式(速度 / 位置 / 电流)在实现 PID 时定 —— 反作用轮一般用电流 / 力矩模式(把控制量当力矩下发);待专题确认。
 
 ## 7. 待 Codex 实现的任务拆解
 （待接口/模式钉死后再拆。预备第一批:① I2C 打通 `UnitRollerI2C`——使能 + 发指令 + 读反馈;② `M5.IMU` 读 θ;③ 最小平衡环。)
