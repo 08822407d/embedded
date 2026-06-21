@@ -10,12 +10,15 @@
 #include "input_event_queue.h"
 #include "input_mapper.h"
 #include "login_uart.h"
+#include "module_fan_controller.h"
 #include "power_detect_probe.h"
 #include "render_pipeline_diagnostics.h"
 #include "status_bar.h"
 #include "tab5_keyboard_input.h"
 #include "terminal_core.h"
 #include "terminal_debug_input.h"
+#include "terminal_view.h"
+#include "temperature_monitor.h"
 #include "ui_theme.h"
 #include "usb_management.h"
 #include "usb_keyboard_probe.h"
@@ -99,27 +102,18 @@ void setupDisplay()
     formatStatusTitle(title, sizeof(title));
 
     ui::applyConfiguredDisplayOrientation();
-    const int32_t availableTerminalHeight =
-        M5.Display.height() - STATUS_BAR_HEIGHT;
-    const int32_t terminalHeight =
-        TERMINAL_ROWS * TERMINAL_CELL_HEIGHT;
-    const int32_t centeredMargin =
-        (availableTerminalHeight - terminalHeight) / 2;
-    const int32_t minimumMargin =
-        TERMINAL_VERTICAL_MARGIN_ROWS * TERMINAL_CELL_HEIGHT;
-    const int32_t terminalMargin =
-        centeredMargin > minimumMargin ? centeredMargin : minimumMargin;
-    const int32_t terminalY = STATUS_BAR_HEIGHT + terminalMargin;
     ui::beginStatusBar(theme);
     M5.Display.fillScreen(theme.screen_background);
     ui::drawStatusBar(title);
-    terminal::begin({
-        .x = 0,
-        .y = terminalY,
-        .width = M5.Display.width(),
-        .height = terminalHeight,
-        .max_columns = TERMINAL_COLUMNS,
-        .max_rows = TERMINAL_ROWS,
+    ui::beginTerminalView({
+        .bounds = {
+            0,
+            STATUS_BAR_HEIGHT,
+            M5.Display.width(),
+            M5.Display.height() - STATUS_BAR_HEIGHT,
+        },
+        .columns = TERMINAL_COLUMNS,
+        .rows = TERMINAL_ROWS,
         .text_size = TERMINAL_TEXT_SIZE,
         .theme = &theme,
         .response_writer = writeTerminalResponse,
@@ -407,6 +401,7 @@ void setup()
     auto cfg = M5.config();
     M5.begin(cfg);
     display_boot_guard::restartIfDisplayUnusable();
+    temperature_monitor::begin();
 #if ENABLE_USB_KEYBOARD_PROBE && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     M5.Power.setExtOutput(true, m5::ext_USB);
 #endif
@@ -427,6 +422,9 @@ void setup()
 #endif
 #if ENABLE_POWER_DETECT_PROBE
     power_detect_probe::begin();
+#endif
+#if ENABLE_MODULE_FAN_CONTROLLER && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    module_fan::begin();
 #endif
 #if (ENABLE_TAB5_KEYBOARD || ENABLE_USB_KEYBOARD_PROBE) && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
     const bool inputQueueReady = input::beginEventQueue();
@@ -479,16 +477,24 @@ void loop()
     readLoginUartToDisplayAndDebug();
     terminal_debug::drainCdcInjection();
     power_detect_probe::update();
+    temperature_monitor::update();
+#if ENABLE_MODULE_FAN_CONTROLLER && !ENABLE_TERMINAL_CDC_INJECTION && !ENABLE_POWER_DETECT_PROBE
+    module_fan::update();
+#endif
     bridgeUsbToLoginUart();
     tab5KeyboardInputUpdate();
     bridgeInputEventsToLoginUart();
 #if !ENABLE_POWER_DETECT_PROBE
     ui::refreshBatteryStatus(false);
+    ui::refreshTemperatureStatus(false);
 #endif
 
     const uint32_t now = millis();
     if (now - lastM5UpdateMs >= kM5UpdateIntervalMs) {
         M5.update();
+#if !ENABLE_POWER_DETECT_PROBE
+        ui::updateStatusBarTouch();
+#endif
         lastM5UpdateMs = now;
     }
 

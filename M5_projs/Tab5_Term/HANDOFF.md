@@ -86,7 +86,20 @@ changes are intentionally part of the same sync.
   keyboard-mounted orientation is a 180-degree turn from the original
   landscape direction.
 - `include/status_bar.h` / `src/status_bar.cpp`: status bar drawing, battery
-  polling, battery icon, and battery area layout.
+  polling, battery icon, temperature readout, and right-side status-area touch
+  handling.
+- `include/temperature_monitor.h` / `src/temperature_monitor.cpp`: shared
+  periodic Tab5 temperature snapshot service. Current sources are the M5Unified
+  IMU reading and Arduino chip-temperature reading.
+- `include/module_fan_controller.h` / `src/module_fan_controller.cpp`: optional
+  Module Fan v1.1 service. It probes the Tab5 M5-Bus/internal I2C address
+  `0x18`, controls the fan from the shared temperature monitor when present,
+  falls back to low-rate probing when absent or detached, and exposes a
+  runtime manual duty setting for CDC commands or future GUI controls.
+- `include/terminal_view.h` / `src/terminal_view.cpp`: UI-facing terminal
+  character-area control. It owns the terminal view bounds, centers the actual
+  `69x32` character grid inside that area, clears the view background, and
+  initializes/redraws `terminal_core`.
 - `include/terminal_core.h` / `src/terminal_core.cpp`: first-stage
   character-cell terminal core, parser state machine, cursor/screen model,
   scrolling, erase operations, and basic SGR colors.
@@ -132,6 +145,10 @@ changes are intentionally part of the same sync.
   comparison outputs, limitations, and validation record.
 - `docs/login_uart_baud.md`: runtime login-UART management commands, endpoint
   coordination, persistence safety, recovery, and validated rates.
+- `docs/touch_gui_foundation.md`: design record for future local touch input
+  and GUI controls, including normalized touch events, widget hit testing,
+  pointer capture, dirty redraw, and button behavior. This is not implemented
+  yet.
 - `tools/send_terminal_test.py`: host-side helper that sends deterministic test
   byte streams to a `tab5_terminal_cdc_inject` firmware over USB CDC. It sends
   in small chunks by default because Tab5 renders while receiving and can lose
@@ -581,24 +598,28 @@ content.
 
 Current fixed settings:
 
-- `STATUS_BAR_HEIGHT=32`
+- `STATUS_BAR_HEIGHT=48`
 - default terminal font: `DejaVu18`, `TERMINAL_TEXT_SIZE=1`,
   `TERMINAL_CELL_WIDTH=18`, `TERMINAL_CELL_HEIGHT=20`
-- formal renderer: fixed-cell; logical terminal geometry is `64x32`, with one
-  blank character row above and below the terminal area. On the current
-  720-pixel display this is a centered 640-pixel content area with 24-pixel
-  top and bottom margins below the 32-pixel status bar.
-- Raw UART has no standard unsolicited window-size negotiation. Keep the
-  Module LLM TTY at `stty rows 32 cols 64`; optional xterm `CSI 18 t` reporting
-  alone does not make a normal serial shell update its TTY size.
+- formal renderer: fixed-cell; logical terminal geometry is `69x32`. The
+  terminal character area is wrapped by `ui::beginTerminalView()`, which
+  centers the rendered grid inside the screen area below the status bar. On the
+  current `1280x720` keyboard-mounted display, the status bar occupies
+  `1280x48`; the rendered terminal grid is `1242x640`, positioned at
+  approximately `x=19,y=64`, leaving about one 18-pixel cell at the left,
+  right, and bottom edges.
+- Raw UART has no standard unsolicited window-size negotiation. When matching
+  the current firmware layout, set the Module LLM TTY explicitly with
+  `stty rows 32 cols 69`; optional xterm `CSI 18 t` reporting alone does not
+  make a normal serial shell update its TTY size. Older persistent Module LLM
+  setup notes may still mention `cols 64`.
 - On 2026-06-15 the user explicitly approved implementing `CSI 18 t` only as
   future protocol readiness for mature login transports such as SSH, Telnet, or
   PTY-backed helpers. Do not use it as a raw UART login resize mechanism, and
   do not inject visible `stty` commands from firmware.
-- T1 validation on 2026-06-15: `CSI 18 t` replies with `CSI 8;32;64t` in the
-  `stage8-protocol` regression case. The complete regression run passed 7/7,
-  then `tab5_min_uart_terminal` was restored and the shell probe returned
-  `shell-path-ok: m5stack-LLM`.
+- Current `stage8-protocol` regression expects `CSI 18 t` to reply with
+  `CSI 8;32;69t`. The original 2026-06-15 hardware validation passed with the
+  older 64-column layout before the later UI geometry change.
 - T2 on 2026-06-15 added `terminal::TerminalGeometry` and
   `terminal::getGeometry()` as the shared geometry source for future transport
   layers. The snapshot includes viewport origin/size, rendered grid size, cell
@@ -616,21 +637,82 @@ Current fixed settings:
   dimensions and drawing UI regions.
 - Title text: white on green, left aligned.
 - Battery area: black panel, right edge of the title bar, same height as the
-  title bar.
+  title bar. Title text, battery percentage, battery icon, and diagnostic
+  status text are vertically centered within the 48-pixel status bar.
+- Temperature area: black panel immediately left of the battery area. It shows
+  one shared temperature-monitor reading. The cached UI text stays ASCII, such
+  as `32C`, but the draw path renders a small degree circle before `C` or
+  `F` and a drawn thermometer icon to the right of the text; Kelvin stays `K`
+  without a degree mark. A tap cycles the display unit through Celsius,
+  Fahrenheit, and Kelvin. Its layout reserves the longest text width among
+  Celsius, Fahrenheit, and Kelvin for the current reading, so unit switching
+  does not resize the panel or move the thermometer icon.
+- Local firmware UI text defaults to English/ASCII unless the user explicitly
+  asks for Chinese. The terminal viewport is different: it renders bytes from
+  the host according to the terminal core's encoding and width handling, and
+  firmware must not translate host terminal content.
 
-Battery layout is intentionally grouped in `BatteryAreaLayout kBatteryArea` in
-`src/status_bar.cpp`. Adjust that group instead of scattering constants.
+Shared status-bar area defaults are grouped in `StatusBarAreaConfig
+kStatusBarAreaDefaults` in `src/status_bar.cpp`. Temperature and battery areas
+compose this same config for height, trailing gap, text size, horizontal
+padding, and palette, so future title/status-bar area adjustments have one
+common shape. Current visible area width is derived from content width plus
+left and right padding; each side is one status-area character width.
+
+Temperature layout is grouped in `TemperatureAreaLayout kTemperatureArea` in
+`src/status_bar.cpp`. It is a status-bar-local control and uses the same
+press/release capture shape as the power menu, without opening the power menu.
+The degree mark is drawn as graphics rather than stored as a Unicode character
+because the current M5GFX status-bar fonts do not provide reliable `U+00B0`
+coverage.
 
 Current battery area behavior:
 
-- Area width: `124`
-- Right inset: `0` so the black area reaches the screen's right edge.
-- Percent text size: `2`
+- Area width: content width plus left/right padding; each side is one
+  status-area character width from the shared config, not a fixed per-area
+  pixel width.
+- Trailing gap: `0` so the black area reaches the screen's right edge.
+- Percent text size: `2`, inherited from the shared status-bar area default.
 - Percent/icon gap: `6`
 - Battery body: `42x20`
 - Battery cap: `4x8`
 - The percent text and full battery icon are centered as one content group
   inside the battery area.
+- The battery/power area is now a touch target. After `M5.update()`, the main
+  loop calls `ui::updateStatusBarTouch()`, which opens a small menu below the
+  status bar when the battery area is tapped. The menu uses English labels
+  `Power Off` and `Restart`.
+- The menu is a status-bar-local control, not the future generic GUI manager.
+  It captures the touch that pressed a menu item, highlights while the finger
+  stays inside that item, cancels if dragged out, and executes only on release
+  inside the same item. Tapping outside the menu closes it.
+- Current power menu geometry is derived from standard values and a shared
+  1.5x scale. Standard width/item height/text size are `144`, `48`, and `1.0`;
+  current width/item height/text size are `216`, `72`, and `1.5`. Menu item
+  text is vertically centered and starts `2 * TERMINAL_CELL_WIDTH` (`36` pixels)
+  from the left edge.
+- The menu configuration intentionally follows an LVGL-like split:
+  `PowerMenuSpec` owns standard geometry, shared scale, item/action metadata,
+  and text metrics; rendering resolves style from item state (`Default` or
+  `Pressed`). Event handlers update state/capture and trigger actions, but do
+  not own visual constants.
+- `Power Off` calls `M5.Power.powerOff()`. On Tab5, current M5Unified sources drive
+  the IO expander `PWROFF_PLUSE` path and then fall back through sleep/restart
+  handling if power-off does not complete. `Restart` calls `ESP.restart()`.
+- Because the menu overlays the terminal area, closing it clears the menu
+  rectangle and calls `terminal::redraw()` before restoring the terminal text
+  style. While the menu is open, it is repainted after touch polling so terminal
+  output cannot permanently overdraw it.
+
+Module Fan runtime controls:
+
+- `OSC 777;module-fan? BEL` prints `TAB5FAN STATE ...`.
+- `OSC 777;module-fan=NN BEL` requests manual fan duty `0..100` percent.
+- `OSC 777;module-fan=auto BEL` returns to the automatic temperature curve.
+- Manual mode is a runtime request, not persisted in NVS. If the fan is absent,
+  the request is still stored in RAM and will be applied after the module is
+  detected. Future GUI controls should call `module_fan::setManualDuty()` and
+  `module_fan::setAutomaticControl()` instead of writing fan registers directly.
 
 Battery icon visual notes:
 
@@ -669,6 +751,18 @@ Tab5 battery facts confirmed from M5Unified/M5Stack sources:
   `getBatteryLevel()` every `10000ms`, and redraw the battery area only when
   the displayed battery level or inferred charging state changes. This keeps
   start/stop charging latency below human-noticeable levels.
+- Battery percentage display is intentionally smoothed around charge-state
+  transitions. Tab5's
+  reported percentage is an INA226-backed voltage/current estimate rather than
+  a true coulomb-counted state of charge; connecting external power can lift the
+  battery terminal voltage and make the raw estimate jump upward, while
+  unplugging can let the terminal voltage sag and make the raw estimate jump
+  downward. The UI keeps the lightning icon responsive, but after charging
+  starts it holds upward percentage changes for a short settle window and then
+  caps charging-time display increases to one percent per battery-level poll.
+  After charging stops, it similarly holds and rate-limits downward display
+  changes for a bounded settle window. Critical low raw readings and unknown
+  readings still display immediately.
 - User validation on 2026-06-04 showed `E2.P6/CHG_STAT` and
   `M5.Power.isCharging()` both stayed high through repeated USB data cable and
   charge cable insert/remove cycles: `p6=1 api=1 ev=0`, while `n` kept
@@ -1001,8 +1095,9 @@ After boot:
   percentage text and an iOS-style battery icon. A lightning mark inside the
   icon means the INA226-current heuristic infers that the battery is charging.
 - Bytes from `LoginSerial` are passed through `terminal_core` and rendered
-  below the status bar. The formal build uses fixed 18x20 cells with the
-  DejaVu18 font face. The proportional renderer is preview-only.
+  by the `terminal_view` character-area control below the status bar. The
+  formal build uses fixed 18x20 cells with the DejaVu18 font face. The
+  proportional renderer is preview-only.
 - The current core implements a pragmatic VT102/xterm-style subset: C0
   controls, common ESC/CSI cursor and erase operations, scroll regions,
   insert/delete character and line, delayed autowrap, DEC Special Graphics,
@@ -1506,8 +1601,8 @@ On 2026-06-08, the user approved the DejaVu18 true-proportional appearance.
 The font face remains accepted, but the formal renderer later returned to
 fixed cells for throughput:
 
-- Formal `tab5_min_uart_terminal`: DejaVu18, fixed 18x20 cells, `64x32`, with
-  one blank character row above and below the terminal area.
+- Formal `tab5_min_uart_terminal`: DejaVu18, fixed 18x20 cells, `69x32`,
+  centered by `terminal_view` inside the area below the 48-pixel status bar.
 - Formal debug `tab5_min_uart_terminal_fixed_debug`: same font and geometry,
   fixed-cell display.
 - `tab5_terminal_font_prop_preview`: DejaVu18 true-proportional display.

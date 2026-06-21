@@ -97,6 +97,17 @@ redrawn. Keep the single-byte path immediate for interactive output.
   M5GFX startup and restarts a limited number of times.
 - `src/display_orientation.cpp`: centralizes the standard vs keyboard-mounted
   180-degree orientation choice.
+- `include/temperature_monitor.h` / `src/temperature_monitor.cpp`: shared
+  periodic Tab5 temperature snapshot service. It currently records the M5Unified
+  IMU temperature and Arduino chip-temperature reading, exposes Celsius values,
+  and provides Fahrenheit/Kelvin conversion helpers for UI code.
+- `src/module_fan_controller.cpp`: low-rate M5-Bus Module Fan v1.1 detection
+  and optional temperature control. It probes the shared internal/M5-Bus I2C
+  address `0x18`, uses the shared temperature monitor as its control input, and
+  applies a table-driven Raspberry Pi 5-style fan curve when the module is
+  present. `module_fan::setManualDuty()` and
+  `module_fan::setAutomaticControl()` are the shared runtime control entry
+  points for CDC management commands and future GUI controls.
 
 ### Terminal Core
 
@@ -128,7 +139,8 @@ Keep these invariants intact:
 - Terminal replies use the configured `ResponseWriter`; they must not write
   directly to a particular UART or CDC transport.
 - Raw UART login behavior does not automatically resize the host PTY. The
-  current Module LLM profile applies `64x32` on the Linux side.
+  current firmware layout is `69x32`; the Module LLM side must be explicitly
+  set to matching rows/cols when exact TUI wrapping matters.
 
 ### Input
 
@@ -152,9 +164,34 @@ mapper is being deliberately bypassed for a documented reason.
 ### UI, Power, And Diagnostics
 
 - `src/ui_theme.cpp` owns the color palette used by the terminal and status bar.
-- `src/status_bar.cpp` draws the top bar, battery area, and charging icon. It
-  also contains the current INA226 charge-current heuristic.
+- Local firmware UI text defaults to English/ASCII unless the user explicitly
+  asks for Chinese. Terminal viewport content is host-controlled terminal
+  output and must not be translated by firmware.
+- `src/status_bar.cpp` draws the top bar, temperature area, battery area,
+  charging icon, and the current local touch controls. Tapping the temperature
+  area cycles Celsius/Fahrenheit/Kelvin. The temperature degree mark is drawn
+  as a small circle before `C` or `F` rather than relying on a Unicode glyph;
+  the temperature label uses a drawn thermometer icon at the right side of the
+  text instead of a `T` prefix. Its layout reserves the longest text width for
+  the current reading across Celsius, Fahrenheit, and Kelvin, so the area width
+  does not change when tapped. Tapping the battery/power area opens a small
+  power menu whose items call the real Tab5 software power-off path and
+  `ESP.restart()`. The file also contains the current INA226 charge-current
+  heuristic. Right-side title/status-bar area style uses
+  `StatusBarAreaConfig` plus `kStatusBarAreaDefaults`; the
+  temperature and battery areas share that base shape for height, trailing gap,
+  text size, horizontal padding, and palette. Their visible widths are derived
+  from current content width plus left/right padding, with area-specific
+  geometry kept in their own layout structs.
+- `src/terminal_view.cpp` is the UI-facing terminal character-area control. It
+  owns the screen bounds below the status bar, centers the rendered character
+  grid there, and initializes/redraws `terminal_core`. Keep future GUI layout
+  changes here instead of rebuilding terminal placement in `src/main.cpp`.
 - `src/screen_capture.cpp` implements debug-only framebuffer capture.
+- `src/usb_management.cpp` owns the formal firmware's private `OSC 777`
+  management frames. Current commands include login-UART settings,
+  render-pipeline diagnostics, CDC mirror control, and Module Fan runtime
+  control through `module-fan?`, `module-fan=NN`, and `module-fan=auto`.
 - `src/terminal_debug_input.cpp` implements CDC injection and terminal state
   diagnostics for regression builds.
 - `include/render_pipeline_diagnostics.h` exposes diagnostic snapshots for the
@@ -184,6 +221,18 @@ mapper is being deliberately bypassed for a documented reason.
 
 Prefer adding repeatable host-side scripts for fixed procedures instead of
 reconstructing long commands manually.
+
+### Touch And GUI Design
+
+- `docs/touch_gui_foundation.md`: foundation record for future local touch
+  input and GUI controls. It separates M5Unified touch sampling, normalized
+  pointer events, GUI widget hit testing/capture, dirty redraw, and feature
+  callbacks. It also defines expected button behavior.
+- The current runtime implementation is intentionally narrow: the status-bar
+  temperature area and battery/power area are local touch controls with their
+  own capture and redraw state, and `terminal_view` wraps the central terminal
+  character area as a first display control. A reusable GUI manager is still
+  future work.
 
 ## Build Environments
 
@@ -215,7 +264,7 @@ different behavior.
   bytes cannot interfere with a real login session.
 - Do not advertise a broader `TERM` identity than the firmware and Module LLM
   configuration can actually support.
-- Treat current `64x32`, `xterm-256color`, truecolor, and 921600-login-UART
+- Treat current `69x32`, `xterm-256color`, truecolor, and 921600-login-UART
   behavior as the accepted baseline unless the user explicitly changes it.
 - If a change requires the user to press USB/A164 keys, announce that before
   starting the capture window.

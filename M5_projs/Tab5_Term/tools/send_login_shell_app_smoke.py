@@ -286,7 +286,7 @@ def main() -> int:
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--term", default="xterm-256color")
     parser.add_argument("--rows", type=int, default=32)
-    parser.add_argument("--cols", type=int, default=64)
+    parser.add_argument("--cols", type=int, default=69)
     parser.add_argument("--apps", default=",".join(DEFAULT_APPS))
     parser.add_argument(
         "--profile",

@@ -40,7 +40,7 @@ Completed through Stage 9:
 - Stages 1 through 4 of `terminal_implementation_plan.md`.
 - Deterministic CDC tests for the implemented parser/screen features.
 - Real Module LLM login-shell application smoke for the available tools.
-- DejaVu18 font face retained with formal fixed-cell rendering at `64x32`.
+- DejaVu18 font face retained with formal fixed-cell rendering at `69x32`.
 - Formal rendering later returned to fixed 18x20 cells for performance while
   retaining the DejaVu18 font face and the proportional preview environment.
 - Formal `tab5_min_uart_terminal` image rebuilt, flashed, and verified.
@@ -942,6 +942,97 @@ enabled in the formal firmware by default.
 
 ## Progress Log
 
+- 2026-06-21: Added a shared Tab5 temperature monitor and status-bar readout.
+  `include/temperature_monitor.h` / `src/temperature_monitor.cpp` now store a
+  periodic snapshot of the readable Tab5 temperature sources: M5Unified IMU
+  temperature and Arduino chip temperature. The title bar now has a black
+  temperature area immediately left of the battery area; it displays ASCII text
+  such as `32C`, rendering the degree mark before `C` or `F` as a small drawn
+  circle instead of a Unicode glyph. The old `T` prefix was replaced with a
+  drawn thermometer icon on the right side of the text. Tapping that area
+  cycles Celsius, Fahrenheit, and Kelvin. The area reserves the maximum text
+  width among those three units for the current reading, keeping the panel and
+  icon stable while units change. Module Fan control now consumes the shared
+  temperature snapshot instead of reading the IMU/chip temperature independently.
+- 2026-06-21: Added a shared status-bar area config shape for the current
+  title-bar data regions. `StatusBarAreaConfig` and `kStatusBarAreaDefaults` in
+  `src/status_bar.cpp` now own the common height/trailing-gap/text-size,
+  horizontal-padding, and palette fields used by both the temperature and
+  battery areas. The old fixed per-area widths were removed; visible width now
+  comes from the current content width plus left/right padding, with each side
+  set to one status-area character width. The area-specific degree mark and
+  battery-icon dimensions remain in `TemperatureAreaLayout` and
+  `BatteryAreaLayout`.
+- 2026-06-21: Added a Module Fan v1.1 controller foundation. The firmware now
+  probes the Tab5 rear M5-Bus through the shared internal I2C bus for the fan's
+  default `0x18` address, confirms the device by reading its address and
+  firmware-version registers, and only then starts temperature control. The
+  default fan curve follows the Raspberry Pi 5 four-level shape
+  (`50/60/67.5/75` degrees Celsius with 5-degree hysteresis) and maps the Pi
+  0-255 PWM values to Module Fan `0-100` duty percentages. If the fan is absent
+  or later stops responding, the controller releases its fan state and returns
+  to low-rate probing; it deliberately does not release the shared Tab5
+  internal I2C bus or disable shared external power rails.
+- 2026-06-21: Added a simple Module Fan manual-speed entry point. The public
+  controller API now has `module_fan::setManualDuty()` and
+  `module_fan::setAutomaticControl()` so a future GUI app can reuse the same
+  path. The formal CDC management channel accepts `module-fan?`,
+  `module-fan=NN` for manual `0..100` percent duty, and `module-fan=auto` to
+  return to automatic temperature control. Manual mode is runtime-only and is
+  kept in RAM even while the fan is absent, then applied when the module is
+  detected.
+- 2026-06-19: Adjusted the layout after user review. The status bar is now
+  `48` pixels high, which is 1.5x the original 32-pixel bar and 0.75x the
+  previous 64-pixel experiment. The fixed 18x20 terminal grid was widened to `69x32`;
+  on the current `1280x720` keyboard-mounted display it renders as
+  approximately `1242x640` at `x=19,y=64`, leaving about one character cell at
+  the left, right, and bottom edges.
+- 2026-06-21: Enlarged the power menu after user touch testing. The menu width
+  and item height now derive from standard values of `144` and `48` pixels
+  through a shared 1.5x scale, producing current `216`-pixel width and
+  `72`-pixel item height. Menu item text now uses the same 1.5x scale, is
+  vertically centered with `middle_left`, and starts `2 * TERMINAL_CELL_WIDTH`
+  (`36` pixels) from the left edge.
+- 2026-06-21: Refactored the status-bar power menu toward an LVGL-like widget
+  configuration shape. `PowerMenuSpec` now owns standard geometry, shared scale,
+  item/action metadata, and text metrics. Drawing resolves style from the item
+  state (`Default` or `Pressed`) instead of scattering those decisions through
+  touch handlers, so a later LVGL port can map the same data to object
+  properties, styles, states, and event callbacks.
+- 2026-06-21: Added a local UI text policy. Firmware-owned UI labels now default
+  to English/ASCII unless the user explicitly asks for Chinese; terminal
+  content remains host-controlled and is not translated by firmware. The
+  status-bar power menu labels changed from Chinese to `Power Off` and
+  `Restart`, using an ASCII M5GFX font.
+- 2026-06-19: Wrapped the central terminal character area in
+  `include/terminal_view.h` / `src/terminal_view.cpp`. The new UI-facing
+  control owns the bounds below the status bar, clears that background, centers
+  the actual rendered grid, and initializes/redraws `terminal_core`.
+- 2026-06-19: Implemented the first runtime touch control in the status bar.
+  Tapping the battery/power area now opens a small menu.
+  The menu highlights pressed items, cancels by dragging out, executes only on
+  release inside the selected item, and closes on outside taps. The power-off
+  action calls `M5.Power.powerOff()` and the restart action calls
+  `ESP.restart()`. The overlay clears
+  itself with `terminal::redraw()` so the terminal contents recover after the
+  menu closes.
+- 2026-06-19: Added `docs/touch_gui_foundation.md`, a design record for future
+  local touch input and GUI controls. The design separates M5Unified touch
+  sampling, normalized pointer events, GUI widget hit testing/capture, dirty
+  redraw, and feature callbacks. It defines first-button behavior including
+  press, drag-out cancel, drag-back restore, release-click, hold, and redraw
+  rules. The generic touch/GUI manager is still future work; the current runtime
+  implementation is the status-bar-local power menu.
+- 2026-06-19: Added status-bar battery percentage smoothing around charging
+  transitions.
+  Tab5's displayed percentage comes from an INA226-backed voltage/current
+  estimate, so plugging in external power can make the raw estimate jump upward
+  as terminal voltage rises, while unplugging can make it jump downward as the
+  terminal voltage settles. The UI now keeps the lightning icon responsive but
+  holds/caps upward changes after charging starts and holds/rate-limits
+  downward changes after charging stops. Critical low raw readings and unknown
+  readings still display immediately. This is a small post-Stage-10 status-bar
+  improvement and does not open a new mainline stage.
 - 2026-06-18: Stage 10 P6 sixth throughput increment added terminal write
   transactions and formal-login backlog-aware render deferral. Standalone row
   text-style caching was low impact (`240x64` stayed about `6.8s`), but
@@ -1260,10 +1351,10 @@ enabled in the formal firmware by default.
   Its existing experimental probe remains available, but it no longer blocks
   Stage 5 completion or the transition to Stage 6.
 - 2026-06-08: formal terminal geometry changed from `64x34` to explicit
-  `64x32`. The 640-pixel terminal content area is vertically centered below
-  the 32-pixel status bar, leaving 24 pixels above and below on the current
-  display. The formal image built, flashed to COM3 with verified hashes, and
-  passed the `shell-path-ok: m5stack-LLM` probe at 921600.
+  `64x32`. At the time this used a 32-pixel status bar and a vertically
+  centered 640-pixel terminal content area. On 2026-06-19, the terminal
+  character grid was wrapped by `terminal_view`; after user review the current
+  layout is a 48-pixel status bar with a `69x32` rendered grid.
 - 2026-06-08: font work completed and formal UART firmware restored.
 - 2026-06-08: Stage 5 input and integration opened at Milestone I1.
 - 2026-06-08: display orientation encapsulated and defaulted to the

@@ -24,6 +24,12 @@ struct TerminalTheme {
     uint16_t battery_low;
     uint16_t battery_charging;
     uint16_t battery_lightning;
+
+    uint16_t menu_background;
+    uint16_t menu_border;
+    uint16_t menu_text;
+    uint16_t menu_pressed_background;
+    uint16_t menu_separator;
 };
 
 const TerminalTheme& terminalTheme(

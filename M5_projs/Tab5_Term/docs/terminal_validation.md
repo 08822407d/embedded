@@ -534,7 +534,8 @@ printf '\033[2J\033[Htop-left\r\n'
 Expected:
 
 - Terminal content area clears.
-- `top-left` appears at the first cell below the status bar.
+- `top-left` appears at the first cell in the centered terminal view below the
+  status bar.
 - Status bar remains visible.
 
 Cursor movement and erase line:
@@ -693,12 +694,13 @@ Stage 8 T1 adds the xterm text-area size query. The dedicated
 `stage8-protocol` regression case expects:
 
 ```text
-\x1b[8;32;64t
+\x1b[8;32;69t
 ```
 
 This response prepares future SSH/Telnet/PTY-backed integrations. It is not
-used to auto-resize the current raw UART login shell; that path still uses the
-Module LLM profile's persistent `stty rows 32 cols 64`.
+used to auto-resize the current raw UART login shell; that path still needs an
+explicit host-side `stty rows 32 cols 69` when matching the current firmware
+geometry.
 
 Stage 8 T2 adds the shared terminal geometry snapshot API used by the T1
 response path and by future transport layers. It has no separate hardware
@@ -724,7 +726,7 @@ python tools/send_terminal_test.py --port COM3 --test font-preview --chunk-size 
 Expected:
 
 - The first line says `Font debug: DejaVu18 glyphs in fixed 18x20 cells`.
-- Cell geometry is `64x32`; narrow glyphs retain equal-width cells in this
+- Cell geometry is `69x32`; narrow glyphs retain equal-width cells in this
   debug mode.
 - DEC graphics, SGR attributes/colors, cursor, and UTF fallback samples remain
   coherent.
@@ -778,7 +780,7 @@ Expected:
 Automated real-shell smoke helper:
 
 ```sh
-python tools/send_login_shell_app_smoke.py --port COM3 --apps clear,reset,tput,less,nano,vim,htop --rows 32 --cols 64 --chunk-size 32 --chunk-delay 0.08
+python tools/send_login_shell_app_smoke.py --port COM3 --apps clear,reset,tput,less,nano,vim,htop --rows 32 --cols 69 --chunk-size 32 --chunk-delay 0.08
 ```
 
 This uses the formal UART build and launches the apps on the external LLM
@@ -894,8 +896,8 @@ Expected:
 
 - The status bar is at the physical top edge when viewed from the keyboard.
 - Status text is upright, and the battery area remains at the upper-right.
-- Terminal content starts below the status bar and retains the expected
-  landscape geometry.
+- Terminal content appears in the centered terminal view below the status bar
+  and retains the expected landscape geometry.
 - The image is rotated, not mirrored.
 
 With the verified official companion keyboard attached through its documented

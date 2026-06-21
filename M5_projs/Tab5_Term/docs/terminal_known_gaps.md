@@ -56,8 +56,9 @@ implementation and regression tests pass.
 
 ## Serial Session Integration
 
-- Raw UART has no automatic PTY window-size propagation. The Module LLM login
-  profile currently applies the fixed `64x32` size.
+- Raw UART has no automatic PTY window-size propagation. The current firmware
+  layout is fixed `69x32`; the Module LLM login profile or any smoke helper
+  must set matching rows/cols explicitly when exact wrapping matters.
 - The private USB CDC management and regression protocols are local device
   tooling, not terminal escape-sequence extensions advertised to Linux
   applications.

@@ -13,7 +13,7 @@
   "cases": {
     "stage1-smoke": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -43,7 +43,7 @@
     },
     "stage2-screen": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -59,7 +59,7 @@
     },
     "stage3-color": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -100,7 +100,7 @@
     },
     "stage4-xterm": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -122,7 +122,7 @@
     },
     "stage7-unicode": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -231,7 +231,7 @@
     },
     "stage7-unicode-graphics": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -303,7 +303,7 @@
     },
     "stage8-protocol": {
       "state": {
-        "cols": 64,
+        "cols": 69,
         "rows": 32,
         "scroll": "0,31",
         "origin": 0,
@@ -312,12 +312,12 @@
       "rows": {
         "0": "Stage8 protocol readiness test",
         "1": "xterm text area size query:",
-        "2": "Expected reply for future mature transports: CSI 8;32;64 t",
-        "3": "Raw UART login still uses persistent stty rows 32 cols 64",
+        "2": "Expected reply for future mature transports: CSI 8;32;69 t",
+        "3": "Raw UART login still needs explicit stty rows 32 cols 69",
         "4": "End of Stage8 protocol readiness test"
       },
       "responses_contains": [
-        "\u001b[8;32;64t"
+        "\u001b[8;32;69t"
       ],
       "cells": []
     }

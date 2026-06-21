@@ -6,6 +6,7 @@
 
 #include "app_config.h"
 #include "login_uart.h"
+#include "module_fan_controller.h"
 #include "render_pipeline_diagnostics.h"
 #include "screen_capture.h"
 
@@ -103,6 +104,45 @@ bool parseBooleanOption(const char *value, bool *result)
     return false;
 }
 
+const char *fanControlModeName(module_fan::ControlMode mode)
+{
+    switch (mode) {
+    case module_fan::ControlMode::Manual:
+        return "manual";
+    case module_fan::ControlMode::Automatic:
+    default:
+        return "auto";
+    }
+}
+
+int32_t temperatureDeciCelsius(const module_fan::State& state)
+{
+    if (!state.temperature_valid) {
+        return 0;
+    }
+
+    const float scaled = state.temperature_celsius * 10.0f;
+    return static_cast<int32_t>(scaled + (scaled >= 0.0f ? 0.5f : -0.5f));
+}
+
+void printModuleFanState()
+{
+    const module_fan::State& state = module_fan::state();
+    Serial.printf(
+        "TAB5FAN STATE attached=%u mode=%s duty=%u manual=%u rpm=%u "
+        "fw=0x%02X missed=%u level=%u temp_valid=%u temp_deci_c=%ld\r\n",
+        state.attached ? 1U : 0U,
+        fanControlModeName(state.control_mode),
+        static_cast<unsigned>(state.duty_percent),
+        static_cast<unsigned>(state.manual_duty_percent),
+        static_cast<unsigned>(state.rpm),
+        static_cast<unsigned>(state.firmware_version),
+        static_cast<unsigned>(state.missed_polls),
+        static_cast<unsigned>(state.cooling_level),
+        state.temperature_valid ? 1U : 0U,
+        static_cast<long>(temperatureDeciCelsius(state)));
+}
+
 void handleFrame()
 {
     const size_t prefixLength = sizeof(kFramePrefix);
@@ -143,6 +183,40 @@ void handleFrame()
         }
         render_pipeline::setMirrorEnabled(enabled);
         Serial.printf("TAB5PIPE MIRROR enabled=%u\r\n", enabled ? 1U : 0U);
+        return;
+    }
+
+    if (strcmp(command, "module-fan?") == 0) {
+        printModuleFanState();
+        return;
+    }
+
+    constexpr char kFanPrefix[] = "module-fan=";
+    if (strncmp(command, kFanPrefix, sizeof(kFanPrefix) - 1) == 0) {
+        const char *value = command + sizeof(kFanPrefix) - 1;
+        if (strcmp(value, "auto") == 0) {
+            module_fan::setAutomaticControl();
+            Serial.println("TAB5FAN OK mode=auto");
+            printModuleFanState();
+            return;
+        }
+
+        char *end = nullptr;
+        const unsigned long parsedDuty = strtoul(value, &end, 10);
+        if (end == value || *end != '\0' || parsedDuty > 100) {
+            Serial.println("TAB5FAN ERR invalid-duty");
+            return;
+        }
+
+        if (!module_fan::setManualDuty(static_cast<uint8_t>(parsedDuty))) {
+            Serial.println("TAB5FAN ERR unavailable");
+            return;
+        }
+
+        Serial.printf(
+            "TAB5FAN OK mode=manual duty=%lu\r\n",
+            parsedDuty);
+        printModuleFanState();
         return;
     }
 

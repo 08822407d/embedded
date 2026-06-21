@@ -380,7 +380,7 @@ def main() -> int:
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--term", default="xterm-256color")
     parser.add_argument("--rows", type=int, default=32)
-    parser.add_argument("--cols", type=int, default=64)
+    parser.add_argument("--cols", type=int, default=69)
     parser.add_argument("--lines", type=int, default=240)
     parser.add_argument("--line-width", type=int, default=64)
     parser.add_argument("--timeout", type=float, default=45.0)

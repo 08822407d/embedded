@@ -387,7 +387,7 @@ try {
             $log = Join-Path $logRoot "app-smoke-$timestamp.log"
 
             Invoke-LoggedCommand -Label "Login shell app smoke on $Port" -LogPath $log -Command {
-                & $python $script --port $Port --apps $Apps --rows 32 --cols 64 `
+                & $python $script --port $Port --apps $Apps --rows 32 --cols 69 `
                     --chunk-size 32 --chunk-delay 0.08
             }
 
@@ -401,7 +401,7 @@ try {
             $log = Join-Path $logRoot "tui-matrix-$timestamp.log"
 
             Invoke-LoggedCommand -Label "Stage 9 TUI matrix on $Port" -LogPath $log -Command {
-                & $python $script --port $Port --profile stage9 --rows 32 --cols 64 `
+                & $python $script --port $Port --profile stage9 --rows 32 --cols 69 `
                     --chunk-size 32 --chunk-delay 0.08
             }
 
@@ -489,7 +489,7 @@ try {
             $arguments = @(
                 "--port", $Port,
                 "--rows", "32",
-                "--cols", "64",
+                "--cols", "69",
                 "--lines", "$BurstLines",
                 "--line-width", "$LineWidth",
                 "--timeout", "$timeoutSeconds",

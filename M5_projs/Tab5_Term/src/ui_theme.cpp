@@ -26,6 +26,12 @@ constexpr TerminalTheme kClassicGreenTheme = {
     .battery_low = rgb565(255, 59, 48),
     .battery_charging = rgb565(52, 199, 89),
     .battery_lightning = rgb565(255, 226, 120),
+
+    .menu_background = rgb565(18, 20, 22),
+    .menu_border = rgb565(96, 116, 104),
+    .menu_text = rgb565(248, 248, 248),
+    .menu_pressed_background = rgb565(0, 86, 62),
+    .menu_separator = rgb565(48, 56, 52),
 };
 } // namespace
 

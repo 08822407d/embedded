@@ -6,7 +6,7 @@ scripts instead of creating parallel test payloads.
 
 ## Accepted Baseline
 
-- Firmware display: DejaVu18, fixed 18x20 cells, `64x32`.
+- Firmware display: DejaVu18, fixed 18x20 cells, `69x32`.
 - Display direction: keyboard-mounted landscape.
 - Login UART: 921600 8N1 on both Tab5 and Module LLM.
 - Linux terminal identity: `xterm-256color`, `COLORTERM=truecolor`.

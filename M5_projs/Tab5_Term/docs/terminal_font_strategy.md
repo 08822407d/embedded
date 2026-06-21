@@ -48,7 +48,7 @@ Default formal firmware uses:
 - `TERMINAL_TEXT_SIZE=1`
 
 This keeps the accepted DejaVu18 glyph appearance but places every glyph in a
-fixed-width cell. The logical terminal geometry is `64x32` on the current Tab5
+fixed-width cell. The logical terminal geometry is `69x32` on the current Tab5
 layout. The formal default was changed back to fixed cells after measurement
 showed the proportional renderer consuming only about 64 printable bytes per
 second: each byte erased the cursor, rendered the changed cell, and redrew the

@@ -105,7 +105,7 @@ STAGE7_UNICODE = (
     b"U1/U2 Unicode width test\r\n"
     b"ASCII: A\xe4\xb8\xadB\r\n"
     b"Combining: e\xcc\x81X\r\n"
-    b"\x1b[4;1HBoundary:\x1b[4;64H\xe4\xb8\xadZ"
+    b"\x1b[4;1HBoundary:\x1b[4;69H\xe4\xb8\xadZ"
     b"\x1b[6;1HErase: A\xe4\xb8\xadBC\x1b[6;10H\x1b[X"
     b"\x1b[7;1HInsert: A\xe4\xb8\xadBC\x1b[7;10H\x1b[@"
     b"\x1b[8;1HDelete: A \xe4\xb8\xadBC\x1b[8;10H\x1b[P"
@@ -136,15 +136,15 @@ STAGE8_PROTOCOL = (
     b"\x1b[2J\x1b[H"
     b"Stage8 protocol readiness test\r\n"
     b"xterm text area size query: \x1b[18t\r\n"
-    b"Expected reply for future mature transports: CSI 8;32;64 t\r\n"
-    b"Raw UART login still uses persistent stty rows 32 cols 64\r\n"
+    b"Expected reply for future mature transports: CSI 8;32;69 t\r\n"
+    b"Raw UART login still needs explicit stty rows 32 cols 69\r\n"
     b"End of Stage8 protocol readiness test"
 )
 
 FONT_PREVIEW = (
     b"\x1b[2J\x1b[H"
     b"Font debug: DejaVu18 glyphs in fixed 18x20 cells\r\n"
-    b"Cell geometry should remain 64 columns x 32 rows.\r\n"
+    b"Cell geometry should remain 69 columns x 32 rows.\r\n"
     b"\r\n"
     b"Upper: ABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n"
     b"Lower: abcdefghijklmnopqrstuvwxyz\r\n"
