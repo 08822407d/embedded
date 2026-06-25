@@ -1,0 +1,459 @@
+diff --git a/.gitignore b/.gitignore
+index c585a06..9d570db 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -7,3 +7,4 @@ Release/*.zip
+ Release/*.json
+ Console/build
+ build/*
++.pio/
+diff --git a/Boards.h b/Boards.h
+index c059cd6..413caee 100644
+--- a/Boards.h
++++ b/Boards.h
+@@ -70,6 +70,10 @@
+   #define MODEL_DE            0xDE // Xiao ESP32S3 with Wio-SX1262 module, 433 MHz
+   #define MODEL_DD            0xDD // Xiao ESP32S3 with Wio-SX1262 module, 868 MHz
+ 
++  #define PRODUCT_M5STACK     0xEC // M5Stack devices
++  #define BOARD_M5_UNIT_C6L   0x45 // M5Stack Unit-C6L / Stamp C6LoRa
++  #define MODEL_5C            0x5C // Unit-C6L, 868-923 MHz with SX1262
++
+   #define PRODUCT_T32_10      0xB2
+   #define BOARD_LORA32_V1_0   0x39
+   #define MODEL_BA            0xBA // LilyGO T3 v1.0, 433 MHz
+@@ -144,6 +148,8 @@
+       #define MODEM SX1262
+     #elif BOARD_MODEL == BOARD_GENERIC_NRF52
+       #define MODEM SX1262
++    #elif BOARD_MODEL == BOARD_M5_UNIT_C6L
++      #define MODEM SX1262
+     #else
+       #define MODEM SX1276
+     #endif
+@@ -166,7 +172,9 @@
+   #define HAS_LORA_PA false
+   #define HAS_LORA_LNA false
+   #define PIN_DISP_SLEEP -1
+-  #define VALIDATE_FIRMWARE true
++  #ifndef VALIDATE_FIRMWARE
++    #define VALIDATE_FIRMWARE true
++  #endif
+ 
+   #if defined(ENABLE_TCXO)
+       #define HAS_TCXO true
+@@ -714,6 +722,38 @@
+         #endif
+       #endif
+ 
++    #elif BOARD_MODEL == BOARD_M5_UNIT_C6L
++      #define IS_ESP32C6 true
++      #define DIO2_AS_RF_SWITCH true
++      #undef HAS_BUSY
++      #define HAS_BUSY true
++      #undef HAS_TCXO
++      #define HAS_TCXO true
++      #undef HAS_NP
++      #define HAS_NP true
++      #undef HAS_EEPROM
++      #define HAS_EEPROM true
++      #define C6L_USE_IO_EXPANDER true
++      #define C6L_AUTOPROVISION true
++      #undef VALIDATE_FIRMWARE
++      #define VALIDATE_FIRMWARE false
++
++      #define I2C_SDA 10
++      #define I2C_SCL 8
++
++      const int pin_cs = 23;
++      const int pin_reset = -1;
++      const int pin_sclk = 20;
++      const int pin_mosi = 21;
++      const int pin_miso = 22;
++      const int pin_busy = 19;
++      const int pin_dio = 7;
++      const int pin_tcxo_enable = -1;
++      const int pin_np = 2;
++
++      const int pin_led_rx = 2;
++      const int pin_led_tx = 2;
++
+     #else
+       #error An unsupported ESP32 board was selected. Cannot compile RNode firmware.
+     #endif
+diff --git a/Device.h b/Device.h
+index e2a1d06..2bb3f7c 100644
+--- a/Device.h
++++ b/Device.h
+@@ -215,6 +215,10 @@ bool device_firmware_ok() {
+ 
+ #if MCU_VARIANT == MCU_ESP32 || MCU_VARIANT == MCU_NRF52
+ bool device_init() {
++  #if HAS_BLUETOOTH == false && HAS_BLE == false
++    bt_ready = true;
++  #endif
++
+   if (bt_ready) {
+     #if MCU_VARIANT == MCU_ESP32
+     for (uint8_t i=0; i<EEPROM_SIG_LEN; i++){dev_eeprom_signature[i]=EEPROM.read(eeprom_addr(ADDR_SIGNATURE+i));}
+diff --git a/RNode_Firmware.ino b/RNode_Firmware.ino
+index 5649206..c92b5a7 100644
+--- a/RNode_Firmware.ino
++++ b/RNode_Firmware.ino
+@@ -15,8 +15,26 @@
+ 
+ #include <Arduino.h>
+ #include <SPI.h>
++#include <Wire.h>
++
++#if defined(C6L_HOST_UART) && C6L_HOST_UART
++  #ifndef C6L_HOST_UART_RX_PIN
++    #define C6L_HOST_UART_RX_PIN 4
++  #endif
++  #ifndef C6L_HOST_UART_TX_PIN
++    #define C6L_HOST_UART_TX_PIN 5
++  #endif
++  HardwareSerial C6LHostSerial(1);
++  #undef Serial
++  #define Serial C6LHostSerial
++#endif
++
+ #include "Utilities.h"
+ 
++#if MCU_VARIANT == MCU_ESP32 || MCU_VARIANT == MCU_NRF52
++void update_csma_parameters();
++#endif
++
+ FIFOBuffer serialFIFO;
+ uint8_t serialBuffer[CONFIG_UART_BUFFER_SIZE+1];
+ 
+@@ -62,6 +80,9 @@ void setup() {
+   #if MCU_VARIANT == MCU_ESP32
+     boot_seq();
+     EEPROM.begin(EEPROM_SIZE);
++    #if BOARD_MODEL == BOARD_M5_UNIT_C6L && C6L_AUTOPROVISION
++      c6l_autoprovision();
++    #endif
+     Serial.setRxBufferSize(CONFIG_UART_BUFFER_SIZE);
+ 
+     #if BOARD_MODEL == BOARD_TDECK
+@@ -119,7 +140,11 @@ void setup() {
+   memset(serialBuffer, 0, sizeof(serialBuffer));
+   fifo_init(&serialFIFO, serialBuffer, CONFIG_UART_BUFFER_SIZE);
+ 
+-  Serial.begin(serial_baudrate);
++  #if defined(C6L_HOST_UART) && C6L_HOST_UART
++    Serial.begin(serial_baudrate, SERIAL_8N1, C6L_HOST_UART_RX_PIN, C6L_HOST_UART_TX_PIN);
++  #else
++    Serial.begin(serial_baudrate);
++  #endif
+ 
+   #if HAS_NP
+     led_init();
+diff --git a/Utilities.h b/Utilities.h
+index f6fbac2..b62e6a4 100644
+--- a/Utilities.h
++++ b/Utilities.h
+@@ -15,6 +15,10 @@
+ 
+ #include "Config.h"
+ 
++#if BOARD_MODEL == BOARD_M5_UNIT_C6L
++    #include <esp_mac.h>
++#endif
++
+ #if HAS_EEPROM
+     #include <EEPROM.h>
+ #elif PLATFORM == PLATFORM_NRF52
+@@ -1395,10 +1399,11 @@ void setTXPower() {
+ 		if (model == MODEL_DB) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 		if (model == MODEL_DC) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 
+-		if (model == MODEL_DD) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+-		if (model == MODEL_DE) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
++			if (model == MODEL_DD) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
++			if (model == MODEL_DE) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
++			if (model == MODEL_5C) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 
+-		if (model == MODEL_E4) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
++			if (model == MODEL_E4) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 		if (model == MODEL_E9) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 		if (model == MODEL_E3) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+ 		if (model == MODEL_E8) LoRa->setTxPower(mapped_lora_txp, PA_OUTPUT_PA_BOOST_PIN);
+@@ -1616,8 +1621,8 @@ bool eeprom_product_valid() {
+ 
+ 	#if PLATFORM == PLATFORM_AVR
+ 	if (rval == PRODUCT_RNODE || rval == PRODUCT_HMBRW) {
+-	#elif PLATFORM == PLATFORM_ESP32
+-	if (rval == PRODUCT_RNODE || rval == BOARD_RNODE_NG_20 || rval == BOARD_RNODE_NG_21 || rval == PRODUCT_HMBRW || rval == PRODUCT_TBEAM || rval == PRODUCT_T32_10 || rval == PRODUCT_T32_20 || rval == PRODUCT_T32_21 || rval == PRODUCT_H32_V2 || rval == PRODUCT_H32_V3 || rval == PRODUCT_H32_V4 || rval == PRODUCT_TDECK_V1 || rval == PRODUCT_TBEAM_S_V1  || rval == PRODUCT_XIAO_S3) {
++		#elif PLATFORM == PLATFORM_ESP32
++		if (rval == PRODUCT_RNODE || rval == BOARD_RNODE_NG_20 || rval == BOARD_RNODE_NG_21 || rval == PRODUCT_HMBRW || rval == PRODUCT_TBEAM || rval == PRODUCT_T32_10 || rval == PRODUCT_T32_20 || rval == PRODUCT_T32_21 || rval == PRODUCT_H32_V2 || rval == PRODUCT_H32_V3 || rval == PRODUCT_H32_V4 || rval == PRODUCT_TDECK_V1 || rval == PRODUCT_TBEAM_S_V1  || rval == PRODUCT_XIAO_S3 || rval == PRODUCT_M5STACK) {
+ 	#elif PLATFORM == PLATFORM_NRF52
+ 	if (rval == PRODUCT_RAK4631 || rval == PRODUCT_HELTEC_T114 || rval == PRODUCT_TECHO || rval == PRODUCT_HMBRW) {
+ 	#else
+@@ -1653,10 +1658,12 @@ bool eeprom_model_valid() {
+ 	if (model == MODEL_16 || model == MODEL_17) {
+ 	#elif BOARD_MODEL == BOARD_TBEAM_S_V1
+ 	if (model == MODEL_DB || model == MODEL_DC) {
+-	#elif BOARD_MODEL == BOARD_XIAO_S3
+-	if (model == MODEL_DD || model == MODEL_DE) {
+-	#elif BOARD_MODEL == BOARD_LORA32_V1_0
+-	if (model == MODEL_BA || model == MODEL_BB) {
++		#elif BOARD_MODEL == BOARD_XIAO_S3
++		if (model == MODEL_DD || model == MODEL_DE) {
++		#elif BOARD_MODEL == BOARD_M5_UNIT_C6L
++		if (model == MODEL_5C || model == MODEL_A6) {
++		#elif BOARD_MODEL == BOARD_LORA32_V1_0
++		if (model == MODEL_BA || model == MODEL_BB) {
+ 	#elif BOARD_MODEL == BOARD_LORA32_V2_0
+ 	if (model == MODEL_B3 || model == MODEL_B8) {
+ 	#elif BOARD_MODEL == BOARD_LORA32_V2_1
+@@ -1727,6 +1734,57 @@ bool eeprom_checksum_valid() {
+ 	return checksum_valid;
+ }
+ 
++#if BOARD_MODEL == BOARD_M5_UNIT_C6L && C6L_AUTOPROVISION
++void c6l_autoprovision() {
++  #if HAS_EEPROM
++    bool c6l_needs_bootstrap = EEPROM.read(eeprom_addr(ADDR_INFO_LOCK)) != INFO_LOCK_BYTE;
++    bool c6l_has_early_custom_id = EEPROM.read(eeprom_addr(ADDR_PRODUCT)) == PRODUCT_M5STACK &&
++                                   EEPROM.read(eeprom_addr(ADDR_MODEL)) == MODEL_5C;
++    bool c6l_has_early_bad_date = EEPROM.read(eeprom_addr(ADDR_MADE + 0)) == 0x20 &&
++                                  EEPROM.read(eeprom_addr(ADDR_MADE + 1)) == 0x26 &&
++                                  EEPROM.read(eeprom_addr(ADDR_MADE + 2)) == 0x06 &&
++                                  EEPROM.read(eeprom_addr(ADDR_MADE + 3)) == 0x24;
++    bool c6l_has_early_bad_serial = EEPROM.read(eeprom_addr(ADDR_SERIAL + 0)) == 0x81 &&
++                                    EEPROM.read(eeprom_addr(ADDR_SERIAL + 1)) == 0xFF &&
++                                    EEPROM.read(eeprom_addr(ADDR_SERIAL + 2)) == 0xFE &&
++                                    EEPROM.read(eeprom_addr(ADDR_SERIAL + 3)) == 0x50;
++    if (!c6l_needs_bootstrap && !c6l_has_early_custom_id && !c6l_has_early_bad_date && !c6l_has_early_bad_serial) { return; }
++
++    uint8_t info[CHECKSUMMED_SIZE];
++    memset(info, 0, sizeof(info));
++
++    uint8_t mac[6] = {0};
++    esp_read_mac(mac, ESP_MAC_WIFI_STA);
++    info[ADDR_PRODUCT] = PRODUCT_RNODE;
++    info[ADDR_MODEL] = MODEL_A6;
++    info[ADDR_HW_REV] = 0x01;
++    info[ADDR_SERIAL + 0] = mac[2];
++    info[ADDR_SERIAL + 1] = mac[3];
++    info[ADDR_SERIAL + 2] = mac[4];
++    info[ADDR_SERIAL + 3] = mac[5];
++
++    const uint32_t made_ts = 1782230400UL; // 2026-06-24 00:00:00 +0800
++    info[ADDR_MADE + 0] = (made_ts >> 24) & 0xFF;
++    info[ADDR_MADE + 1] = (made_ts >> 16) & 0xFF;
++    info[ADDR_MADE + 2] = (made_ts >> 8) & 0xFF;
++    info[ADDR_MADE + 3] = made_ts & 0xFF;
++
++    for (uint8_t i = 0; i < CHECKSUMMED_SIZE; i++) {
++      eeprom_update(eeprom_addr(i), info[i]);
++    }
++
++    unsigned char *hash = MD5::make_hash((char *)info, CHECKSUMMED_SIZE);
++    for (uint8_t i = 0; i < 16; i++) {
++      eeprom_update(eeprom_addr(ADDR_CHKSUM + i), hash[i]);
++    }
++    free(hash);
++
++    eeprom_update(eeprom_addr(ADDR_CONF_OK), 0x00);
++    eeprom_update(eeprom_addr(ADDR_INFO_LOCK), INFO_LOCK_BYTE);
++  #endif
++}
++#endif
++
+ void wr_conf_save(uint8_t mode) {
+ 	eeprom_update(eeprom_addr(ADDR_CONF_WIFI), mode);
+   #if !HAS_EEPROM && MCU_VARIANT == MCU_NRF52
+@@ -2041,4 +2099,4 @@ void host_disconnected() {
+ 	last_rssi     = -292;
+ 	last_rssi_raw = 0x00;
+ 	last_snr_raw  = 0x80;
+-}
+\ No newline at end of file
++}
+diff --git a/platformio.ini b/platformio.ini
+new file mode 100644
+index 0000000..9622efc
+--- /dev/null
++++ b/platformio.ini
+@@ -0,0 +1,31 @@
++[platformio]
++src_dir = .
++default_envs = m5stack-unitc6l-rnode
++
++[env:m5stack-unitc6l-rnode]
++platform = https://github.com/pioarduino/platform-espressif32/archive/refs/heads/develop.zip
++board = esp32-c6-devkitc-1
++framework = arduino
++upload_speed = 1500000
++monitor_speed = 115200
++extra_scripts = pre:../scripts/fix_toolchain_path.py
++
++build_flags =
++    -DARDUINO_USB_MODE=1
++    -DARDUINO_USB_CDC_ON_BOOT=1
++    -DBOARD_MODEL=0x45
++    -DCORE_DEBUG_LEVEL=1
++
++lib_deps =
++    rweather/Crypto@^0.4.0
++    adafruit/Adafruit NeoPixel@^1.15.5
++
++lib_ldf_mode = deep+
++
++[env:m5stack-unitc6l-rnode-uart]
++extends = env:m5stack-unitc6l-rnode
++build_flags =
++    ${env:m5stack-unitc6l-rnode.build_flags}
++    -DC6L_HOST_UART=1
++    -DC6L_HOST_UART_RX_PIN=4
++    -DC6L_HOST_UART_TX_PIN=5
+diff --git a/sx126x.cpp b/sx126x.cpp
+index 97ca045..30a00ff 100644
+--- a/sx126x.cpp
++++ b/sx126x.cpp
+@@ -5,9 +5,12 @@
+ 
+ #if MODEM == SX1262
+ #include "sx126x.h"
++#if C6L_USE_IO_EXPANDER
++#include <Wire.h>
++#endif
+ 
+ #if MCU_VARIANT == MCU_ESP32
+-  #if MCU_VARIANT == MCU_ESP32 and !defined(CONFIG_IDF_TARGET_ESP32S3)
++  #if defined(CONFIG_IDF_TARGET_ESP32)
+     #include "soc/rtc_wdt.h"
+   #endif
+   #define ISR_VECT IRAM_ATTR
+@@ -108,6 +111,86 @@ extern SPIClass SPI;
+ 
+ #define MAX_PKT_LENGTH 255
+ 
++#if C6L_USE_IO_EXPANDER
++static constexpr uint8_t C6L_IOE_ADDR = 0x43;
++static constexpr uint8_t C6L_IOE_REG_ID = 0x01;
++static constexpr uint8_t C6L_IOE_REG_DIR = 0x03;
++static constexpr uint8_t C6L_IOE_REG_OUT = 0x05;
++static constexpr uint8_t C6L_IOE_REG_HIZ = 0x07;
++static constexpr uint8_t C6L_IOE_REG_IN_DEF = 0x09;
++static constexpr uint8_t C6L_IOE_REG_PULL_EN = 0x0B;
++static constexpr uint8_t C6L_IOE_REG_PULL_SEL = 0x0D;
++static constexpr uint8_t C6L_IOE_REG_INT_MASK = 0x11;
++static constexpr uint8_t C6L_IOE_PIN_LNA_EN = 5;
++static constexpr uint8_t C6L_IOE_PIN_ANT_SW = 6;
++static constexpr uint8_t C6L_IOE_PIN_NRST = 7;
++
++static bool c6l_ioe_ready = false;
++static uint8_t c6l_ioe_out = 0b10000000;
++
++static bool c6l_ioe_write(uint8_t reg, uint8_t value) {
++  Wire.beginTransmission(C6L_IOE_ADDR);
++  Wire.write(reg);
++  Wire.write(value);
++  return Wire.endTransmission() == 0;
++}
++
++static uint8_t c6l_ioe_read(uint8_t reg) {
++  Wire.beginTransmission(C6L_IOE_ADDR);
++  Wire.write(reg);
++  if (Wire.endTransmission(false) != 0) { return 0; }
++  if (Wire.requestFrom(C6L_IOE_ADDR, (uint8_t)1) != 1) { return 0; }
++  return Wire.read();
++}
++
++static bool c6l_ioe_set(uint8_t pin, bool level) {
++  if (level) { c6l_ioe_out |= (1 << pin); }
++  else       { c6l_ioe_out &= ~(1 << pin); }
++  return c6l_ioe_write(C6L_IOE_REG_OUT, c6l_ioe_out);
++}
++
++static bool c6l_ioe_begin() {
++  if (c6l_ioe_ready) { return true; }
++
++  Wire.begin(I2C_SDA, I2C_SCL);
++  Wire.setClock(400000);
++
++  if (c6l_ioe_read(C6L_IOE_REG_ID) == 0) { return false; }
++
++  const uint8_t init_regs[][2] = {
++    {C6L_IOE_REG_DIR,      0b11100000},
++    {C6L_IOE_REG_OUT,      0b10000000},
++    {C6L_IOE_REG_HIZ,      0b00011100},
++    {C6L_IOE_REG_PULL_SEL, 0b11000011},
++    {C6L_IOE_REG_PULL_EN,  0b11000011},
++    {C6L_IOE_REG_IN_DEF,   0b00000011},
++    {C6L_IOE_REG_INT_MASK, 0b11111100},
++  };
++
++  for (size_t i = 0; i < sizeof(init_regs) / sizeof(init_regs[0]); i++) {
++    if (!c6l_ioe_write(init_regs[i][0], init_regs[i][1])) { return false; }
++  }
++
++  c6l_ioe_out = 0b10000000;
++  c6l_ioe_ready = true;
++  return true;
++}
++
++static bool c6l_radio_enable_rf_paths() {
++  return c6l_ioe_set(C6L_IOE_PIN_ANT_SW, true) &&
++         c6l_ioe_set(C6L_IOE_PIN_LNA_EN, true);
++}
++
++static bool c6l_radio_reset() {
++  if (!c6l_ioe_begin()) { return false; }
++  if (!c6l_ioe_set(C6L_IOE_PIN_NRST, false)) { return false; }
++  delay(100);
++  if (!c6l_ioe_set(C6L_IOE_PIN_NRST, true)) { return false; }
++  delay(10);
++  return c6l_radio_enable_rf_paths();
++}
++#endif
++
+ sx126x::sx126x() :
+   _spiSettings(16E6, MSBFIRST, SPI_MODE0),
+   _ss(LORA_DEFAULT_SS_PIN), _reset(LORA_DEFAULT_RESET_PIN), _dio0(LORA_DEFAULT_DIO0_PIN), _busy(LORA_DEFAULT_BUSY_PIN), _rxen(LORA_DEFAULT_RXEN_PIN),
+@@ -132,8 +215,12 @@ sx126x::sx126x() :
+ bool sx126x::preInit() {
+   pinMode(_ss, OUTPUT);
+   digitalWrite(_ss, HIGH);
++
++  #if C6L_USE_IO_EXPANDER
++    if (!c6l_radio_reset()) { return false; }
++  #endif
+   
+-  #if BOARD_MODEL == BOARD_T3S3 || BOARD_MODEL == BOARD_HELTEC32_V3 || BOARD_MODEL == BOARD_HELTEC32_V4 || BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_XIAO_S3
++  #if BOARD_MODEL == BOARD_T3S3 || BOARD_MODEL == BOARD_HELTEC32_V3 || BOARD_MODEL == BOARD_HELTEC32_V4 || BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_XIAO_S3 || BOARD_MODEL == BOARD_M5_UNIT_C6L
+     SPI.begin(pin_sclk, pin_miso, pin_mosi, pin_cs);
+   #elif BOARD_MODEL == BOARD_TECHO
+     SPI.setPins(pin_miso, pin_sclk, pin_mosi);
+@@ -299,6 +386,11 @@ void sx126x::setPacketParams(long preamble_symbols, uint8_t headermode, uint8_t
+ }
+ 
+ void sx126x::reset(void) {
++  #if C6L_USE_IO_EXPANDER
++    c6l_radio_reset();
++    return;
++  #endif
++
+   if (_reset != -1) {
+     pinMode(_reset, OUTPUT);
+     digitalWrite(_reset, LOW);
+@@ -703,6 +795,8 @@ void sx126x::enableTCXO() {
+       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
+     #elif BOARD_MODEL == BOARD_HELTEC32_V4
+       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
++    #elif BOARD_MODEL == BOARD_M5_UNIT_C6L
++      uint8_t buf[4] = {MODE_TCXO_3_0V_6X, 0x00, 0x00, 0xFF};
+     #endif
+     executeOpcode(OP_DIO3_TCXO_CTRL_6X, buf, 4);
+   #endif
+@@ -883,4 +977,4 @@ byte sx126x::random() { return readRegister(REG_RANDOM_GEN_6X); }
+ 
+ sx126x sx126x_modem;
+ 
+-#endif
+\ No newline at end of file
++#endif
