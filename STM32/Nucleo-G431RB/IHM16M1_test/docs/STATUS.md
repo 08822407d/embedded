@@ -6,18 +6,20 @@
 **最后更新:2026-06-29**
 
 ## 现在到哪
-- 持久化骨架(`CLAUDE.md` + `docs/` 七件套)+ `.claude/settings.json` 免授权已建并入 git,**安全网已激活**。
-- **设备探测完成**:NUCLEO-G431RB 在线(ST-Link SN / Device ID / 已装工具链见 [`FACTS.md`](FACTS.md) F-3~F-6);**端口不固定,每次烧录/调试前现场扫**(见 [`OPERATIONS.md`](OPERATIONS.md) §0)。
-- **工具链**:本机 CubeCLT 1.18.0 / CubeIDE 1.18.1(非最新,最新见 F-6);X-CUBE-MCSDK 疑未装。**已决:暂缓升级/安装,等需求与工具链路线定了一起办**。
-- **仍未**:编写功能代码、选定工具链路线、烧录、给电机上电。
+- 持久化骨架 + `.claude/settings.json` 免授权已建并入 git,**安全网已激活**。
+- **设备探测完成**:NUCLEO-G431RB 在线(ST-Link SN / Device ID / 工具链见 [`FACTS.md`](FACTS.md) F-3~F-6);**端口不固定,每次烧录/调试前现场扫**(见 [`OPERATIONS.md`](OPERATIONS.md) §0)。
+- **需求与路线已定**(见 [`REQUIREMENTS.md`](REQUIREMENTS.md) + [`DECISIONS.md`](DECISIONS.md) #003):用 **ST X-CUBE-MCSDK** 的 Motor Profiler 标定散货三相 BLDC(自带霍尔)→ MC Workbench 生成霍尔 FOC 固件 → 烧录调速。硬件 = ST 官方套件 **P-NUCLEO-IHM03** 组合(F-7)。
+- **工具链**:本机 CubeMX 6.15 / G4 FW 1.6.1 / CubeCLT 1.18 / CubeIDE 1.18.1 已就位,**只差 X-CUBE-MCSDK 6.4.1 待装**(F-9/F-10,需用户登录 st.com)。
+- **仍未**:装 MCSDK、标定电机、写/生成代码、烧录、给电机上电。
 
 ## 下一步(按顺序)
-- [ ] 用户说明项目**具体需求 / 控制目标** → 填 [`REQUIREMENTS.md`](REQUIREMENTS.md)
-- [ ] 定**工具链路线**(走不走 MCSDK FOC、CubeIDE 2.x vs CubeCLT+VSCode)→ 连带决定升级/装 MCSDK → [`OPERATIONS.md`](OPERATIONS.md) / [`DECISIONS.md`](DECISIONS.md)
-- [ ] 核实**硬件电气事实**(IHM16M1 驱动芯片、母线电压、电流采样方式、G431 的 TIM/ADC/GPIO 映射)→ [`FACTS.md`](FACTS.md)
-- [ ] 出**架构设计** → [`DESIGN.md`](DESIGN.md);随后写 `CODEX_TASK_*.md` 分派 codex 实现
+- [ ] **装 X-CUBE-MCSDK 6.4.1**(用户主导,登录 st.com;本机其余环境已齐)
+- [ ] 核实硬件电气配置:**IHM16M1 采样跳线(单/三电阻,霍尔 FOC 需三电阻)**、霍尔→G431 引脚、母线电压范围 → 查 UM2415 / 看板子 → [`FACTS.md`](FACTS.md)
+- [ ] 跑 **Motor Profiler** 标定散货电机(电机空载、可急停、有人值守)
+- [ ] **MC Workbench** 配置(三电阻 + 霍尔反馈)生成 FOC 工程 → 编译烧录 → 闭环调速验证
 
 ## 卡点 / 待用户拍板
-- 项目**具体用途**未定(IHM16M1 可做 BLDC/PMSM FOC、六步换向、或仅做某子功能验证)。
-- **工具链路线**未定 —— 直接影响 OPERATIONS、代码组织、以及升级/装 MCSDK 的时机。
-- 电机型号 / 供电 / 是否有编码器或霍尔传感器,未知。
+- **X-CUBE-MCSDK 未装**(推进前提)。
+- **采样跳线配置未知**:霍尔 FOC 必须三电阻,需确认 IHM16M1 当前配置。
+- **电机能否被 Motor Profiler 顺利标定未知**(散货、可能是 gimbal/低电流 → 已知有坑,见 REQUIREMENTS 待确认)。
+- **电机供电方案**(母线电压/电流、电源)未定。

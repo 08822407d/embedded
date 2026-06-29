@@ -12,5 +12,12 @@
 - ⚠️ **铁律(血泪)**:**备份绝不用"删文件"的方式** —— 上一个被删的 matrix/agent-context 模板就是这么把整套文档弄丢的。要快照用复制或 git。
 - **配套**:`.claude/settings.json` 把只读/安全命令加 `allow` 白名单减弹窗,把烧录命令(多工具链候选)设 `ask` 必问,作红线的技术兜底。
 
-## #002 — 工具链(待定)
-- _尚未决定。候选:STM32CubeMX/CubeIDE、ST MCSDK(FOC 代码生成)、PlatformIO(ststm32)、裸 HAL/LL。定下后补本条并写 OPERATIONS.md。_
+## #002 — 工具链(部分定,见 #003)
+- 初始候选:STM32CubeMX/CubeIDE、ST MCSDK、PlatformIO、裸 HAL/LL。**2026-06-29 定为 ST MCSDK 路线,详见 #003。**
+
+## #003 — 2026-06-29 — 路线 = ST X-CUBE-MCSDK FOC + Motor Profiler 标定散货电机
+- **决定**:走 ST 官方电机控制套件:**Motor Profiler 标定**散货电机 → **MC Workbench 生成 FOC 工程**(三电阻采样 + 霍尔位置反馈)→ 编译烧录 → 闭环调速。**不自研控制算法**。
+- **理由**:硬件正是官方套件 **P-NUCLEO-IHM03**(IHM16M1+G431RB)组合,流程 / 文档(UM2538 / UM2415)齐全;电机散货、参数未知,Motor Profiler 正是自动测未知 PMSM/BLDC 参数的工具;MCSDK 支持 STM32G4。
+- **已知风险(查证,详见 REQUIREMENTS 待确认 / FACTS)**:① Motor Profiler 对 gimbal / 低电流电机标定有坑(低压限、1-shunt 不稳),建议 >1000RPM;② **霍尔 FOC 必须三电阻**,否则只能 6-step;③ 霍尔低速 FOC 60° 跳变是已知难点。
+- **依赖**:装 **X-CUBE-MCSDK 6.4.1**(本机 CubeMX 6.15 / G4 FW 1.6.1 / CubeCLT 1.18 已就位,见 FACTS F-10),由用户登录 st.com 安装。
+- **否决**:自研 FOC / 六步 —— 官方套件现成,散货电机更需 Motor Profiler 自动标定,自研徒增工作量与风险。
