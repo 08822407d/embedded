@@ -11,7 +11,8 @@
 | F-2 | 扩展板为 X-NUCLEO-IHM16M1(三相电机驱动评估板) | 用户陈述 + 目录命名 | 2026-06-29 |
 | F-3 | 板载调试器 = **STLINK-V3**(USB `0483:374e`);**本板 ST-Link SN = `002A00403234510E33353533`**(唯一固定标识,用于现场匹配端口) | `STM32_Programmer_CLI -l` 实测 | 2026-06-29 |
 | F-4 | MCU **Device ID = `0x468`** = STM32G431 系列(与 F-1 板名一致) | ST-Link 探测 | 2026-06-29 |
-| F-5 | 本机工具链 = **STM32CubeCLT 1.18.0**(`STM32_Programmer_CLI` v2.20.0 + `openocd` + `dfu-util`),装在 `/opt/st/stm32cubeclt_1.18.0`;未装 stlink-tools(`st-info`/`st-flash`)、`stm32flash` | `command -v` + 实测 | 2026-06-29 |
+| F-5 | 本机已装 ST 工具:**STM32CubeCLT 1.18.0**(`STM32_Programmer_CLI` v2.20.0 + `openocd` + `dfu-util`,在 `/opt/st/stm32cubeclt_1.18.0`)、**STM32CubeIDE 1.18.1**(`/opt/st/stm32cubeide_1.18.1`);未装 stlink-tools(`st-info`/`st-flash`)、`stm32flash` | `command -v` + `ls /opt/st` 实测 | 2026-06-29 |
+| F-6 | **工具链非最新(查证当日)**:最新 = CubeCLT **1.21.0**(2026-02)/ CubeProgrammer **2.22**(2026-04)/ CubeIDE **2.1.0**(从 1.x 大版本跃迁);本机偏旧但**对成熟芯片 G431 功能够用、不阻塞**。升级收益 = GCC14 + 修复 + 新特性;升级需登录 st.com 下载、属系统级操作 → **由用户主导,勿擅自装** | WebSearch(st.com / community.st.com) | 2026-06-29 |
 
 > 注1:**端口 / 接口(`/dev/ttyACMx`)不在此记录** —— 每次插拔 / 枚举顺序会变,属易变状态。**每次烧录 / 调试前按 [`OPERATIONS.md`](OPERATIONS.md) §0 现场扫描**,靠 F-3 的 ST-Link SN 解析当前端口;此处只记固定标识。
 > 注2:F-1~F-5 是**身份 / 工具链**层面确认;**具体电气参数(IHM16M1 驱动芯片、母线电压、采样电阻、跳线、引脚映射)尚未核实**,用前查数据手册 / 实测,**别从模型记忆里填具体引脚号**(易错且危险)。
@@ -22,3 +23,4 @@
 - G431 ↔ IHM16M1 的引脚映射:三相互补 PWM(TIM1?)、ADC 通道、使能 / 故障线
 - 板载跳线 / 焊桥默认配置
 - 串口 VCP 波特率
+- **X-CUBE-MCSDK**(电机 FOC 套件 / Motor Control Workbench)**疑未装**(`~/STMicroelectronics`、`/opt/st` 未见);若走 ST FOC 路线需安装,且版本要与 CubeMX / 固件包匹配。STM32CubeMX 本体位置也待确认(仅见 `~/STM32Cube/Repository` 固件缓存)
