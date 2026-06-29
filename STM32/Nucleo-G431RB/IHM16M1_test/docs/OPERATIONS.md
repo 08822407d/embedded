@@ -4,13 +4,12 @@
 > ⚠️ 烧录 / 上电机电源是**操作红线**(见 [`CLAUDE.md`](../CLAUDE.md)),未经本会话明确授权别做。
 
 ## 0. 设备探测(动手前必做,别写死端口/探针)
-主机可能接多块 ST-Link / 板子,或一块没连。**烧录或读串口前先确认目标在线且确为 G431RB。**
-> 原则:**按机器可读字段分类**(USB VID:PID、ST-Link 序列号),**别看端口名、别靠人眼认型号** —— 端口名(`ttyACM0` 等)不固定,型号靠猜易错。
+主机可能接多块 ST-Link / 板子,或一块没连;**USB 口 / 端口号每次插拔会变**。**烧录或读串口前必现场扫描**:确认目标在线且确为 G431RB,并按固定 SN 解析当前端口。
+> 原则:**按固定标识匹配**(ST-Link SN、USB VID:PID —— 见 [`FACTS.md`](FACTS.md) F-3/F-4),**别看端口名、别记上次的 `ttyACMx` 数字、别靠人眼认型号**。
 
-- **找 ST-Link(USB)**:`lsusb` 看有无 STMicroelectronics ST-LINK(VID `0483`,常见 PID `374b`=ST-LINK/V2-1)。
-- **探针信息**:若装了 STM32CubeProgrammer → `STM32_Programmer_CLI -l`;若用 OpenOCD → 起对应 cfg;若用 stlink 工具 → `st-info --probe`(看 chipid / 是否 G431)。
-- **虚拟串口(板载 VCP)**:ST-LINK/V2-1 提供 USB-CDC,通常枚举为 `/dev/ttyACM*`。**名字不固定**:用 `ls -l /dev/ttyACM*` 列出,多块时按 `udevadm info /dev/ttyACMx` 的序列号区分,别假定 ttyACM0 就是目标。
-- **多板 / 误连**:若出现非 G431 的板,**别碰**;只对确认为目标的设备操作。
+- **第 1 步 · 确认目标板在线且为 G431**:`STM32_Programmer_CLI -l` —— 在线会直接列出 `Board: NUCLEO-G431RB` + `ST-Link SN`(应 = FACTS F-3 的 `002A...3533`)+ `Device ID 0x468`(FACTS F-4)。**这一步即可确认身份,无需连 SWD**。
+- **第 2 步 · 解析 VCP 串口(现场,别写死)**:`ls -l /dev/serial/by-id/` —— 找含本板 ST-Link SN 的 `...STLINK-V3_<SN>-if02` 链接,它指向**当前**的 `/dev/ttyACMx`。⚠️ 裸 `ttyACMx` 数字每次可能变,**永远按 by-id(SN)解析**。
+- ⚠️ **同机干扰**:本机常并存其它板(如 Espressif ESP32,VID `303a`,会占一个 `/dev/ttyACM`)。务必按 **ST-Link SN / VID:PID `0483:374e`** 锁定 G431,**别拿错口、别碰非目标板**。
 
 ## 1. 编译(待定)
 _选定工具链后填,候选:_
