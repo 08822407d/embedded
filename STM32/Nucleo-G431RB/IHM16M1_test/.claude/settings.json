@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(wc *)",
+      "Bash(mkdir *)",
+      "Bash(command -v *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git ls-files *)",
+      "Bash(git rev-parse *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git -C * status*)",
+      "Bash(git -C * log*)",
+      "Bash(git -C * show*)",
+      "Bash(git -C * diff*)",
+      "Bash(git -C * ls-files*)",
+      "Bash(git -C * rev-parse*)",
+      "Bash(git -C * check-ignore*)",
+      "Bash(git -C * add *)",
+      "Bash(git -C * commit *)",
+      "Bash(lsusb)",
+      "Bash(lsusb *)",
+      "Bash(udevadm info *)",
+      "Bash(st-info --probe)",
+      "Bash(st-info --serial*)",
+      "Bash(STM32_Programmer_CLI -l*)",
+      "Bash(python3 *)",
+      "WebFetch",
+      "WebSearch",
+      "Skill(codex:setup)",
+      "Skill(codex:rescue)"
+    ],
+    "ask": [
+      "Bash(pio run -t upload*)",
+      "Bash(pio run --target upload*)",
+      "Bash(pio run -e * -t upload*)",
+      "Bash(platformio run -t upload*)",
+      "Bash(STM32_Programmer_CLI *-w*)",
+      "Bash(STM32_Programmer_CLI *--write*)",
+      "Bash(STM32_Programmer_CLI *-d*)",
+      "Bash(st-flash write*)",
+      "Bash(st-flash *)",
+      "Bash(openocd *program*)",
+      "Bash(openocd *flash write*)"
+    ]
+  }
+}
