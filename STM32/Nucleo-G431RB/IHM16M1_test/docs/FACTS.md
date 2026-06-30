@@ -11,7 +11,8 @@
 | F-2 | 扩展板为 X-NUCLEO-IHM16M1(三相电机驱动评估板) | 用户陈述 + 目录命名 | 2026-06-29 |
 | F-3 | 板载调试器 = **STLINK-V3**(USB `0483:374e`);**本板 ST-Link SN = `002A00403234510E33353533`**(唯一固定标识,用于现场匹配端口) | `STM32_Programmer_CLI -l` 实测 | 2026-06-29 |
 | F-4 | MCU **Device ID = `0x468`** = STM32G431 系列(与 F-1 板名一致) | ST-Link 探测 | 2026-06-29 |
-| F-5 | 本机已装 ST 工具:**STM32CubeCLT 1.18.0**(`STM32_Programmer_CLI` v2.20.0 + `openocd` + `dfu-util`,在 `/opt/st/stm32cubeclt_1.18.0`)、**STM32CubeIDE 1.18.1**(`/opt/st/stm32cubeide_1.18.1`);未装 stlink-tools(`st-info`/`st-flash`)、`stm32flash` | `command -v` + `ls /opt/st` 实测 | 2026-06-29 |
+| F-5 | 本机已装 ST 工具:**STM32CubeCLT 1.18.0**(`/opt/st/stm32cubeclt_1.18.0`:`STM32_Programmer_CLI` **v2.19.0**、`openocd`、`arm-none-eabi-gcc` **13.3.1**;**CubeCLT 不含 `make`** → 编译用系统 GNU Make 4.3 + 其 GCC)、**STM32CubeIDE 1.18.1**;未装 stlink-tools、`stm32flash` | codex 冒烟实测 | 2026-06-30 |
+| F-11 | **硬件/通信/工具链冒烟测试通过**(只读+离线,详见 [`HW_SMOKE_TEST.md`](HW_SMOKE_TEST.md)):SWD 只读读到 Device ID `0x468`/flash 128KB/option bytes;CubeMX headless 生成 + CubeCLT GCC 编译通过。ST-Link FW=`V3J16M9`。**注**:CubeMX `.ioc` 默认请求 G4 FW **V1.6.3**,本机仅 **V1.6.1**(已用本机版本;装 MCSDK 时留意 FW 版本匹配) | codex 冒烟实测 | 2026-06-30 |
 | F-6 | **工具链非最新(查证当日)**:最新 = CubeCLT **1.21.0**(2026-02)/ CubeProgrammer **2.22**(2026-04)/ CubeIDE **2.1.0**(从 1.x 大版本跃迁);本机偏旧但**对成熟芯片 G431 功能够用、不阻塞**。升级收益 = GCC14 + 修复 + 新特性;升级需登录 st.com 下载、属系统级操作 → **由用户主导,勿擅自装** | WebSearch(st.com / community.st.com) | 2026-06-29 |
 | F-7 | 硬件组合 `IHM16M1 + G431RB` = ST 官方套件 **P-NUCLEO-IHM03** 的板卡组合(原配 gimbal 电机 GBM2804H-100T);核心手册 **UM2415**(IHM16M1)、**UM2538**(IHM03 pack FOC 评估) | WebSearch(st.com) | 2026-06-29 |
 | F-8 | IHM16M1 功率级 = **STSPIN830**,支持**单 / 三电阻**电流采样(板上跳线选,本板当前配置**待核实**;**霍尔 FOC 需三电阻**) | WebSearch + UM2415 | 2026-06-29 |

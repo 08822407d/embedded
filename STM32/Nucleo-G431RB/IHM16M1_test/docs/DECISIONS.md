@@ -19,5 +19,11 @@
 - **决定**:走 ST 官方电机控制套件:**Motor Profiler 标定**散货电机 → **MC Workbench 生成 FOC 工程**(三电阻采样 + 霍尔位置反馈)→ 编译烧录 → 闭环调速。**不自研控制算法**。
 - **理由**:硬件正是官方套件 **P-NUCLEO-IHM03**(IHM16M1+G431RB)组合,流程 / 文档(UM2538 / UM2415)齐全;电机散货、参数未知,Motor Profiler 正是自动测未知 PMSM/BLDC 参数的工具;MCSDK 支持 STM32G4。
 - **已知风险(查证,详见 REQUIREMENTS 待确认 / FACTS)**:① Motor Profiler 对 gimbal / 低电流电机标定有坑(低压限、1-shunt 不稳),建议 >1000RPM;② **霍尔 FOC 必须三电阻**,否则只能 6-step;③ 霍尔低速 FOC 60° 跳变是已知难点。
-- **依赖**:装 **X-CUBE-MCSDK 6.4.1**(本机 CubeMX 6.15 / G4 FW 1.6.1 / CubeCLT 1.18 已就位,见 FACTS F-10),由用户登录 st.com 安装。
+- **依赖**:装 **X-CUBE-MCSDK 6.4.x**,由用户登录 st.com 安装(平台限制见 #004)。
 - **否决**:自研 FOC / 六步 —— 官方套件现成,散货电机更需 Motor Profiler 自动标定,自研徒增工作量与风险。
+
+## #004 — 2026-06-30 — 双机(Linux + Windows)开发,经 GitHub push/pull 保存与交接
+- **决定**:本项目固定两台机器协作 —— **Linux(Ubuntu,本仓/编译/烧录)+ Windows PC(MCSDK 标定与 FOC 生成)**;**保存与交接统一走 GitHub `origin` 的 `commit + push` / `pull`**。详见 [`SYNC_WORKFLOW.md`](SYNC_WORKFLOW.md)。
+- **理由**:**X-CUBE-MCSDK / MC Workbench / Motor Profiler 仅有 Windows 版**(2026-06-30 多个 ST 官方/社区来源查证:"ST MC Workbench runs on Windows",无 Linux 版),本机 Ubuntu 跑不了标定;而设计/文档/编译留在 Linux。两机须可靠同步 → GitHub。
+- **配套**:① `.gitattributes` 统一仓库 LF,防跨 OS 换行翻动;② `.gitignore` 扩展忽略两 OS 构建产物 + 生成工程;③ **"保存"定义从"本地 commit"升级为"commit + push","接手"先 pull**(SYNC_WORKFLOW 纪律 1–2)。
+- **取代**:此前 HANDOFF 里"整目录复制交接"的设想 → 改为 GitHub push/pull。

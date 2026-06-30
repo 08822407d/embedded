@@ -1,0 +1,20 @@
+# ===== 构建产物(Linux make + Windows CubeIDE)=====
+**/build/
+**/Debug/
+**/Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.o
+*.d
+
+# ===== CubeMX 生成的冒烟工程(靠种子 .ioc + cubemx_generate.txt 复现,不入库)=====
+hw_smoke/g431_hw_smoke/
+
+# ===== IDE / OS 本地文件 =====
+.settings/
+*.launch
+.DS_Store
+Thumbs.db

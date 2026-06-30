@@ -1,0 +1,9 @@
+config load /home/cheyh/projs/embedded/STM32/Nucleo-G431RB/IHM16M1_test/hw_smoke/g431_hw_smoke.ioc
+project SetCustomFwPath /home/cheyh/STM32Cube/Repository/STM32Cube_FW_G4_V1.6.1
+project name g431_hw_smoke
+project path /home/cheyh/projs/embedded/STM32/Nucleo-G431RB/IHM16M1_test/hw_smoke
+project toolchain Makefile
+SetStructure Basic
+SetCopyLibrary "copy only"
+project generate
+exit
