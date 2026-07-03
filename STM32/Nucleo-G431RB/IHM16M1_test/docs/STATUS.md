@@ -3,25 +3,25 @@
 > **每次会话先读本文件;收尾必更新它,然后 `git commit`。** 这是恢复上下文的第一站。
 > 维护原则:**只覆盖『进行中 / 下一步 / 卡点』,别无限堆历史 —— 历史交给 git。**
 
-**最后更新:2026-06-30**
+**最后更新:2026-07-03**
 
 ## 现在到哪
-- 持久化骨架 + `.claude/settings.json` 免授权已建并入 git,**安全网已激活**。
-- **设备探测完成**:NUCLEO-G431RB 在线(ST-Link SN / Device ID / 工具链见 [`FACTS.md`](FACTS.md) F-3~F-6);**端口不固定,每次烧录/调试前现场扫**(见 [`OPERATIONS.md`](OPERATIONS.md) §0)。
-- **需求与路线已定**(见 [`REQUIREMENTS.md`](REQUIREMENTS.md) + [`DECISIONS.md`](DECISIONS.md) #003):用 **ST X-CUBE-MCSDK** 的 Motor Profiler 标定散货三相 BLDC(自带霍尔)→ MC Workbench 生成霍尔 FOC 固件 → 烧录调速。硬件 = ST 官方套件 **P-NUCLEO-IHM03** 组合(F-7)。
-- **工具链**:本机 CubeMX 6.15 / G4 FW 1.6.1 / CubeCLT 1.18 / CubeIDE 1.18.1 已就位,**只差 X-CUBE-MCSDK 6.4.1 待装**(F-9/F-10,需用户登录 st.com)。
-- **硬件/通信/工具链冒烟测试完成(只读 + 离线编译,未烧录)**:详见 [`HW_SMOKE_TEST.md`](HW_SMOKE_TEST.md)。ST-Link SN 匹配、SWD hot-plug 只读读到 Device ID `0x468` / flash `128 KBytes` / option bytes, VCP by-id 当前解析到 `ttyACM1`, CubeMX 生成 `hw_smoke/g431_hw_smoke/` 并用 CubeCLT GCC 编译出 `.elf/.bin/.hex`。
-- **仍未**:装 MCSDK、标定电机、烧录、给电机上电、让电机转动。
+- 持久化骨架 + 安全红线已建并入 git;本项目继续按 [`SYNC_WORKFLOW.md`](SYNC_WORKFLOW.md) 双机 `commit + push` 交接。
+- **Linux 侧硬件/通信/工具链冒烟测试已完成**(只读 + 离线编译,未烧录):见 [`HW_SMOKE_TEST.md`](HW_SMOKE_TEST.md)。
+- **Windows 侧硬件/通信/工具链冒烟测试已完成**(只读 + 离线编译,未烧录/未跑 MCSDK):见 [`HW_SMOKE_TEST_WIN.md`](HW_SMOKE_TEST_WIN.md)。同一块板 SN `002A00403234510E33353533` 在线,当前 Windows VCP 实测为 `COM4`(只作本次记录;以后仍按 SN 重扫),SWD HOTPLUG 只读读到 Device ID `0x468` / flash `128 KBytes` / option bytes,Windows 本机工具链编译出 `.elf/.bin/.hex`。
+- **Windows 侧 MCSDK 已安装**:`C:\Program Files (x86)\STMicroelectronics\MC_SDK_6.4.1`;MC Workbench `STMCWB.exe` v6.4.1、MotorPilot 存在。仅做文件盘点,未启动会驱动硬件的功能。
+- 需求与路线仍为 [`DECISIONS.md`](DECISIONS.md) #003:用 ST X-CUBE-MCSDK 的 Motor Profiler 标定散货三相 BLDC(自带霍尔) → MC Workbench 生成霍尔 FOC 固件 → 编译烧录 → 闭环调速。
+- **仍未**:核实 IHM16M1 跳线/霍尔引脚/母线电压,运行 Motor Profiler,生成正式 FOC 工程,烧录,给电机上电,让电机转动。
 
 ## 下一步(按顺序)
-- [ ] **装 X-CUBE-MCSDK 6.4.1**(用户主导,登录 st.com;本机其余环境已齐)
-- [ ] 核实硬件电气配置:**IHM16M1 采样跳线(单/三电阻,霍尔 FOC 需三电阻)**、霍尔→G431 引脚、母线电压范围 → 查 UM2415 / 看板子 → [`FACTS.md`](FACTS.md)
-- [ ] 跑 **Motor Profiler** 标定散货电机(电机空载、可急停、有人值守)
-- [ ] **MC Workbench** 配置(三电阻 + 霍尔反馈)生成 FOC 工程 → 编译烧录 → 闭环调速验证
-- [ ] 若继续用 `hw_smoke/` 作工具链健康检查,复跑 `make -C hw_smoke/g431_hw_smoke GCC_PATH=/opt/st/stm32cubeclt_1.18.0/GNU-tools-for-STM32/bin`;仍然不要烧录该测试固件。
+- [ ] 核实硬件电气配置:**IHM16M1 采样跳线(单/三电阻,霍尔 FOC 需三电阻)**、霍尔→G431 引脚、母线电压范围 → 查 UM2415 / 看板子 → 记录到 [`FACTS.md`](FACTS.md)
+- [ ] 用户主导、有人员值守、确认电源/急停/空载安全后,在 Windows 侧跑 **Motor Profiler** 标定散货电机
+- [ ] 用 **MC Workbench** 配置(三电阻 + 霍尔反馈)生成 FOC 工程
+- [ ] 编译正式 FOC 工程;在明确授权、电机电源安全状态确认后,再进入烧录/调试步骤
+- [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
 ## 卡点 / 待用户拍板
-- **X-CUBE-MCSDK 未装**(推进前提)。
 - **采样跳线配置未知**:霍尔 FOC 必须三电阻,需确认 IHM16M1 当前配置。
-- **电机能否被 Motor Profiler 顺利标定未知**(散货、可能是 gimbal/低电流 → 已知有坑,见 REQUIREMENTS 待确认)。
-- **电机供电方案**(母线电压/电流、电源)未定。
+- **电机供电方案**(母线电压/电流、电源、急停/固定方式)未定。
+- **Motor Profiler 标定风险**仍在:散货电机、可能是 gimbal/低电流类型,标定可能需要调整电压/转速/负载安全条件。
+- 任何烧录、运行、Motor Profiler、MC Workbench 生成/下载、给电机扩展板上电或让电机转动的步骤,都必须重新获得明确授权并有人值守。

@@ -12,6 +12,7 @@
 
 # ===== CubeMX 生成的冒烟工程(靠种子 .ioc + cubemx_generate.txt 复现,不入库)=====
 hw_smoke/g431_hw_smoke/
+hw_smoke_win/g431_hw_smoke_win/
 
 # ===== IDE / OS 本地文件 =====
 .settings/
