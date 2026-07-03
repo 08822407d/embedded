@@ -17,6 +17,9 @@
 | F-13 | **Windows 侧同一块板在线**:用户确认目标硬件已通过 mini-USB 接到本 PC;`STM32_Programmer_CLI -l` 报 ST-Link SN `002A00403234510E33353533`, ST-Link FW `V3J17M10`, Board `NUCLEO-G431RB`, VCP 当前为 `COM4`;PnP 设备存在 `USB\VID_0483&PID_374E\002A00403234510E33353533`/`ST-Link Debug`/`NOD_G431RB` | Windows codex 冒烟实测 + 用户 HITL 确认 | 2026-07-03 |
 | F-14 | **Windows 侧 SWD 只读通信通过**:HOTPLUG 读到 Device ID `0x468`, DBGMCU IDCODE `0x20036468`, flash size `128 KBytes`, flash-size register `0x1FFF75E0 : 0080`, option bytes 可显示(`RDP 0xAA Level 0`);全程未擦写/未烧录/未 run | Windows codex 冒烟实测(`STM32_Programmer_CLI -c port=SWD mode=HOTPLUG ... -r32/-r16/-ob displ`) | 2026-07-03 |
 | F-15 | **Windows 侧离线工具链编译通过**:CubeMX 6.17.0-RC5 + G4 FW V1.6.2 生成 `hw_smoke_win/g431_hw_smoke_win/`;`hw_smoke_win/build_win.ps1` 对 Windows 生成的 `sysmem.c`/`syscalls.c` 和 Makefile `C_SOURCES` 做后处理;CubeIDE GNU Make + CubeCLT GCC 编译出 `g431_hw_smoke_win.elf/.bin/.hex`, `.elf` 87,352 bytes, size=`text 4400/data 12/bss 1572` | Windows codex 冒烟实测,详见 [`HW_SMOKE_TEST_WIN.md`](HW_SMOKE_TEST_WIN.md) | 2026-07-03 |
+| F-16 | **UM2415 Rev 4 明确 IHM16M1 的 FOC 三电阻为出厂默认**:`JP4/JP7` 底部焊桥 open、`J5/J6` closed、`J2` 2-3、`J3` 1-2;**FOC 单电阻**为 `JP4/JP7` closed、`J5/J6` closed、`J2` 1-2、`J3` 2-3;**6-step**为 `JP4/JP7` closed、`J5/J6` open。当前实物确认见 F-18 | UM2415 Rev 4 p.7 Table 2 / Table 3 + p.14 schematic + p.16 BOM;截图与判读见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
+| F-17 | **校正 F-8 的旧简写**:`霍尔 FOC 必须三电阻`不是准确的通用事实。UM2415/MCSDK 均列出 IHM16M1 的 FOC single-shunt 与 three-shunt 变体,Hall 传感器是独立的速度/位置反馈变体;但本项目的 Motor Profiler/未知电机路线仍应优先使用默认三电阻,因为 MCSDK release notes 写明 Motor Profiler 不支持 single-shunt,且 STO-PLL 必须 three-shunt | UM2415 Rev 4 p.7;MCSDK 6.4.1 `X-NUCLEO-IHM16M1.json`;`Release Notes for X-Cube-MCSDK.html`;详见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
+| F-18 | **当前这块 IHM16M1 实物确认处于默认 FOC 三电阻采样拓扑**:用户对照 UM2415 截图确认 `J5/J6` 均有跳帽闭合;底面照片与用户观察确认 `JP4/JP7` 两组焊桥均干净断开(open),无焊锡/导线/元件连接。`J3` 用户观察为接在远离霍尔传感器接线针一侧两针,但该相对方向未换算成引脚编号;当前单/三电阻结论不依赖 J3 | 用户 HITL-2 视觉确认 + 用户提供底面照片 + [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
 | F-6 | **工具链非最新(查证当日)**:最新 = CubeCLT **1.21.0**(2026-02)/ CubeProgrammer **2.22**(2026-04)/ CubeIDE **2.1.0**(从 1.x 大版本跃迁);本机偏旧但**对成熟芯片 G431 功能够用、不阻塞**。升级收益 = GCC14 + 修复 + 新特性;升级需登录 st.com 下载、属系统级操作 → **由用户主导,勿擅自装** | WebSearch(st.com / community.st.com) | 2026-06-29 |
 | F-7 | 硬件组合 `IHM16M1 + G431RB` = ST 官方套件 **P-NUCLEO-IHM03** 的板卡组合(原配 gimbal 电机 GBM2804H-100T);核心手册 **UM2415**(IHM16M1)、**UM2538**(IHM03 pack FOC 评估) | WebSearch(st.com) | 2026-06-29 |
 | F-8 | IHM16M1 功率级 = **STSPIN830**,支持**单 / 三电阻**电流采样(板上跳线选,本板当前配置**待核实**;**霍尔 FOC 需三电阻**) | WebSearch + UM2415 | 2026-06-29 |
@@ -27,7 +30,6 @@
 > 注2:F-1~F-10 是**身份 / 工具链 / 选型**层面确认;**具体电气配置(采样单 / 三电阻跳线、母线电压、引脚映射、霍尔接入引脚)尚未核实**,用前查数据手册(UM2415 / UM2538)/ 实测,**别从模型记忆里填具体引脚号**(易错且危险)。
 
 ## 待核实(核实后上移到上表)
-- **IHM16M1 当前电流采样跳线 = 单电阻 / 三电阻**(霍尔 FOC 必须三电阻);采样电阻阻值 / 运放增益
 - **霍尔 H1/H2/H3 在 IHM16M1 → G431 的对应引脚 / 定时器输入**;母线电压允许范围
 - G431 ↔ IHM16M1 完整引脚映射:三相互补 PWM(TIM1?)、ADC 通道、使能 / 故障线;板载跳线 / 焊桥默认配置
 - 串口 VCP 波特率

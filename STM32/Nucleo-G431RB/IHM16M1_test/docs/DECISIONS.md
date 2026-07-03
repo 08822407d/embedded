@@ -27,3 +27,9 @@
 - **理由**:**X-CUBE-MCSDK / MC Workbench / Motor Profiler 仅有 Windows 版**(2026-06-30 多个 ST 官方/社区来源查证:"ST MC Workbench runs on Windows",无 Linux 版),本机 Ubuntu 跑不了标定;而设计/文档/编译留在 Linux。两机须可靠同步 → GitHub。
 - **配套**:① `.gitattributes` 统一仓库 LF,防跨 OS 换行翻动;② `.gitignore` 扩展忽略两 OS 构建产物 + 生成工程;③ **"保存"定义从"本地 commit"升级为"commit + push","接手"先 pull**(SYNC_WORKFLOW 纪律 1–2)。
 - **取代**:此前 HANDOFF 里"整目录复制交接"的设想 → 改为 GitHub push/pull。
+
+## #005 — 2026-07-03 — 校正采样拓扑约束:默认/推荐三电阻,但 Hall FOC 本身不强制三电阻
+- **决定**:继续把本项目实际路线锁定为**确认并使用 IHM16M1 默认 FOC 三电阻配置**后再做 Motor Profiler/FOC 生成;同时校正 #003 风险项中的简写:不是"霍尔 FOC 必须三电阻",而是"UM2415/MCSDK 支持 FOC 单电阻与三电阻;本项目因 Motor Profiler 和未知电机调试风险而优先/需要三电阻基线"。
+- **理由**:UM2415 Rev 4 Table 2 把 FOC 三电阻列为默认配置(`JP4/JP7` open、`J5/J6` closed、`J2` 2-3、`J3` 1-2),同时也列出 FOC single-shunt 配置;MCSDK 6.4.1 IHM16M1 board JSON 同时提供 `ThreeShunt_AmplifiedCurrents` 与 `SingleShunt_AmplifiedCurrents`,Hall 传感器作为独立速度/位置反馈变体存在。
+- **风险边界**:MCSDK release notes 写明 Motor Profiler 不支持 single-shunt current sensing,且 STO-PLL 必须 three-shunt;因此即使 Hall FOC 不由霍尔本身强制三电阻,本项目的"未知电机 + Motor Profiler"路线仍应从三电阻开始。
+- **配套**:截图和实物核对清单见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md);当前实物到底是默认三电阻还是被改过,仍待用户按 `JP4/JP7` 底面焊桥与 `J5/J6` 跳帽确认。

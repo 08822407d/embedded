@@ -14,6 +14,9 @@
 hw_smoke/g431_hw_smoke/
 hw_smoke_win/g431_hw_smoke_win/
 
+# ===== 手册原件 / 本地参考大文件 =====
+hw_ref/ihm16m1/source/
+
 # ===== IDE / OS 本地文件 =====
 .settings/
 *.launch
