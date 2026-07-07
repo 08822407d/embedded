@@ -9,3 +9,14 @@ sdkconfig*
 build/
 __pycache__/
 *.pyc
+
+# Archived local PlatformIO build/debug artifacts are kept out of git.
+archive/**/.pio/
+archive/**/.logs/
+archive/**/.vscode/.browse.c_cpp.db*
+archive/**/.vscode/c_cpp_properties.json
+archive/**/.vscode/launch.json
+archive/**/.vscode/ipch/
+
+# Third-party import scratch files.
+third_party/*.tar.gz
