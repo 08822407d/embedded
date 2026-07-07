@@ -18,8 +18,10 @@ Current status:
 - `third_party/libvterm-src/` contains an MIT-licensed `libvterm` source
   snapshot imported from `neovim/libvterm`.
 - `port/libvterm_adapter/` contains the first firmware-facing adapter skeleton.
-- No Tab5 build or flash validation has been performed in this phase because
-  the board is not available.
+- Official firmware build helper scripts are available for Windows and Ubuntu;
+  see `docs/official_firmware_build.md`.
+- No flash or hardware validation has been performed in this phase because the
+  board is not available.
 
-Start with `docs/current_work.md` and `docs/libvterm_port_plan.md` before
-continuing implementation.
+Start with `docs/current_work.md`, `docs/official_firmware_build.md`, and
+`docs/libvterm_port_plan.md` before continuing implementation.

@@ -1,5 +1,21 @@
 # Decision Log
 
+## 2026-07-07: Separate Official Firmware Worktrees By Host OS
+
+Decision: keep official firmware clones and build outputs under ignored
+host-specific paths:
+
+- `worktrees/windows/`
+- `worktrees/ubuntu/`
+- `toolchains/windows/`
+- `toolchains/ubuntu/`
+
+Reason: the user expects development on both Windows 10 and Ubuntu 24.04.
+ESP-IDF exports, Python environments, desktop CMake caches, path separators, and
+native compiler choices are host-specific. Sharing one official firmware build
+directory would make failures hard to diagnose and could corrupt a working
+configuration from the other host.
+
 ## 2026-07-07: Archive PlatformIO Project In-Repo
 
 Decision: move the existing standalone PlatformIO Tab5 terminal firmware into

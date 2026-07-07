@@ -20,3 +20,7 @@ archive/**/.vscode/ipch/
 
 # Third-party import scratch files.
 third_party/*.tar.gz
+
+# Local official-firmware worktrees and toolchains are host-specific.
+worktrees/
+toolchains/

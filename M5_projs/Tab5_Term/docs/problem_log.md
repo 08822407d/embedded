@@ -1,5 +1,54 @@
 # Problem Log
 
+## 2026-07-07: Official Firmware Dependency Fetch Can Look Stalled
+
+Symptom: running the official `fetch_repos.py` on Windows produced a long
+period with no useful progress output while fetching/checking out the `lvgl`
+dependency. It was interrupted during investigation.
+
+Action taken: switched local helper scripts to shallow clone each dependency
+from `repos.json` only when the dependency directory is missing. The current
+Windows worktree has all four dependencies present.
+
+Status: mitigated for local work. Use `tools/official_firmware_windows.ps1` or
+`tools/official_firmware_ubuntu.sh` instead of manually reasoning through the
+official fetch step during routine setup.
+
+## 2026-07-07: Windows ESP-IDF Build Blocked By Missing idf.py
+
+Symptom: `.\tools\official_firmware_windows.ps1 -Action build-idf` stops before
+compilation because `idf.py` is missing and `IDF_PATH` is not set.
+
+Action taken: recorded the expected toolchain version in
+`docs/official_firmware_build.md`. The script now gives a direct diagnostic.
+
+Status: unresolved until ESP-IDF `v5.4.2` is installed and exported in the
+current PowerShell session.
+
+## 2026-07-07: Windows Desktop Smoke Build Blocked By Missing C/C++ Compiler
+
+Symptom: the official desktop CMake build cannot configure because no C or C++
+compiler is visible in PATH. The first CMake attempt reported missing
+`CMAKE_C_COMPILER` and `CMAKE_CXX_COMPILER`.
+
+Action taken: updated the Windows helper script to fail earlier with a clear
+message when `cl`, `gcc`, and `clang` are all missing.
+
+Status: unresolved until a Visual Studio Developer PowerShell, MinGW, or LLVM
+environment is used.
+
+## 2026-07-07: Ubuntu Script Syntax Check Blocked On This Windows Host
+
+Symptom: invoking `bash` on the current Windows host starts a broken WSL
+instance that fails before running the command. Therefore `bash -n
+tools/official_firmware_ubuntu.sh` could not be used from this host.
+
+Action taken: kept the Ubuntu script as a standalone file for a real Ubuntu
+24.04 environment. Do not treat the Windows WSL failure as evidence about the
+script or the official firmware source.
+
+Status: pending validation on Ubuntu 24.04.
+
 ## 2026-07-07: Official libvterm Tarball Download Failed In PowerShell
 
 Symptom: downloading

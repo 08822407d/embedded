@@ -1,5 +1,43 @@
 # Current Work
 
+## 2026-07-07 Official Firmware Build Probe
+
+Official firmware source has been cloned locally for build integration work:
+
+- Windows worktree: `worktrees/windows/M5Tab5-UserDemo/`
+- Official repo commit: `68b19d3`
+- Dependency commits from `repos.json` shallow clones:
+  - `mooncake`: `0dfc177`
+  - `mooncake_log`: `41d00d9`
+  - `lvgl`: `7f07a129e`
+  - `smooth_ui_toolkit`: `3a749e5`
+
+New host-specific helper scripts:
+
+- Windows: `tools/official_firmware_windows.ps1`
+- Ubuntu 24.04: `tools/official_firmware_ubuntu.sh`
+
+The scripts use separate ignored paths:
+
+- `worktrees/windows/`
+- `worktrees/ubuntu/`
+- `toolchains/windows/`
+- `toolchains/ubuntu/`
+
+Windows build probe results:
+
+- `.\tools\official_firmware_windows.ps1 -Action check`: passed as a tool
+  inventory command. It found `git`, `python`, `cmake`, and `ninja`.
+- `.\tools\official_firmware_windows.ps1 -Action build-idf`: blocked before
+  firmware compilation because `idf.py` is not available and `IDF_PATH` is not
+  set.
+- `.\tools\official_firmware_windows.ps1 -Action build-desktop`: blocked before
+  source compilation because no C/C++ compiler is visible in PATH.
+
+This means no current failure is attributed to the official firmware source or
+the `libvterm` adapter. The Windows host needs ESP-IDF `v5.4.2` exported before
+the real Tab5 firmware build can be attempted.
+
 ## 2026-07-07 PlatformIO Archive And Official Firmware Port Start
 
 The standalone PlatformIO Tab5 terminal firmware has been moved into
