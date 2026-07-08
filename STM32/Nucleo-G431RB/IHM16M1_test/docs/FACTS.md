@@ -20,6 +20,11 @@
 | F-16 | **UM2415 Rev 4 明确 IHM16M1 的 FOC 三电阻为出厂默认**:`JP4/JP7` 底部焊桥 open、`J5/J6` closed、`J2` 2-3、`J3` 1-2;**FOC 单电阻**为 `JP4/JP7` closed、`J5/J6` closed、`J2` 1-2、`J3` 2-3;**6-step**为 `JP4/JP7` closed、`J5/J6` open。当前实物确认见 F-18 | UM2415 Rev 4 p.7 Table 2 / Table 3 + p.14 schematic + p.16 BOM;截图与判读见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
 | F-17 | **校正 F-8 的旧简写**:`霍尔 FOC 必须三电阻`不是准确的通用事实。UM2415/MCSDK 均列出 IHM16M1 的 FOC single-shunt 与 three-shunt 变体,Hall 传感器是独立的速度/位置反馈变体;但本项目的 Motor Profiler/未知电机路线仍应优先使用默认三电阻,因为 MCSDK release notes 写明 Motor Profiler 不支持 single-shunt,且 STO-PLL 必须 three-shunt | UM2415 Rev 4 p.7;MCSDK 6.4.1 `X-NUCLEO-IHM16M1.json`;`Release Notes for X-Cube-MCSDK.html`;详见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
 | F-18 | **当前这块 IHM16M1 实物确认处于默认 FOC 三电阻采样拓扑**:用户对照 UM2415 截图确认 `J5/J6` 均有跳帽闭合;底面照片与用户观察确认 `JP4/JP7` 两组焊桥均干净断开(open),无焊锡/导线/元件连接。`J3` 用户观察为接在远离霍尔传感器接线针一侧两针,但该相对方向未换算成引脚编号;当前单/三电阻结论不依赖 J3 | 用户 HITL-2 视觉确认 + 用户提供底面照片 + [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md) | 2026-07-03 |
+| F-19 | **IHM16M1 霍尔/编码器接口 J1 的 5V 供电来自 Nucleo 开发板**,不是电机母线;J1 pin1/2/3 分别为 Hall 1/2/3,pin4 为 `5 V supply from Nucleo development board`,pin5 为 GND;板上为开漏/开集电极 Hall 提供 R20/R21/R22 上拉 | UM2415 Rev 4 p.9 Section 4.5 / Table 6;详见 [`HALL_PROBE_FW.md`](HALL_PROBE_FW.md) | 2026-07-08 |
+| F-20 | **IHM16M1 + NUCLEO-G431RB 的默认霍尔读取引脚可用 PC6/PC7/PC8**:MCSDK 6.4.1 组合解选择 H1=PC6/TIM3_CH1,H2=PC7/TIM3_CH2,H3=PC8/TIM3_CH3;默认 VCP UART 为 USART2 PA2/PA3 | UM2415 Rev 4 p.11/p.12 schematic + MCSDK 6.4.1 power/control board JSON + MCSDK 示例组合解;详见 [`HALL_PROBE_FW.md`](HALL_PROBE_FW.md) | 2026-07-08 |
+| F-21 | **只读霍尔诊断固件已离线编译并在 HITL-1 授权后烧录/校验成功**:`hall_probe_fw` 仅初始化 USART2 PA2/PA3 和 Hall 输入 PC6/PC7/PC8,不配置 TIM1/PWM/桥臂 enable/电机控制栈;Windows CubeCLT GCC 构建输出 `hall_probe_fw.elf/.hex/.bin`,size=`text 1964/data 4/bss 4`;STM32CubeProgrammer 对 SN `002A00403234510E33353533` 写入 `1.92 KB` 到 `0x08000000` 并 verify successful | codex 离线编译 + HITL-1 后烧录实测;源码与报告见 [`hall_probe_fw/src/main.c`](../hall_probe_fw/src/main.c) / [`HALL_PROBE_FW.md`](HALL_PROBE_FW.md) | 2026-07-08 |
+| F-22 | **只读霍尔诊断串口初读正常**:VCP `COM4` 以 `115200 8N1` 输出有效 Hall 状态 `hall=010 sector=4 elec_deg_nom=240`,串口 `r` 命令已验证可清零到 `trans=0 h1_rise=0 invalid=0 skipped=0` | codex 串口读取实测;详见 [`HALL_PROBE_FW.md`](HALL_PROBE_FW.md) | 2026-07-08 |
+| F-23 | **当前散货电机手转霍尔测得极对数 = 4 对极**:用户手转约一机械圈时,霍尔序列连续有效 `010 -> 011 -> 001 -> 101 -> 100 -> 110 -> 010`,最终 `h1_rise=4`, `trans=25`, `invalid=0`, `skipped=0`;理论 4 对极一圈约 24 个 Hall transition,实测多 1 个 sector 表示略微转过起点,不影响 H1 上升沿极对数结论 | HITL-2 用户手转 + codex 串口采集;详见 [`HALL_PROBE_FW.md`](HALL_PROBE_FW.md) | 2026-07-08 |
 | F-6 | **工具链非最新(查证当日)**:最新 = CubeCLT **1.21.0**(2026-02)/ CubeProgrammer **2.22**(2026-04)/ CubeIDE **2.1.0**(从 1.x 大版本跃迁);本机偏旧但**对成熟芯片 G431 功能够用、不阻塞**。升级收益 = GCC14 + 修复 + 新特性;升级需登录 st.com 下载、属系统级操作 → **由用户主导,勿擅自装** | WebSearch(st.com / community.st.com) | 2026-06-29 |
 | F-7 | 硬件组合 `IHM16M1 + G431RB` = ST 官方套件 **P-NUCLEO-IHM03** 的板卡组合(原配 gimbal 电机 GBM2804H-100T);核心手册 **UM2415**(IHM16M1)、**UM2538**(IHM03 pack FOC 评估) | WebSearch(st.com) | 2026-06-29 |
 | F-8 | IHM16M1 功率级 = **STSPIN830**,支持**单 / 三电阻**电流采样(板上跳线选,本板当前配置**待核实**;**霍尔 FOC 需三电阻**) | WebSearch + UM2415 | 2026-06-29 |
@@ -27,11 +32,11 @@
 | F-10 | 本机电机开发环境**只差 MCSDK**:已装 **STM32CubeMX 6.15.0**(`~/STM/STM32CubeMX`)+ **STM32Cube_FW_G4 V1.6.1**(Repository)+ CubeCLT 1.18 / CubeIDE 1.18.1(F-5);缺 X-CUBE-MCSDK(F-9) | `find` + `ls Repository` 实测 | 2026-06-29 |
 
 > 注1:**端口 / 接口(`/dev/ttyACMx`)不在此记录** —— 每次插拔 / 枚举顺序会变,属易变状态。**每次烧录 / 调试前按 [`OPERATIONS.md`](OPERATIONS.md) §0 现场扫描**,靠 F-3 的 ST-Link SN 解析当前端口;此处只记固定标识。
-> 注2:F-1~F-10 是**身份 / 工具链 / 选型**层面确认;**具体电气配置(采样单 / 三电阻跳线、母线电压、引脚映射、霍尔接入引脚)尚未核实**,用前查数据手册(UM2415 / UM2538)/ 实测,**别从模型记忆里填具体引脚号**(易错且危险)。
+> 注2:仍未核实的具体电气配置包括**母线电压范围、正式 FOC 工程用 PWM/ADC/enable/fault 完整映射**等;用前查数据手册(UM2415 / UM2538)/MCSDK 板卡定义/实测,**别从模型记忆里填具体引脚号**(易错且危险)。
 
 ## 待核实(核实后上移到上表)
-- **霍尔 H1/H2/H3 在 IHM16M1 → G431 的对应引脚 / 定时器输入**;母线电压允许范围
+- 母线电压允许范围
 - G431 ↔ IHM16M1 完整引脚映射:三相互补 PWM(TIM1?)、ADC 通道、使能 / 故障线;板载跳线 / 焊桥默认配置
-- 串口 VCP 波特率
+- 串口 VCP 波特率已用于只读霍尔诊断 `115200 8N1`;正式 MCSDK 工程默认值仍待由 Workbench 工程确认
 - **散货电机是否 gimbal 类型 / 大致 KV / 转速范围**(影响 Motor Profiler 标定成败)
-- 待装 **X-CUBE-MCSDK 6.4.1**(见 F-9/F-10);装后确认与 CubeMX 6.15 兼容、Motor Profiler 是否列出 IHM16M1
+- 正式 MCSDK 工程生成前,仍需确认当前 Windows 工具链组合与 MCSDK 6.4.1 / CubeMX 6.17.0-RC5 的实际生成兼容性
