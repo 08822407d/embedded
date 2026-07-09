@@ -54,9 +54,14 @@
 3. Current Sensing → **Three shunt resistors**(单电阻不支持 Profiler,与 F-17 一致)。
 4. ADC → **3 shunts / 2 ADC**(⚠ 必须 2 个 ADC;1 ADC 会让进度条**卡在 7%** —— AN 已知问题;G431RB 支持 ADC1/ADC2)。
 5. Application configuration → 勾选 **Motor Profiler** 特性。
-6. Auxiliary/Speed sensor → **Hall sensor**(这样之后能顺带做霍尔标定,得到霍尔安放角/位移,对我们霍尔 FOC 直接有用)。
+6. 传感器配置(⚠ 实测有坑,已验证正确配法):**Motor Profiler 不兼容"Hall 作主传感器"**,报错 `Motor Profiler is not available for Hall Sensor. Only for STO PLL or High Sensitivity Observer`。正确配法 =
+   - Motor 标签:**打开 Hall effect**(否则 Auxiliary 里选不了 Hall);
+   - Speed Sensing Mode Selection:**Main = Observer + PLL (Sensorless / STO PLL)**(不是 Hall!开 Hall effect 后 UI 会默认把 Main 设成 Hall,需**手动改回 Observer+PLL**);
+   - Auxiliary Sensor = **Hall**(此时才腾得出来);
+   - 然后 Application Configuration 里 **Motor Profiler 才能勾上**。这样既无感标电机参数,又保留 Hall 辅助以便顺带标霍尔安放角。
 7. (低电感电机)可适当**提高 PWM 频率**以降低相电流纹波(AN 提示;本电机低电感,可能需要)。
-8. Save + Generate,工具链选 **STM32CubeIDE**。
+8. Save + Generate,工具链选 **STM32CubeIDE**(MCSDK 为其提供 Motor Profiler 预编译库 `libmp-G4-*`,最稳;codex 可 headless 构建 + `STM32_Programmer_CLI` 烧录,与 IDE 无关)。
+   - ⚠ **CubeMX 版本**:MC Workbench 用它自己集成的 CubeMX(实测只提供 **6.14.1**),与我们独立安装的 6.18.0 无关。6.14.1 是**稳定版**(之前的生成 bug 是 6.17.0-RC5 特有),支持 G431、是 MCSDK 6.4.1 配套验证版本,**生成正常、直接用**。
 
 **Phase B(可交 codex/脚本):编译**
 - 用本机 Windows 工具链(CubeCLT GCC + CubeIDE make,复用 `hw_smoke_win`/`build_win.ps1` 思路)编译生成的工程 → 产出 profiler 固件 `.elf/.hex/.bin`,留磁盘。
