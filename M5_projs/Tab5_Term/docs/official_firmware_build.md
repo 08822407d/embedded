@@ -24,6 +24,32 @@ These paths are ignored by git. This prevents Windows-generated build files,
 ESP-IDF virtual environments, and Ubuntu build outputs from sharing the same
 directory.
 
+## Git And Patch Boundary
+
+This project lives inside the larger git repository
+`/home/cheyh/projs/embedded`. The current parent-repo remote is
+`git@github.com:08822407d/embedded.git`.
+
+The official firmware worktree under `worktrees/ubuntu/M5Tab5-UserDemo/` is
+itself a clone of `https://github.com/m5stack/M5Tab5-UserDemo`, but the
+`worktrees/` directory is ignored by the parent repo. Do not commit or push from
+inside the official firmware worktree unless intentionally preparing a separate
+fork/PR workflow.
+
+For this port workspace, preserve local official-firmware modifications as
+portable patch files under `port/official_firmware_patches/`. Commit those patch
+files, repo-local docs, and helper tools from the parent repo with path-scoped
+commands such as:
+
+```bash
+git add --all M5_projs/Tab5_Term
+git commit -m "tab5 official firmware port checkpoint"
+git push -u origin master
+```
+
+Do not use `git add --all` as a substitute for checking the parent-repo status;
+the git root covers more than `M5_projs/Tab5_Term`.
+
 ## Windows 10 Commands
 
 Check available tools and the local official repo:
@@ -108,6 +134,20 @@ shallow-clone commits recorded in `docs/current_work.md`.
 was flashed to the connected ESP32-P4 Tab5 over USB Serial/JTAG. A subsequent
 raw serial boot capture reached `AppLauncher`, including display/touch, USB
 host, RS485, and Wi-Fi/AP initialization logs.
+
+As of 2026-07-09, the Ubuntu worktree also has local terminal-entry and
+screenshot-debug patches applied:
+
+- `port/official_firmware_patches/0001-launcher-terminal-button.patch`
+- `port/official_firmware_patches/0002-screen-capture-debug.patch`
+
+The patched build was flashed to `/dev/ttyACM0` and verified by:
+
+- boot log reaching `AppStartupAnim on close`, `AppLauncher on open`, and
+  `screen-capture debug command task started`;
+- host screenshot command:
+  `python3 tools/capture_screen.py --port /dev/ttyACM0 --output .logs/screenshots/tab5-launcher-terminal-entry-fixed.png --open-delay 8 --timeout 90`;
+- screenshot metadata: `1280x720`, `rgb565le`, CRC32 `2B8CB402`.
 
 ## Current Windows Status
 

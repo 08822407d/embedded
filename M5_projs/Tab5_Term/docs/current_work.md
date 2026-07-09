@@ -1,5 +1,161 @@
 # Current Work
 
+## 2026-07-09 End-Of-Day Handoff
+
+Today's official-firmware checkpoint is usable as the next starting point.
+
+State to preserve:
+
+- The connected Tab5 currently has a patched official firmware flashed from the
+  Ubuntu worktree. It includes the launcher terminal-entry placeholder and the
+  USB Serial/JTAG screenshot debug path.
+- Build, flash, boot-log, and screenshot validation passed after the white
+  startup-screen fix. The verified screenshot is
+  `.logs/screenshots/tab5-launcher-terminal-entry-fixed.png` with CRC32
+  `2B8CB402`.
+- The official firmware source changes remain in the ignored worktree
+  `worktrees/ubuntu/M5Tab5-UserDemo/`.
+- Portable replay artifacts are tracked as patches:
+  - `port/official_firmware_patches/0001-launcher-terminal-button.patch`
+  - `port/official_firmware_patches/0002-screen-capture-debug.patch`
+- The host capture tool to keep is `tools/capture_screen.py`.
+
+Repository handoff notes:
+
+- The git root for this checkout is `/home/cheyh/projs/embedded`, not this
+  `Tab5_Term` directory.
+- The parent repo remote is `origin = git@github.com:08822407d/embedded.git`.
+  There is no `master` remote. A literal `git push -u master` would fail before
+  pushing.
+- Use path-scoped staging for this project, for example
+  `git add --all M5_projs/Tab5_Term`, before committing from the parent repo.
+- `worktrees/` and `toolchains/` are ignored. Parent-repo commits should carry
+  docs, tools, archived/reference code, and patch files, not the whole official
+  firmware checkout or ESP-IDF toolchain.
+
+Recommended first actions next session:
+
+- Confirm the Tab5 USB Serial/JTAG port before flashing or capturing again.
+- Touch-test the terminal overlay on the physical device and verify that the
+  old two sleep regions no longer trigger their original actions.
+- Start replacing the placeholder terminal click handler with the first real
+  terminal popup/view.
+- Keep using `tools/capture_screen.py` after UI changes so visual regressions
+  are observable from the host.
+
+## 2026-07-09 Screenshot Debug And Runtime Launcher Validation
+
+The Ubuntu official-firmware worktree now includes the first automated screen
+capture debug path:
+
+- Device-side source files changed in ignored official worktree:
+  - `worktrees/ubuntu/M5Tab5-UserDemo/app/app.cpp`
+  - `worktrees/ubuntu/M5Tab5-UserDemo/app/debug/screen_capture_debug.cpp`
+  - `worktrees/ubuntu/M5Tab5-UserDemo/app/debug/screen_capture_debug.h`
+  - `worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5/main/CMakeLists.txt`
+  - `worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5/main/app_main.cpp`
+- Host-side capture tool:
+  - `tools/capture_screen.py`
+- Portable tracked patch:
+  `port/official_firmware_patches/0002-screen-capture-debug.patch`
+
+Behavior added:
+
+- The firmware listens on USB Serial/JTAG for the private OSC frame
+  `ESC ] 777 ; screen-capture? BEL`.
+- On request, it snapshots `lv_screen_active()` with LVGL's snapshot API,
+  streams RGB565 little-endian bytes framed by `TAB5SHOT BEGIN` and
+  `TAB5SHOT END crc32=...`, and throttles output through the
+  `usb_serial_jtag` driver so large captures do not corrupt the CDC stream.
+- The host tool writes PNG, raw RGB565, and JSON metadata files.
+- The screenshot task starts after the launcher main loop has had a short
+  chance to run. The USB Serial/JTAG driver is installed lazily only when a
+  screenshot command is handled.
+- A 250 ms post-HAL settle delay was added before `AppStartupAnim` is opened.
+  Without this delay, this build could reach `AppStartupAnim on open` and then
+  remain on the white startup background, apparently due to the first LVGL lock
+  attempt racing the freshly started display/LVGL port.
+
+Validation:
+
+- `idf.py build` passed with ESP-IDF `v5.4.2`.
+- App binary: `build/m5stack_tab5.bin`.
+- Binary size: `0x57cac0` bytes.
+- Smallest app partition: `0xa00000` bytes.
+- Free app partition space: `0x483540` bytes, `45%`.
+- `idf.py -p /dev/ttyACM0 flash` passed. Bootloader, app, and partition table
+  writes all reported verified hashes.
+- A raw pyserial boot-log capture after USB Serial/JTAG reset showed:
+  `AppStartupAnim on close`, `AppLauncher on create`, `AppLauncher on open`,
+  `launcher-view init`, and `screen-capture debug command task started`.
+- Screenshot command passed:
+  `python3 tools/capture_screen.py --port /dev/ttyACM0 --output .logs/screenshots/tab5-launcher-terminal-entry-fixed.png --open-delay 8 --timeout 90`
+- Captured image metadata:
+  - Resolution: `1280x720`
+  - Format: `rgb565le`
+  - CRC32: `2B8CB402`
+  - SHA256:
+    `f9c1dad8a6ccfc7cd97d0ae00fc6313d6d6249d6850acca39361a8c56390f022`
+  - PNG:
+    `.logs/screenshots/tab5-launcher-terminal-entry-fixed.png`
+
+Visual result:
+
+- The screenshot shows the official launcher rather than the previous white
+  startup background.
+- The terminal entry overlay is visible in the right-side power panel region,
+  covering the old shake/RTC sleep entries with a dark rounded `>_` button.
+- The old top `Sleep & Touch To Wakeup` button remains unchanged.
+
+Next work:
+
+- Touch-test the new terminal overlay on the physical Tab5 and confirm the
+  placeholder click handler fires while the old two regions do not.
+- Replace the placeholder click handler with the real terminal popup/view.
+- Keep `tools/capture_screen.py` available for future GUI layout debugging.
+
+## 2026-07-09 Launcher Terminal Entry Placeholder
+
+Official firmware launcher power panel now has the first terminal entry point
+in the Ubuntu worktree:
+
+- Source files changed in ignored official worktree:
+  - `worktrees/ubuntu/M5Tab5-UserDemo/app/apps/app_launcher/view/panel_power.cpp`
+  - `worktrees/ubuntu/M5Tab5-UserDemo/app/apps/app_launcher/view/view.h`
+- Portable tracked patch:
+  `port/official_firmware_patches/0001-launcher-terminal-button.patch`
+
+Behavior changed:
+
+- The two right-side launcher power-panel entries for shake wakeup and 10-second
+  RTC wakeup are no longer clickable from `PanelPower`.
+- Their previous `SleepShakeWakeupWindow` and `SleepRtcWakeupWindow` classes and
+  transparent hit regions were removed from this panel.
+- A single visible terminal-style button now covers the combined old two-button
+  region. It draws a rounded `>_` terminal glyph with LVGL/smooth_ui_toolkit.
+- Clicking the new entry currently plays the existing click tone and logs
+  `terminal button clicked`. Opening the real terminal view is intentionally not
+  implemented yet.
+
+Validation:
+
+- Command shape:
+  `export IDF_TOOLS_PATH="$PWD/toolchains/ubuntu/espressif"; source toolchains/ubuntu/esp-idf-v5.4.2/export.sh; cd worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5; idf.py build`
+- Build passed with ESP-IDF `v5.4.2`.
+- App binary: `build/m5stack_tab5.bin`.
+- Binary size: `0x57ae40` bytes.
+- Smallest app partition: `0xa00000` bytes.
+- Free app partition space: `0x4851c0` bytes, `45%`.
+
+Next work:
+
+- Flash and visually/touch-test this launcher entry on a physical Tab5 before
+  marking runtime behavior verified.
+- Replace the placeholder click handler with terminal view/popup launch once the
+  terminal GUI container is designed.
+- If upstream launcher art changes, recheck whether the old labels remain baked
+  into `launcher_bg.c` and whether this overlay still covers them cleanly.
+
 ## 2026-07-08 Ubuntu Official Firmware Baseline
 
 Official firmware source was freshly cloned on Ubuntu 24.04 into the ignored

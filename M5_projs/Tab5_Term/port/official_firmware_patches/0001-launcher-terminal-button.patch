@@ -1,0 +1,145 @@
+diff --git a/app/apps/app_launcher/view/panel_power.cpp b/app/apps/app_launcher/view/panel_power.cpp
+index ffce09a..6104618 100644
+--- a/app/apps/app_launcher/view/panel_power.cpp
++++ b/app/apps/app_launcher/view/panel_power.cpp
+@@ -22,10 +22,11 @@ static const ui::Window::KeyFrame_t _kf_power_off_close          = {562, -319, 1
+ static const ui::Window::KeyFrame_t _kf_power_off_open           = {123, -200, 703, 291, 255};
+ static const ui::Window::KeyFrame_t _kf_sleep_touch_wakeup_close = {562, -245, 146, 70, 0};
+ static const ui::Window::KeyFrame_t _kf_sleep_touch_wakeup_open  = {123, -200, 703, 291, 255};
+-static const ui::Window::KeyFrame_t _kf_sleep_shake_wakeup_close = {562, -172, 146, 70, 0};
+-static const ui::Window::KeyFrame_t _kf_sleep_shake_wakeup_open  = {123, -163, 703, 291, 255};
+-static const ui::Window::KeyFrame_t _kf_sleep_rtc_wakeup_close   = {562, -98, 146, 70, 0};
+-static const ui::Window::KeyFrame_t _kf_sleep_rtc_wakeup_open    = {123, -116, 703, 291, 255};
++
++static constexpr int16_t _terminal_button_x = 562;
++static constexpr int16_t _terminal_button_y = -135;
++static constexpr int16_t _terminal_button_w = 146;
++static constexpr int16_t _terminal_button_h = 144;
+ 
+ class PowerWindowBase : public ui::Window {
+ public:
+@@ -154,60 +155,6 @@ public:
+     }
+ };
+ 
+-class SleepShakeWakeupWindow : public PowerWindowBase {
+-public:
+-    SleepShakeWakeupWindow()
+-    {
+-        config.kfClosed    = _kf_sleep_shake_wakeup_close;
+-        config.kfOpened    = _kf_sleep_shake_wakeup_open;
+-        config.bgColor     = 0xB18F6C;
+-        config.borderColor = 0x896B4D;
+-    }
+-
+-    void onOpen() override
+-    {
+-        apply_label_header_style(_label_header.get(), 50, -92, "Your device will shut down.");
+-
+-        apply_label_msg_style(_label_msg.get(), 50, -21,
+-                              "Please place it still before confirming.\nShake the device to wake it up.");
+-
+-        _btn_cancel->onClick().connect([&]() { close(); });
+-        apply_button_style(_btn_cancel.get(), -24, 78, 0x896B4D, "Cancel");
+-
+-        _btn_confirm->onClick().connect([&]() { GetHAL()->sleepAndShakeWakeup(); });
+-        apply_button_style(_btn_confirm.get(), 207, 78, 0xD5AA7E, "Sleep");
+-    }
+-
+-    void onClose() override
+-    {
+-        audio::play_next_tone_progression();
+-    }
+-};
+-
+-class SleepRtcWakeupWindow : public PowerWindowBase {
+-public:
+-    SleepRtcWakeupWindow()
+-    {
+-        config.kfClosed    = _kf_sleep_rtc_wakeup_close;
+-        config.kfOpened    = _kf_sleep_rtc_wakeup_open;
+-        config.bgColor     = 0x637991;
+-        config.borderColor = 0x435A73;
+-    }
+-
+-    void onOpen() override
+-    {
+-        apply_label_header_style(_label_header.get(), 50, -92, "Your device will shut down.");
+-
+-        apply_label_msg_style(_label_msg.get(), 50, -21, "It will automatically wake up in 10 seconds.");
+-
+-        _btn_cancel->onClick().connect([&]() { close(); });
+-        apply_button_style(_btn_cancel.get(), -24, 78, 0x435A73, "Cancel");
+-
+-        _btn_confirm->onClick().connect([&]() { GetHAL()->sleepAndRtcWakeup(); });
+-        apply_button_style(_btn_confirm.get(), 207, 78, 0x709DCE, "Sleep");
+-    }
+-};
+-
+ void PanelPower::init()
+ {
+     _btn_power_off = std::make_unique<Container>(lv_screen_active());
+@@ -236,31 +183,26 @@ void PanelPower::init()
+         _window->open();
+     });
+ 
+-    _btn_sleep_shake_wakeup = std::make_unique<Container>(lv_screen_active());
+-    _btn_sleep_shake_wakeup->align(LV_ALIGN_CENTER, 562, -172);
+-    _btn_sleep_shake_wakeup->setSize(146, 70);
+-    _btn_sleep_shake_wakeup->setOpa(0);
+-    _btn_sleep_shake_wakeup->onClick().connect([&]() {
++    _btn_terminal = std::make_unique<Container>(lv_screen_active());
++    _btn_terminal->align(LV_ALIGN_CENTER, _terminal_button_x, _terminal_button_y);
++    _btn_terminal->setSize(_terminal_button_w, _terminal_button_h);
++    _btn_terminal->setBgColor(lv_color_hex(0x222A31));
++    _btn_terminal->setBgOpa(245);
++    _btn_terminal->setBorderColor(lv_color_hex(0x62D7FF));
++    _btn_terminal->setBorderWidth(2);
++    _btn_terminal->setRadius(18);
++    _btn_terminal->setShadowWidth(0);
++    _btn_terminal->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
++    _btn_terminal->onClick().connect([&]() {
+         audio::play_next_tone_progression();
+-
+-        // Create window
+-        _window = std::make_unique<SleepShakeWakeupWindow>();
+-        _window->init(lv_screen_active());
+-        _window->open();
++        mclog::tagInfo(_tag, "terminal button clicked");
+     });
+ 
+-    _btn_sleep_rtc_wakeup = std::make_unique<Container>(lv_screen_active());
+-    _btn_sleep_rtc_wakeup->align(LV_ALIGN_CENTER, 562, -98);
+-    _btn_sleep_rtc_wakeup->setSize(146, 70);
+-    _btn_sleep_rtc_wakeup->setOpa(0);
+-    _btn_sleep_rtc_wakeup->onClick().connect([&]() {
+-        audio::play_next_tone_progression();
+-
+-        // Create window
+-        _window = std::make_unique<SleepRtcWakeupWindow>();
+-        _window->init(lv_screen_active());
+-        _window->open();
+-    });
++    _label_terminal_icon = std::make_unique<Label>(_btn_terminal->get());
++    _label_terminal_icon->align(LV_ALIGN_CENTER, 0, 0);
++    _label_terminal_icon->setTextColor(lv_color_hex(0xF4FCFF));
++    _label_terminal_icon->setTextFont(&lv_font_montserrat_36);
++    _label_terminal_icon->setText(">_");
+ }
+ 
+ void PanelPower::update(bool isStacked)
+diff --git a/app/apps/app_launcher/view/view.h b/app/apps/app_launcher/view/view.h
+index 6684fe3..4642b47 100644
+--- a/app/apps/app_launcher/view/view.h
++++ b/app/apps/app_launcher/view/view.h
+@@ -167,8 +167,8 @@ public:
+ private:
+     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _btn_power_off;
+     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _btn_sleep_touch_wakeup;
+-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _btn_sleep_shake_wakeup;
+-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _btn_sleep_rtc_wakeup;
++    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _btn_terminal;
++    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _label_terminal_icon;
+     std::unique_ptr<ui::Window> _window;
+ };
+ 

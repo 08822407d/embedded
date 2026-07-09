@@ -1,0 +1,446 @@
+diff --git a/app/app.cpp b/app/app.cpp
+index c1eb98b..400c474 100644
+--- a/app/app.cpp
++++ b/app/app.cpp
+@@ -14,6 +14,7 @@
+ using namespace mooncake;
+ 
+ static const std::string _tag = "app";
++static constexpr uint32_t kPostHalInitSettleMs = 250;
+ 
+ void app::Init(InitCallback_t callback)
+ {
+@@ -23,6 +24,7 @@ void app::Init(InitCallback_t callback)
+     if (callback.onHalInjection) {
+         callback.onHalInjection();
+     }
++    GetHAL()->delay(kPostHalInitSettleMs);
+ 
+     GetMooncake();
+ 
+diff --git a/app/debug/screen_capture_debug.cpp b/app/debug/screen_capture_debug.cpp
+new file mode 100644
+index 0000000..357d6b8
+--- /dev/null
++++ b/app/debug/screen_capture_debug.cpp
+@@ -0,0 +1,351 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "screen_capture_debug.h"
++
++#include <algorithm>
++#include <atomic>
++#include <cerrno>
++#include <cstddef>
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <fcntl.h>
++#include <unistd.h>
++
++#include <driver/usb_serial_jtag.h>
++#include <driver/usb_serial_jtag_vfs.h>
++#include <esp_err.h>
++#include <esp_log.h>
++#include <freertos/FreeRTOS.h>
++#include <freertos/task.h>
++#include <hal/hal.h>
++#include <lvgl.h>
++#include <mooncake_log.h>
++
++namespace debug {
++namespace screen_capture {
++namespace {
++
++constexpr const char* kTag = "screen-capture";
++constexpr uint8_t kFramePrefix[] = {0x1B, ']', '7', '7', '7', ';'};
++constexpr uint8_t kFrameTerminator = 0x07;
++constexpr size_t kFrameCapacity = 96;
++constexpr uint32_t kCrcPolynomial = 0xEDB88320u;
++constexpr uint32_t kTaskDelayMs = 10;
++constexpr size_t kUsbSerialTxBufferBytes = 8192;
++constexpr size_t kUsbSerialRxBufferBytes = 512;
++constexpr size_t kUsbSerialChunkBytes = 128;
++constexpr uint32_t kUsbSerialFlushTimeoutMs = 2000;
++constexpr uint32_t kUsbSerialRowYieldInterval = 8;
++
++std::atomic_bool g_started{false};
++std::atomic_bool g_capture_busy{false};
++std::atomic_bool g_usb_serial_driver_ready{false};
++
++uint8_t g_frame[kFrameCapacity];
++size_t g_frame_length = 0;
++
++class CaptureOutputGuard {
++public:
++    CaptureOutputGuard()
++    {
++        esp_log_level_set("*", ESP_LOG_ERROR);
++        flockfile(stdout);
++    }
++
++    ~CaptureOutputGuard()
++    {
++        funlockfile(stdout);
++        esp_log_level_set("*", ESP_LOG_INFO);
++    }
++};
++
++uint32_t update_crc32(uint32_t crc, const uint8_t* data, size_t length)
++{
++    for (size_t index = 0; index < length; ++index) {
++        crc ^= data[index];
++        for (uint8_t bit = 0; bit < 8; ++bit) {
++            crc = (crc >> 1) ^ ((crc & 1u) ? kCrcPolynomial : 0u);
++        }
++    }
++    return crc;
++}
++
++bool write_all(const uint8_t* data, size_t length)
++{
++    size_t offset = 0;
++    while (offset < length) {
++        if (g_usb_serial_driver_ready.load()) {
++            const size_t remaining = length - offset;
++            const size_t chunk = std::min(remaining, kUsbSerialChunkBytes);
++            const int written = usb_serial_jtag_write_bytes(data + offset, chunk, portMAX_DELAY);
++            if (written > 0) {
++                offset += static_cast<size_t>(written);
++                continue;
++            }
++
++            vTaskDelay(pdMS_TO_TICKS(1));
++            continue;
++        }
++
++        const ssize_t written = write(STDOUT_FILENO, data + offset, length - offset);
++        if (written > 0) {
++            offset += static_cast<size_t>(written);
++            continue;
++        }
++        if (written < 0 && (errno == EAGAIN || errno == EINTR)) {
++            vTaskDelay(pdMS_TO_TICKS(1));
++            continue;
++        }
++        return false;
++    }
++    return true;
++}
++
++bool flush_output()
++{
++    if (g_usb_serial_driver_ready.load()) {
++        return usb_serial_jtag_wait_tx_done(pdMS_TO_TICKS(kUsbSerialFlushTimeoutMs)) == ESP_OK;
++    }
++
++    return fsync(STDOUT_FILENO) == 0;
++}
++
++bool write_text(const char* text)
++{
++    return write_all(reinterpret_cast<const uint8_t*>(text), strlen(text));
++}
++
++bool write_line(const char* line)
++{
++    if (!write_text(line)) {
++        return false;
++    }
++    return write_text("\r\n");
++}
++
++void set_stdin_nonblocking()
++{
++    const int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
++    if (flags >= 0) {
++        fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
++    }
++}
++
++void ensure_usb_serial_driver()
++{
++    if (!usb_serial_jtag_is_driver_installed()) {
++        usb_serial_jtag_driver_config_t config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
++        config.tx_buffer_size = kUsbSerialTxBufferBytes;
++        config.rx_buffer_size = kUsbSerialRxBufferBytes;
++
++        const esp_err_t result = usb_serial_jtag_driver_install(&config);
++        if (result != ESP_OK && !usb_serial_jtag_is_driver_installed()) {
++            mclog::tagWarn(kTag, "USB Serial/JTAG driver install failed: {}", esp_err_to_name(result));
++            return;
++        }
++    }
++
++    usb_serial_jtag_vfs_use_driver();
++    g_usb_serial_driver_ready = true;
++}
++
++bool read_byte(uint8_t& byte)
++{
++    if (g_usb_serial_driver_ready.load()) {
++        return usb_serial_jtag_read_bytes(&byte, 1, 0) == 1;
++    }
++
++    return read(STDIN_FILENO, &byte, 1) == 1;
++}
++
++void reset_candidate()
++{
++    g_frame_length = 0;
++}
++
++bool stream_active_screen()
++{
++    bool expected = false;
++    if (!g_capture_busy.compare_exchange_strong(expected, true)) {
++        write_line("TAB5SHOT ERR busy");
++        return false;
++    }
++
++    ensure_usb_serial_driver();
++
++    lv_draw_buf_t* snapshot = nullptr;
++    lv_display_rotation_t rotation = LV_DISPLAY_ROTATION_0;
++    {
++        LvglLockGuard lock;
++
++        lv_display_t* display = lv_display_get_default();
++        lv_obj_t* screen = lv_screen_active();
++        if (display == nullptr || screen == nullptr) {
++            g_capture_busy = false;
++            write_line("TAB5SHOT ERR no-display");
++            return false;
++        }
++
++        rotation = lv_display_get_rotation(display);
++        snapshot = lv_snapshot_take(screen, LV_COLOR_FORMAT_RGB565);
++    }
++
++    if (snapshot == nullptr) {
++        g_capture_busy = false;
++        write_line("TAB5SHOT ERR snapshot");
++        return false;
++    }
++
++    if (snapshot->header.cf != LV_COLOR_FORMAT_RGB565 || snapshot->data == nullptr) {
++        lv_draw_buf_destroy(snapshot);
++        g_capture_busy = false;
++        write_line("TAB5SHOT ERR format");
++        return false;
++    }
++
++    const uint32_t width = snapshot->header.w;
++    const uint32_t height = snapshot->header.h;
++    const uint32_t stride = snapshot->header.stride;
++    const size_t row_bytes = static_cast<size_t>(width) * 2;
++    const size_t byte_count = row_bytes * height;
++
++    if (width == 0 || height == 0 || stride < row_bytes) {
++        lv_draw_buf_destroy(snapshot);
++        g_capture_busy = false;
++        write_line("TAB5SHOT ERR geometry");
++        return false;
++    }
++
++    char header[160];
++    snprintf(header,
++             sizeof(header),
++             "TAB5SHOT BEGIN v=1 width=%lu height=%lu format=rgb565le bytes=%lu rotation=%u source=lvgl-snapshot\r\n",
++             static_cast<unsigned long>(width),
++             static_cast<unsigned long>(height),
++             static_cast<unsigned long>(byte_count),
++             static_cast<unsigned>(rotation));
++
++    CaptureOutputGuard output_guard;
++    bool success = write_text(header);
++    uint32_t crc = 0xFFFFFFFFu;
++    const uint8_t* data = snapshot->data;
++    for (uint32_t y = 0; success && y < height; ++y) {
++        const uint8_t* row = data + static_cast<size_t>(y) * stride;
++        crc = update_crc32(crc, row, row_bytes);
++        success = write_all(row, row_bytes);
++        if (success && (y % kUsbSerialRowYieldInterval) == (kUsbSerialRowYieldInterval - 1)) {
++            success = flush_output();
++            vTaskDelay(pdMS_TO_TICKS(1));
++        }
++    }
++
++    lv_draw_buf_destroy(snapshot);
++
++    if (!success) {
++        g_capture_busy = false;
++        return false;
++    }
++
++    crc ^= 0xFFFFFFFFu;
++    char footer[48];
++    snprintf(footer, sizeof(footer), "\r\nTAB5SHOT END crc32=%08lX\r\n", static_cast<unsigned long>(crc));
++    success = write_text(footer);
++    if (success) {
++        success = flush_output();
++    }
++
++    g_capture_busy = false;
++    return success;
++}
++
++void handle_command(const char* command)
++{
++    if (strcmp(command, "screen-capture?") == 0) {
++        stream_active_screen();
++        return;
++    }
++
++    if (strcmp(command, "screen-capture-info?") == 0) {
++        write_line("TAB5SHOT INFO v=1 command=screen-capture? format=rgb565le source=lvgl-snapshot");
++        return;
++    }
++
++    write_line("TAB5DBG ERR unknown-command");
++}
++
++void process_byte(uint8_t byte)
++{
++    if (g_frame_length == 0) {
++        if (byte == kFramePrefix[0]) {
++            g_frame[0] = byte;
++            g_frame_length = 1;
++        }
++        return;
++    }
++
++    if (g_frame_length < sizeof(kFramePrefix)) {
++        g_frame[g_frame_length] = byte;
++        ++g_frame_length;
++        if (byte != kFramePrefix[g_frame_length - 1]) {
++            reset_candidate();
++        }
++        return;
++    }
++
++    if (byte == kFrameTerminator) {
++        const size_t command_length = g_frame_length - sizeof(kFramePrefix);
++        char command[kFrameCapacity] = {};
++        memcpy(command, g_frame + sizeof(kFramePrefix), command_length);
++        reset_candidate();
++        handle_command(command);
++        return;
++    }
++
++    if (g_frame_length >= kFrameCapacity - 1) {
++        reset_candidate();
++        write_line("TAB5DBG ERR command-too-long");
++        return;
++    }
++
++    g_frame[g_frame_length] = byte;
++    ++g_frame_length;
++}
++
++void task_entry(void*)
++{
++    mclog::tagInfo(kTag, "debug command task started");
++    set_stdin_nonblocking();
++
++    while (true) {
++        uint8_t byte = 0;
++        if (read_byte(byte)) {
++            process_byte(byte);
++            continue;
++        }
++
++        vTaskDelay(pdMS_TO_TICKS(kTaskDelayMs));
++    }
++}
++
++} // namespace
++
++void start()
++{
++    bool expected = false;
++    if (!g_started.compare_exchange_strong(expected, true)) {
++        return;
++    }
++
++    BaseType_t result = xTaskCreate(task_entry, "screen_capture_dbg", 8192, nullptr, 1, nullptr);
++    if (result != pdPASS) {
++        g_started = false;
++        mclog::tagError(kTag, "failed to start debug command task");
++    }
++}
++
++} // namespace screen_capture
++} // namespace debug
+diff --git a/app/debug/screen_capture_debug.h b/app/debug/screen_capture_debug.h
+new file mode 100644
+index 0000000..cd33d58
+--- /dev/null
++++ b/app/debug/screen_capture_debug.h
+@@ -0,0 +1,14 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++namespace debug {
++namespace screen_capture {
++
++void start();
++
++} // namespace screen_capture
++} // namespace debug
+diff --git a/platforms/tab5/main/CMakeLists.txt b/platforms/tab5/main/CMakeLists.txt
+index 38a7e34..52a3bec 100644
+--- a/platforms/tab5/main/CMakeLists.txt
++++ b/platforms/tab5/main/CMakeLists.txt
+@@ -3,6 +3,8 @@ file(GLOB_RECURSE APP_LAYER_SRCS
+     ../../../app/*.cc
+     ../../../app/*.cpp
+ )
++list(APPEND APP_LAYER_SRCS ../../../app/debug/screen_capture_debug.cpp)
++list(REMOVE_DUPLICATES APP_LAYER_SRCS)
+ 
+ set(APP_LAYER_INCS
+     ../../../app
+diff --git a/platforms/tab5/main/app_main.cpp b/platforms/tab5/main/app_main.cpp
+index a48f7bc..fd509ad 100644
+--- a/platforms/tab5/main/app_main.cpp
++++ b/platforms/tab5/main/app_main.cpp
+@@ -5,11 +5,16 @@
+  */
+ #include "hal/hal_esp32.h"
+ #include <app.h>
++#include <debug/screen_capture_debug.h>
+ #include <hal/hal.h>
+ #include <memory>
+ #include <freertos/FreeRTOS.h>
+ #include <freertos/task.h>
+ 
++namespace {
++constexpr TickType_t kScreenCaptureStartDelay = pdMS_TO_TICKS(1000);
++}
++
+ extern "C" void app_main(void)
+ {
+     // 应用层初始化回调
+@@ -22,8 +27,14 @@ extern "C" void app_main(void)
+ 
+     // 应用层启动
+     app::Init(callback);
++    const TickType_t app_start_tick = xTaskGetTickCount();
++    bool screen_capture_started = false;
+     while (!app::IsDone()) {
+         app::Update();
++        if (!screen_capture_started && xTaskGetTickCount() - app_start_tick >= kScreenCaptureStartDelay) {
++            debug::screen_capture::start();
++            screen_capture_started = true;
++        }
+         vTaskDelay(1);
+     }
+     app::Destroy();

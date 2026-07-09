@@ -1,5 +1,107 @@
 # Problem Log
 
+## 2026-07-09: Parent Git Root Can Make Commits Too Broad
+
+Symptom: running normal git commands from `M5_projs/Tab5_Term` can be
+misleading because the actual git root is `/home/cheyh/projs/embedded`.
+Unscoped `git add --all` stages changes relative to that larger repository.
+
+Evidence:
+
+- `git rev-parse --show-toplevel` returns `/home/cheyh/projs/embedded`.
+- The parent repo remote is `git@github.com:08822407d/embedded.git`.
+- There is no remote named `master`; a literal `git push -u master` fails with
+  `No such remote 'master'`.
+- The official firmware clone has its own M5Stack remote, but it is under the
+  ignored `worktrees/` directory and is not the parent repo's push target.
+
+Risk: a broad parent-repo commit could accidentally include unrelated sibling
+project changes. It should not, however, become a push or PR to the M5Stack
+official firmware repo or the libvterm upstream unless commands are run inside
+those separate repositories and a PR is created explicitly.
+
+Action taken: recorded the safe path-scoped workflow in
+`docs/official_firmware_build.md` and the current handoff in
+`docs/current_work.md`.
+
+Status: mitigated for the current checkpoint. Before committing, run
+`git status --short --branch` from the parent repo and stage with
+`git add --all M5_projs/Tab5_Term`.
+
+## 2026-07-09: Startup White Screen After Screenshot Debug Integration
+
+Symptom: after the first screenshot-debug integration build was flashed, the
+physical Tab5 stayed on a white screen from startup. A first screenshot capture
+also returned an all-white `1280x720` image.
+
+Evidence:
+
+- Raw serial boot logs after USB Serial/JTAG reset reached
+  `AppStartupAnim on open` but did not reach `AppStartupAnim on close` or
+  `AppLauncher on open` within a longer capture window.
+- The white screen matched the startup animation's initial white background.
+- Moving the screenshot task later showed that the screenshot task was not the
+  direct blocker; when delayed, it never started because startup did not reach
+  the launcher loop.
+
+Likely cause: app-level UI startup was racing the freshly initialized
+display/LVGL port. The first startup animation LVGL lock could block before the
+animation created visible objects or closed.
+
+Action taken:
+
+- Added a 250 ms post-HAL settle delay before opening `AppStartupAnim`.
+- Kept screenshot debug lazy and non-invasive: the task starts after the main
+  app loop has run briefly, and the USB Serial/JTAG driver is installed only
+  when serving a screenshot command.
+
+Status: resolved in the current Ubuntu worktree. A post-fix boot log reached
+`AppStartupAnim on close`, `AppLauncher on create`, `AppLauncher on open`,
+`launcher-view init`, and `screen-capture debug command task started`. A
+post-fix screenshot captured the launcher with CRC32 `2B8CB402`.
+
+## 2026-07-09: Initial Screenshot Stream CRC Mismatch
+
+Symptom: the first official-firmware screenshot capture emitted
+`TAB5SHOT BEGIN` and `TAB5SHOT END`, but the host calculated a different CRC
+than the device.
+
+Evidence:
+
+- Device CRC: `9C0A682E`.
+- Host CRC: `5A6E0432`.
+- The transfer used plain POSIX `write()` to the console stream.
+
+Likely cause: the USB Serial/JTAG console VFS writes bytes through a small
+buffer path with short flush behavior intended for logs, not large raw binary
+frames. Logs or dropped bytes can corrupt a full-screen RGB565 stream.
+
+Action taken: switched screenshot transfer to the ESP-IDF `usb_serial_jtag`
+driver, used 128-byte chunks, periodic `usb_serial_jtag_wait_tx_done()` calls,
+and temporary log-level reduction during the binary frame.
+
+Status: resolved. The verified capture
+`.logs/screenshots/tab5-launcher-terminal-entry-fixed.png` was received as
+`1280x720 rgb565le` with CRC32 `2B8CB402`.
+
+## 2026-07-09: Launcher Sleep Labels Are Baked Into Background Art
+
+Symptom: searches for `sleep & shake to wakeup`, `sleep 10 seconds`, and related
+strings did not find launcher button label text in C++ source. The power panel
+uses transparent `Container` hit regions over the launcher background, so the
+visible labels are most likely baked into `app/assets/images/launcher_bg.c`.
+
+Action taken: removed the two old transparent click regions from `PanelPower`
+and drew a visible terminal button overlay over their combined region. The patch
+is recorded at
+`port/official_firmware_patches/0001-launcher-terminal-button.patch` for replay
+against fresh official-firmware worktrees.
+
+Status: partially runtime-validated. `idf.py build` and flash passed on Ubuntu
+with ESP-IDF `v5.4.2`, and the automated screenshot shows the terminal overlay
+covering the old two-button region. Direct touch-hit validation is still
+pending.
+
 ## 2026-07-07: Official Firmware Dependency Fetch Can Look Stalled
 
 Symptom: running the official `fetch_repos.py` on Windows produced a long

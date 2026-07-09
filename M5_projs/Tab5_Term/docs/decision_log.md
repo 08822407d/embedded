@@ -1,5 +1,64 @@
 # Decision Log
 
+## 2026-07-09: Use USB Serial/JTAG OSC 777 For LVGL Screenshots
+
+Decision: add a private debug command on USB Serial/JTAG using the existing
+OSC-777 style frame:
+
+`ESC ] 777 ; screen-capture? BEL`
+
+The device replies with a small ASCII `TAB5SHOT BEGIN` header, raw RGB565LE
+frame bytes from `lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB565)`,
+and a `TAB5SHOT END crc32=...` footer. The host tool converts the stream to
+PNG and checks CRC before writing output files.
+
+Reason: this keeps GUI debugging scriptable from Codex without adding an
+interactive monitor dependency. It also matches the archived PlatformIO
+terminal firmware's debug convention closely enough that old host-side ideas
+remain reusable.
+
+Implementation detail: large binary transfers use the ESP-IDF
+`usb_serial_jtag` driver with chunking, periodic TX flushes, and temporary log
+level reduction. Plain console `write()` was not reliable enough for full
+screen RGB565 frames.
+
+## 2026-07-09: Start Screenshot Debug After Launcher Settles
+
+Decision: start the screenshot command task from `app_main()` only after the
+main app loop has run for a short time, and install the USB Serial/JTAG driver
+lazily when a screenshot command is actually served.
+
+Reason: the screenshot facility is for debugging normal GUI state. It should
+not perturb the official firmware's startup sequence or claim the USB console
+driver before the UI is ready.
+
+## 2026-07-09: Add A Short Post-HAL LVGL Settle Delay
+
+Decision: wait 250 ms after HAL initialization before opening the startup
+animation app.
+
+Reason: after adding the debug path and testing with repeated USB
+Serial/JTAG resets, the app could reach `AppStartupAnim on open` and remain on
+the white startup background. A short settle delay let the freshly started
+display/LVGL port become ready before the first app-level LVGL lock. Boot logs
+then reached `AppLauncher on open`, and host screenshots captured the launcher.
+
+## 2026-07-09: Use A Visible LVGL Overlay For The First Terminal Entry
+
+Decision: replace the launcher power panel's shake-wakeup and 10-second sleep
+entries with one visible LVGL/smooth_ui_toolkit `Container` button that draws a
+`>_` terminal glyph and owns the combined old hit region.
+
+Reason: the displayed launcher labels for these entries are not source strings
+in `panel_power.cpp`; they appear to be baked into the generated launcher
+background asset. A visible LVGL overlay cancels the old touch behavior, hides
+the obsolete labels in the current art, and avoids regenerating bitmap assets
+before the terminal GUI design is mature.
+
+Rejected direction for now: editing `launcher_bg.c` directly. It is generated
+image data and would make the first terminal-entry iteration harder to review
+and replay across fresh official-firmware worktrees.
+
 ## 2026-07-07: Separate Official Firmware Worktrees By Host OS
 
 Decision: keep official firmware clones and build outputs under ignored
