@@ -24,8 +24,9 @@
 - [x] 烧录 `hall_probe_fw\build\hall_probe_fw.elf`,打开 VCP 串口,读取 PC6/PC7/PC8 Hall 状态
 - [x] 用户手转转子一机械圈,用 H1 上升沿计数确定极对数,并用总 Hall transition 计数交叉验证
 - [x] 目标电机定型(GM16020-06)、极对数=4、12V 电源备妥、CubeMX 升级 6.18.0 → 已落盘 F-24/F-25/F-12
-- [ ] **下一步主线**:CC 起草 **Motor Profiler 标定 codex 任务书**(含安全前提、极对数=4、限流方案、失败重试与 ESC 升级机制),经用户逐项确认安全前提后再执行
-- [ ] 用户主导、有人员值守、确认电源/限流/急停/电机固定/**拆除轴上指针**后,在 Windows 侧跑 **Motor Profiler** 标定 GM16020-06
+- [x] CC 起草 **Motor Profiler 标定 SOP**(用户驱动 GUI + CC 旁站,非 codex 任务):见 [`MOTOR_PROFILER_SOP.md`](MOTOR_PROFILER_SOP.md)
+- [ ] **下一步主线**:按 SOP 做物理准备(拆指针/固定电机/**串保险丝补限流**/急停/值守)→ 用户授权 → 在 MC Workbench 跑 Motor Profiler,CC 旁站解读;标不动则转 SOP §7 Plan B 手工测参(需仪表,或等明天)
+- ⚠️ **本次电源无可调限流**(12.6V/1.9A,F-25):靠"Motor Profiler Imax 低起步 + 串 1–1.5A 快熔保险丝 + 低速起步 + 值守随时断电"四层兜底
 - [ ] 用 **MC Workbench** 配置(三电阻 + 霍尔反馈)生成 FOC 工程
 - [ ] 编译正式 FOC 工程;在明确授权、电机电源安全状态确认后,再进入烧录/调试步骤
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
