@@ -20,11 +20,14 @@ not continue expanding the old `terminal_core`.
 
 ## Current Constraints
 
-- The physical Tab5 is not available in this phase.
-- Do not perform build, flash, or hardware validation unless the user says the
-  board is available.
-- Focus on source layout, third-party import, adapter boundaries, and durable
-  records.
+- The physical Tab5 became available for the 2026-07-08 official-firmware
+  baseline validation. Do not assume it remains available in future sessions;
+  recheck USB device identity before flashing.
+- Official-firmware build and flash are now allowed when the user asks for
+  baseline validation or migration testing. Keep terminal-port changes separate
+  from unmodified official-firmware baseline checks.
+- Continue to focus on source layout, third-party import, adapter boundaries,
+  and durable records before adding product GUI behavior.
 
 ## Persistence Requirement
 

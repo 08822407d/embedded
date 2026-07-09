@@ -1,5 +1,73 @@
 # Current Work
 
+## 2026-07-08 Ubuntu Official Firmware Baseline
+
+Official firmware source was freshly cloned on Ubuntu 24.04 into the ignored
+worktree:
+
+- Ubuntu worktree: `worktrees/ubuntu/M5Tab5-UserDemo/`
+- Official repo commit: `68b19d3`
+- Dependency commits from `repos.json` shallow clones:
+  - `mooncake`: `0dfc177`
+  - `mooncake_log`: `41d00d9`
+  - `lvgl`: `7f07a129e`
+  - `smooth_ui_toolkit`: `3a749e5`
+
+ESP-IDF `v5.4.2` was installed under ignored project-local tool paths:
+
+- ESP-IDF source: `toolchains/ubuntu/esp-idf-v5.4.2/`
+- `IDF_TOOLS_PATH`: `toolchains/ubuntu/espressif/`
+- ESP-IDF commit: `f5c3654`
+
+Ubuntu build result:
+
+- Command shape:
+  `export IDF_TOOLS_PATH="$PWD/toolchains/ubuntu/espressif"; source toolchains/ubuntu/esp-idf-v5.4.2/export.sh; cd worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5; idf.py build`
+- Build passed with ESP-IDF `v5.4.2`.
+- App: `m5stack_tab5`, version `V0.4`.
+- Binary: `build/m5stack_tab5.bin`.
+- Binary size: `0x57bab0` bytes.
+- Smallest app partition: `0xa00000` bytes.
+- Free app partition space: `0x484550` bytes, `45%`.
+
+Ubuntu flash result:
+
+- Target port:
+  `/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00`
+  -> `/dev/ttyACM0`
+- Detected chip: ESP32-P4 revision `v1.3`, MAC `30:ed:a0:e2:e2:48`.
+- Command shape:
+  `idf.py -p /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 flash`
+- Flash passed at `460800` baud.
+- Bootloader, app, and partition table writes all reported verified hashes.
+
+Runtime boot-log validation:
+
+- A raw pyserial capture after `esptool chip_id` hard reset recorded `14413`
+  bytes at `115200` baud.
+- The boot log reached `app_main()`, initialized PSRAM, I2C, codec, IMU, INA226,
+  RTC, display, touch, USB host, HID, RS485, and Wi-Fi/AP services.
+- Display/touch evidence included ST7123 detection, display resolution
+  `720x1280`, touch firmware version `3(1.71.1.3)`, and LCD backlight `100%`.
+- The app reached `AppStartupAnim`, then closed it and opened `AppLauncher`.
+- Wi-Fi AP startup was logged as `M5Tab5-UserDemo-WiFi` with DHCP server
+  `192.168.4.1`.
+- Nonfatal runtime anomalies seen in this baseline log: RTC/system time synced to
+  `2062-03-07`, LEDC warned that GPIO 22 was not usable or conflicted, and the
+  audio path logged one `Mode 1 conflict sample_rate 44100 with 48000` error.
+  The firmware continued into `AppLauncher`, so treat these as official-baseline
+  observations unless they become user-visible blockers.
+
+Notes:
+
+- `idf.py monitor` needs a TTY-backed stdin. Non-TTY Codex command execution
+  fails before opening the monitor. A PTY-backed timed monitor started but did
+  not emit boot text in the capture window; raw pyserial after an esptool reset
+  was the reliable boot-log method in this session.
+- Build output had warnings from the official source and IDF config, but no
+  compiler/linker/build failure. Do not treat those warnings as terminal-port
+  regressions unless they become runtime blockers.
+
 ## 2026-07-07 Official Firmware Build Probe
 
 Official firmware source has been cloned locally for build integration work:

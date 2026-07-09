@@ -20,8 +20,8 @@ Current status:
 - `port/libvterm_adapter/` contains the first firmware-facing adapter skeleton.
 - Official firmware build helper scripts are available for Windows and Ubuntu;
   see `docs/official_firmware_build.md`.
-- No flash or hardware validation has been performed in this phase because the
-  board is not available.
+- Ubuntu 24.04 has built and flashed the unmodified official Tab5 firmware
+  baseline, and a USB Serial/JTAG boot-log capture reached `AppLauncher`.
 
 Start with `docs/current_work.md`, `docs/official_firmware_build.md`, and
 `docs/libvterm_port_plan.md` before continuing implementation.

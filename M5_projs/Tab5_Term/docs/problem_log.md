@@ -71,7 +71,51 @@ Symptom: the Tab5 board is not currently available to the user.
 Action taken: no build, flash, or runtime claims are made. New code is recorded
 as source-level scaffold only.
 
-Status: unresolved until a later device session.
+Status: resolved for the official firmware baseline on Ubuntu 24.04 as of
+2026-07-08. The connected Tab5 was built, flashed, and boot-log validated before
+terminal migration work. This does not validate the future terminal port itself.
+
+## 2026-07-08: ESP-IDF Monitor Needs TTY In Codex
+
+Symptom: `idf.py monitor` failed in plain non-TTY command execution with:
+
+`Monitor requires standard input to be attached to TTY. Try using a different terminal.`
+
+Action taken: reran the monitor command with a PTY. The monitor started but did
+not emit boot text in the timed capture window, so runtime validation used a
+lower-level reset/read flow: `esptool chip_id` to hard reset, followed by direct
+pyserial capture at `115200` baud.
+
+Status: workaround accepted for this session. Use the raw serial capture method
+again if `idf.py monitor` is awkward inside Codex.
+
+## 2026-07-08: ESP-IDF Toolchain Kept Project-Local
+
+Symptom: this Ubuntu host had `~/esp/v5.5/esp-idf/export.sh`, but exporting it
+failed because its Python environment was missing. The official firmware target
+requires ESP-IDF `v5.4.2`, not v5.5.
+
+Action taken: cloned ESP-IDF `v5.4.2` into `toolchains/ubuntu/esp-idf-v5.4.2`
+and installed the `esp32p4` tools with
+`IDF_TOOLS_PATH=toolchains/ubuntu/espressif`.
+
+Status: resolved. Future Ubuntu builds should source the project-local v5.4.2
+environment unless the official firmware requirement changes.
+
+## 2026-07-08: Official Baseline Boot Has Nonfatal Warnings
+
+Symptom: the unmodified official firmware boot log contains several warnings or
+errors even though the app continues to launch:
+
+- RTC/system time synced to `2062-03-07`.
+- LEDC warned that GPIO 22 was not usable or conflicted.
+- The audio path logged `Mode 1 conflict sample_rate 44100 with 48000`.
+
+Action taken: recorded these as official-baseline observations from the
+2026-07-08 Ubuntu flash/boot validation, not as terminal-port regressions.
+
+Status: open for later visual/runtime review. Do not attribute these messages to
+the terminal migration unless they newly change after port work begins.
 
 ## 2026-07-07: Adapter Callback Access Control
 
