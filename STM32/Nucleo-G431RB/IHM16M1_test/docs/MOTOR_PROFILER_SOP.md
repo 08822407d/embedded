@@ -44,7 +44,29 @@
 
 > 注:Motor Profiler 通常要你填极对数、Imax、额定电压等再点开始;**具体字段/按钮以 MC Workbench 6.4.1 当场向导为准**,我会实时看着你填、逐项确认。
 
-## 5. Motor Profiler 操作流程(跟向导走,CC 实时指导)
+## 4.5 前置:必须先"生成→编译→烧录" Motor Profiler 固件(MCSDK 6.2+,无预编译二进制)
+> 依据:本机官方 **AN Motor Profiler**(`C:\Program Files (x86)\STMicroelectronics\MC_SDK_6.4.1\Documentation\html\md_docs_2_a_n___motor___profiler.html`)。**6.2 起不再附带预编译 profiler 固件**——必须用 MC Workbench 生成带 Motor Profiler 特性的 FOC 工程 → 编译 → 烧板。板子跑上该固件后,MotorPilot profiler 才连得上(否则就是我们看到的 Board Disconnected / Start profile 灰 / 白框点不动)。
+> 好消息:**X-NUCLEO-IHM16M1 在官方支持列表内,且其 .json 含 `resistorOffset` 参数 → 允许直接标定**(不含该参数会"怪声且不标定")。
+
+**Phase A(MC Workbench GUI,用户+CC):生成 Profiler 工程**
+1. MC Workbench → **New Project**(不是 Tools→Motor Profiler)。
+2. 电机选 **低压 / 未知电机(low voltage motor)**;控制板 **NUCLEO-G431RB** + 功率板 **X-NUCLEO-IHM16M1**(或 P-NUCLEO-IHM03 pack)。
+3. Current Sensing → **Three shunt resistors**(单电阻不支持 Profiler,与 F-17 一致)。
+4. ADC → **3 shunts / 2 ADC**(⚠ 必须 2 个 ADC;1 ADC 会让进度条**卡在 7%** —— AN 已知问题;G431RB 支持 ADC1/ADC2)。
+5. Application configuration → 勾选 **Motor Profiler** 特性。
+6. Auxiliary/Speed sensor → **Hall sensor**(这样之后能顺带做霍尔标定,得到霍尔安放角/位移,对我们霍尔 FOC 直接有用)。
+7. (低电感电机)可适当**提高 PWM 频率**以降低相电流纹波(AN 提示;本电机低电感,可能需要)。
+8. Save + Generate,工具链选 **STM32CubeIDE**。
+
+**Phase B(可交 codex/脚本):编译**
+- 用本机 Windows 工具链(CubeCLT GCC + CubeIDE make,复用 `hw_smoke_win`/`build_win.ps1` 思路)编译生成的工程 → 产出 profiler 固件 `.elf/.hex/.bin`,留磁盘。
+
+**Phase C(⛔ 红线,逐次授权):烧录 profiler 固件**
+- **母线断电**下,用 STM32CubeProgrammer/CubeIDE 把 profiler 固件烧到板子(SN `002A00403234510E33353533`)。**烧录本身不驱动电机,安全**;真正转电机在 Phase D。烧录会覆盖 hall_probe,正常。
+
+**Phase D(GUI,用户+CC):MotorPilot 标定** → 见 §5(此时板子已跑 profiler FW,MotorPilot 能连上、显示 Control/Power Board、字段可填、Start profile 变亮)。
+
+## 5. Motor Profiler 操作流程(Phase D;板子已跑 profiler FW 后)
 > 我对 6.4.1 具体 UI 不逐像素打包票;**按向导走、每步把屏幕上看到的读给我**,我判断对错与下一步。大致流程:
 1. **通电前**先启动 MC Workbench → 进入 **Motor Profiler**(起始页有入口)。
 2. 选/确认硬件:控制板 NUCLEO-G431RB + 功率板 X-NUCLEO-IHM16M1(或直接 IHM03 pack)。
@@ -62,6 +84,15 @@
 - MC Workbench 报 **fault / over-current / start-up failure** 且反复重试;
 - 保险丝熔断(说明发生过流,查因再说,别急着换更大的保险丝硬冲)。
 **中止后**:断电、记录当时屏幕读数/报错/现象,交给我判断(可能是 Imax 太低拉不起、或低电感标定坑、或接线/固定问题)。
+
+## 6.5 AN 已知问题对照(我们这颗电机很可能撞上,预判)
+来自官方 AN Motor Profiler「Known Problems」——**对高 KV/低电感微型电机尤其相关**:
+- **进度条卡 7%**:current sensing 用了 1 个 ADC → 必须 **2 ADC**(见 §4.5 步 4)。
+- **进度条卡 28%**:FW 找不到可行的启动速度爬坡 → **调 Max current / Max speed**;仍不行则转 **Open Loop** 手动调启动爬坡再回填。**本电机最可能卡这里**(低电感、高 KV 启动难)。
+- **过压/欠压错误(标定前)**:把 UnderVoltage/OverVoltage threshold 设合理(母线 12.6V → 欠压阈值设远低、过压设远高,如 ~6V / ~20V);也可能是 1 ADC 造成。
+- **怪声且不标定**:power board .json 缺 `resistorOffset` → IHM16M1 含此参数,应无此问题;若真遇到,AN 提供 "Offset Detection" 用已知 Rs 电机反算(我们暂无已知 Rs 电机,故走不了,只能靠 IHM16M1 自带值)。
+- **Start profile 按钮变灰/复位后不可用**:disconnect → GUI/load GUI 重载 profiler.qml → 重新 connect。
+- **低电感高纹波**:可在 WB 生成时**提高 PWM 频率**改善控制(§4.5 步 7)。
 
 ## 7. Plan B —— 手工测参(Motor Profiler 标不动时;需仪表,可能等明天)
 若 §5 反复失败,改手工测下列参数,直接填进 MC Workbench(跳过自动标定):
