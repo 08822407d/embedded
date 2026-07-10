@@ -1,3 +1,6 @@
+# 忽略了什么 + 生成工程被覆盖时如何保住改动 → 见 docs/GITIGNORE_AND_REGEN.md
+# 改本文件的忽略策略时,请同步更新该文档 §1。
+
 # ===== 构建产物(Linux make + Windows CubeIDE)=====
 **/build/
 **/Debug/
