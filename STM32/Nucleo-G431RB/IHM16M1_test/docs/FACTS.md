@@ -29,6 +29,10 @@
 | F-25 | **已备妥 12V 电机母线电源**:用户确认取得合适的 12V 电源为 IHM16M1 供电(电机额定 12V,落在 STSPIN830 4.5–45V 供电范围内)。**Motor Profiler/标定时应经限流实验电源供电**,限流先设低值(空载 0.16A → 起步上限 ≤0.5–1A),电流/急停方案见 Motor Profiler 任务书 | 用户确认 | 2026-07-08 |
 | F-26 | **MC Workbench 已生成的 Motor Profiler 工程结构已核实**:`GM16020-06_profile/STM32CubeIDE/` 是 Eclipse 工程根,有 Debug 配置和链接脚本 `STM32G431RBTX_FLASH.ld`;其 `.cproject` 将 `../../MCSDK_v6.4.2-Full/MotorControl/libMP/libmp-G4-IAR_ARMv7-M.a` 作为 Motor Profiler 库链接输入,库文件实存 | codex 只读核对 `.project`/`.cproject`/文件路径 | 2026-07-10 |
 | F-27 | **Motor Profiler 固件 Phase B 已在 Windows STM32CubeIDE 1.19.0 headless 下离线编译通过**:Debug 生成 `GM16020-06_profile.elf/.hex/.bin`,size=`text 57728/data 3184/bss 7376`;生成工程漏配 CMSIS-DSP include,通过 headless 临时 `-I .../Drivers/CMSIS/DSP/Include` 补齐后 clean build 0 errors/0 warnings。无手改 `.cproject`、无烧录/硬件访问 | codex 离线构建实测;详见 [`PROFILER_FW_BUILD.md`](PROFILER_FW_BUILD.md) | 2026-07-10 |
+| F-28 | **Motor Profiler 标定完成(电机+霍尔)**,结果存 `GM16020-06.json`:**Rs=1.41Ω、Ls=0.19mH、极对数=4**(三次一致稳)、**Ke(BEmfConstant)=0.449**(⚠️ run 间跳动:三次 0.62/0.385/0.449,后两次完整 run 在 0.4~0.45,**FOC 时须验证/微调**)、maxRatedSpeed≈19806RPM、nominalDCVoltage=12.46V、friction=0.03/inertia=0.05、磁结构 **SM-PMSM**、兼容 FOC+sixStep;**霍尔标定有效**:`placementElectricalAngle=58°`(正/反向 91°/25° 取均值)、`sensorsDisplacement=120°`(首次标定 placement=0°/反向缺失=无效,已重标修正)。烧录用 STM32CubeProgrammer 对 SN 002A...3533 写入 verified。json 原件在被忽略的 `GM16020-06_profile/`,已拷贝 `docs/profiler_results/GM16020-06.json` 作受控备份 | 用户操作 MotorPilot 完整标定(Imax 0.5A / Max speed 20000)+ CC 旁站核对 json | 2026-07-10 |
+| F-29 | **IHM16M1 母线电压允许范围 = 7–45 Vdc,max rated current = 2.12 Apk**(MotorPilot profiler 界面读出的功率板规格);我们的 12.6V 母线稳在范围内 | MotorPilot(MCSDK 6.4.2)功率板信息显示 | 2026-07-10 |
+| F-30 | **正式霍尔 FOC 工程已生成并核对**:受控种子 `GM16020-06_foc.stwb6` + 被忽略生成树 `GM16020-06_foc/`;MCSDK/Workbench=6.4.2,生成 `.ioc` 记录 `CUBE_MX_VER=6.14.1`(勿与 standalone CubeMX 6.18.0 混淆)。有效值为 4 对极、Hall 120°/58°、30kHz PWM、500rpm 默认目标、三电阻外置运放双 ADC(V 相 PB11 由 ADC1/ADC2 共享),PWM PA8/9/10、enable PB13/14/15、Hall PC6/7/8、DP PA11、VBUS PA0、温度 PC4、MCP USART2 PA2/PA3@1843200。Start/Stop、potentiometer、open loop、over-modulation、DPWM、flux weakening、Motor Profiler 均关闭;源码中无应用层 `MC_StartMotor1` 调用 | codex 对 `.stwb6`、生成 `.ioc`、C 头文件/源码逐项只读核对;详见 [`FOC_FW_BUILD.md`](FOC_FW_BUILD.md) | 2026-07-10 |
+| F-31 | **正式 FOC Debug 已在 STM32CubeIDE 1.19.0 headless 下离线 clean build 通过**:`0 errors, 0 warnings`,无需 Profiler 工程曾用的 CMSIS-DSP 临时 include 绕过;输出 `GM16020-06_foc.elf/.hex/.bin`,size=`text 36484/data 976/bss 7152`,生成树无手改。全过程未枚举板卡、未调用 Programmer/ST-Link、未烧录/复位、未运行 MotorPilot、未给母线上电/未转电机。另发现种子 Ke=`0.449045...` 被生成器量化为 C 参数 `0.4`,保留为首次上电前复核项 | codex 离线构建、objcopy/readelf 与生成源码核对;详见 [`FOC_FW_BUILD.md`](FOC_FW_BUILD.md) | 2026-07-10 |
 | F-6 | **工具链非最新(查证当日)**:最新 = CubeCLT **1.21.0**(2026-02)/ CubeProgrammer **2.22**(2026-04)/ CubeIDE **2.1.0**(从 1.x 大版本跃迁);本机偏旧但**对成熟芯片 G431 功能够用、不阻塞**。升级收益 = GCC14 + 修复 + 新特性;升级需登录 st.com 下载、属系统级操作 → **由用户主导,勿擅自装** | WebSearch(st.com / community.st.com) | 2026-06-29 |
 | F-7 | 硬件组合 `IHM16M1 + G431RB` = ST 官方套件 **P-NUCLEO-IHM03** 的板卡组合(原配 gimbal 电机 GBM2804H-100T);核心手册 **UM2415**(IHM16M1)、**UM2538**(IHM03 pack FOC 评估) | WebSearch(st.com) | 2026-06-29 |
 | F-8 | IHM16M1 功率级 = **STSPIN830**,支持**单 / 三电阻**电流采样(板上跳线选)。⚠️ 本条末句"霍尔 FOC 需三电阻"及"当前配置待核实"**已被 F-16/F-17/F-18 校正/落实**:霍尔本身不强制三电阻,但本项目仍用默认三电阻;当前实物 = 默认 FOC 三电阻 | WebSearch + UM2415 | 2026-06-29 |
@@ -36,10 +40,12 @@
 | F-10 | 本机电机开发环境**只差 MCSDK**:已装 **STM32CubeMX 6.15.0**(`~/STM/STM32CubeMX`)+ **STM32Cube_FW_G4 V1.6.1**(Repository)+ CubeCLT 1.18 / CubeIDE 1.18.1(F-5);缺 X-CUBE-MCSDK(F-9) | `find` + `ls Repository` 实测 | 2026-06-29 |
 
 > 注1:**端口 / 接口(`/dev/ttyACMx`)不在此记录** —— 每次插拔 / 枚举顺序会变,属易变状态。**每次烧录 / 调试前按 [`OPERATIONS.md`](OPERATIONS.md) §0 现场扫描**,靠 F-3 的 ST-Link SN 解析当前端口;此处只记固定标识。
-> 注2:仍未核实的具体电气配置包括**母线电压范围、正式 FOC 工程用 PWM/ADC/enable/fault 完整映射**等;用前查数据手册(UM2415 / UM2538)/MCSDK 板卡定义/实测,**别从模型记忆里填具体引脚号**(易错且危险)。
+> 注2:正式 FOC 工程的母线范围与生成引脚映射已由 F-29/F-30 落实;未来若重生成或改变板卡/采样拓扑,仍须重新核对 `.ioc`/板卡定义,**不得从模型记忆里沿用具体引脚号**。
+> 注3:F-9/F-10 是 2026-06-29 的历史环境快照,其中“MCSDK 未安装/最新 6.4.1”已由当前 Windows 实测 F-12 的 **MCSDK 6.4.2 已安装**取代,不得当作现状。
 
 ## 待核实(核实后上移到上表)
-- IHM16M1 板级母线电压允许范围的确切上下限(已知 12V 稳妥可用,F-25;精确范围可后续查 UM2415 核)
-- G431 ↔ IHM16M1 完整引脚映射:三相互补 PWM(TIM1?)、ADC 通道、使能 / 故障线;板载跳线 / 焊桥默认配置(霍尔读取脚 PC6/7/8 已由 F-20 确认)
-- 串口 VCP 波特率已用于只读霍尔诊断 `115200 8N1`;正式 MCSDK 工程默认值仍待由 Workbench 工程确认
-- 正式 MCSDK 工程生成前,仍需确认当前 Windows 工具链组合与 **MCSDK 6.4.2 / CubeMX 6.18.0** 的实际生成兼容性(6.17.0-RC5 的 headless 生成 bug 是否在 6.18.0 消失,待生成时复验;见 F-12/F-15)
+- ~~IHM16M1 板级母线电压允许范围~~ → **已确认 7–45Vdc(F-29)**
+- ~~G431 ↔ IHM16M1 正式 FOC 完整引脚映射~~ → **已由生成 `.ioc`/源码确认(F-30)**
+- ~~正式 MCSDK 工程 MCP 串口默认值~~ → **USART2 PA2/PA3,1843200 baud(F-30)**
+- ~~当前 Windows 工具链与 MCSDK 6.4.2 正式工程的生成/构建兼容性~~ → **已生成且 headless clean build 通过(F-31)**
+- **首次带母线闭环前**仍需复核生成器把 Ke `0.449045...` 量化为 `0.4` 的影响,并实测空载转速/BEMF;不得把“编译通过”当作控制参数已验证

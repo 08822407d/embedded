@@ -5,7 +5,7 @@
 > **第一步:打开并读 [`docs/STATUS.md`](docs/STATUS.md)** —— 它告诉你现在进行到哪、下一步做什么、卡在哪。
 
 ## 这是什么项目(一句话)
-STM32 **Nucleo-G431RB**(STM32G431RB,Cortex-M4F @170MHz)主控 + **X-NUCLEO-IHM16M1** 官方扩展板上的开发。X-NUCLEO-IHM16M1 是 ST 的**三相电机(BLDC/PMSM)驱动评估板**(IHM 系列),故本项目很可能是**电机控制**方向 —— 但**具体用途与控制方案由用户逐步说明**,落到 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)。当前处于**需求讨论阶段,尚未实现任何功能**。
+STM32 **Nucleo-G431RB**(STM32G431RB,Cortex-M4F @170MHz)主控 + **X-NUCLEO-IHM16M1** 官方三相电机驱动扩展板,目标电机为带 Hall 的 GM16020-06。Motor Profiler 标定、正式 Hall FOC 工程生成和离线构建已完成;项目当前按用户要求**暂停在烧录/首次闭环上电之前**。准确进度、风险与恢复步骤以 [`docs/STATUS.md`](docs/STATUS.md) 为准。
 
 ## 交互方式:语音听写输入(重要)
 本项目的对话**主要由语音听写产生**:用户说话 → 语音转文字(STT)→ 文本发给你,因此你收到的文字**可能带有识别误差**(同音字、词边界错位、标点缺失、专业术语被听错等)。

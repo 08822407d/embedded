@@ -22,6 +22,11 @@ hw_smoke_win/g431_hw_smoke_win/
 # 仅保留上级目录的 .stwb6 种子(MC Workbench 工程文件)作复现锚点。
 GM16020-06_profile/
 
+# ===== MC Workbench/CubeMX 生成的正式 FOC 工程 =====
+# 约定:根目录下正式 FOC 生成目录统一以 _foc 结尾;整树可由同名 .stwb6 种子重生成,不入库。
+# 后续若必须手改其中 Src/Inc 等文件,先按 docs/GITIGNORE_AND_REGEN.md §3/§4 放行或备份并登记。
+/*_foc/
+
 # ===== 手册原件 / 本地参考大文件 =====
 hw_ref/ihm16m1/source/
 

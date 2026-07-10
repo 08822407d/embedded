@@ -1,0 +1,27 @@
+{
+    "BEmfConstant": 0.4490450918674469,
+    "compatibility": [
+        "FOC",
+        "sixStep"
+    ],
+    "description": "GM16020-06 motor",
+    "friction": 0.03,
+    "hallSensor": {
+        "placementElectricalAngle": 58,
+        "sensorsDisplacement": 120
+    },
+    "hardwareFamily": "MOTOR",
+    "hasHallSensor": true,
+    "id": "GM16020-06",
+    "inertia": 0.05,
+    "label": "GM16020-06",
+    "ls": 0.19,
+    "magneticStructure": {
+        "type": "SM-PMSM"
+    },
+    "maxRatedSpeed": 19806,
+    "nominalCurrent": 0.5,
+    "nominalDCVoltage": 12.45806884765625,
+    "polePairs": 4,
+    "rs": 1.4057204723358154
+}

@@ -15,10 +15,12 @@
 - **霍尔手转极对数测量已完成**:HITL-2 用户手转约一机械圈,串口采集到连续有效序列 `010 -> 011 -> 001 -> 101 -> 100 -> 110 -> 010`,最终 `h1_rise=4`, `trans=25`, `invalid=0`, `skipped=0`;结论为当前散货电机 **4 对极**。`trans=25` 比理论 24 多 1 个 Hall sector,表示手转略过起点,不影响极对数结论。
 - **目标电机已完整定型 = GM16020-06**(三相八线带霍尔,DC12V,空载 18200RPM,空载 0.16A,**4 对极**,6 槽,高 KV≈1517;详见 F-24)。属"高转速/低电流/低电感"微型电机,Motor Profiler 已知有坑,需预期要调参。
 - **12V 母线电源已备妥**(F-25);标定时须经限流实验电源、限流起步 ≤0.5–1A。
-- **Windows CubeMX 已升级 6.17.0-RC5 → 6.18.0**(F-12,2026-07-08 用户手工全量安装,运行时核验);RC5 的 headless 生成 bug 是否消失待生成 FOC 工程时复验。
-- **Motor Profiler 固件 Phase B(仅离线编译)已完成**:MC Workbench 生成工程 `GM16020-06_profile` 以 CubeIDE 1.19.0 headless 构建 Debug 成功,`.elf/.hex/.bin` 留在 `GM16020-06_profile\STM32CubeIDE\Debug\`。该工程漏配 CMSIS-DSP include,构建命令以临时 `-I ...\Drivers\CMSIS\DSP\Include` 补齐,未手改生成树。完整命令、产物及首次失败记录见 [`PROFILER_FW_BUILD.md`](PROFILER_FW_BUILD.md)。**Phase C 烧录未执行,未访问硬件、未运行 MotorPilot。**
-- 需求与路线仍为 [`DECISIONS.md`](DECISIONS.md) #003:用 ST X-CUBE-MCSDK 的 Motor Profiler 标定散货三相 BLDC(自带霍尔) → MC Workbench 生成霍尔 FOC 固件 → 编译烧录 → 闭环调速。
-- **电气/参数前提基本齐备**(采样拓扑=三电阻、极对数=4、霍尔脚 PC6-8、12V 电源、工具链 6.18.0)。**仍未**:运行 Motor Profiler、生成正式 FOC 工程、给电机上电、让电机转动。
+- **Windows CubeMX 已升级 6.17.0-RC5 → 6.18.0**(F-12,2026-07-08 用户手工全量安装,运行时核验);MCSDK 6.4.2 内置 CubeMX 已成功生成正式工程且后续构建通过,当前组合不再阻塞。
+- **Motor Profiler 固件 Phase B(仅离线编译)已完成**:MC Workbench 生成工程 `GM16020-06_profile` 以 CubeIDE 1.19.0 headless 构建 Debug 成功,`.elf/.hex/.bin` 留在 `GM16020-06_profile\STM32CubeIDE\Debug\`。该工程漏配 CMSIS-DSP include,构建命令以临时 `-I ...\Drivers\CMSIS\DSP\Include` 补齐,未手改生成树。完整命令、产物及首次失败记录见 [`PROFILER_FW_BUILD.md`](PROFILER_FW_BUILD.md)。该 Phase B 任务本身未烧录/未访问硬件;后续 Phase C/D 结果见下一条。
+- **Motor Profiler 标定(Phase C 烧录 + Phase D 标定)已完成**:CC 在用户授权+母线断电下用 `STM32_Programmer_CLI` 烧 profiler 固件(verified、认 SN),用户操作 MotorPilot 完成**电机+霍尔完整标定**。结果见 **F-28**:Rs=1.41Ω / Ls=0.19mH / 极对数=4 / Ke(BEmf)=0.449 / 霍尔 placement=58°、displacement=120°;⚠️ Ke run 间跳动(0.385~0.62),FOC 时须验证/微调。原 json 在被忽略目录,已备份 [`docs/profiler_results/GM16020-06.json`](profiler_results/GM16020-06.json)。母线范围 7–45V 确认(F-29)。
+- **正式霍尔 FOC 工程已生成并完成离线构建验证**:种子 `GM16020-06_foc.stwb6` 已保留,生成树 `GM16020-06_foc/` 按 [`GITIGNORE_AND_REGEN.md`](GITIGNORE_AND_REGEN.md) 忽略。STM32CubeIDE 1.19.0 headless clean build Debug 一次通过(`0 errors,0 warnings`),`.elf/.hex/.bin` 留在本机 ignored `Debug/`;未手改生成树。完整配置审计、命令、hash 和产物见 [`FOC_FW_BUILD.md`](FOC_FW_BUILD.md) / F-30/F-31。
+- 正式工程有效配置包括:Hall PC6/7/8、120°/58°、4 对极、PWM 30kHz、三电阻双 ADC、默认速度 500rpm、USART2 MCP 1843200;Start/Stop 与 potentiometer 均关闭,源码无自动 `MC_StartMotor1` 调用。**注意:**种子 Ke=0.449045... 被生成 C 参数量化为 0.4,首次带电前仍要复核。
+- [`DECISIONS.md`](DECISIONS.md) #003 路线已完成到“正式工程生成 + 离线编译”。**用户选择在此暂停**;正式 FOC 尚未烧录,未做首次闭环上电/调速,本次构建也未访问硬件。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
@@ -27,13 +29,15 @@
 - [x] 目标电机定型(GM16020-06)、极对数=4、12V 电源备妥、CubeMX 升级 6.18.0 → 已落盘 F-24/F-25/F-12
 - [x] CC 起草 **Motor Profiler 标定 SOP**(用户驱动 GUI + CC 旁站,非 codex 任务):见 [`MOTOR_PROFILER_SOP.md`](MOTOR_PROFILER_SOP.md)
 - [x] Motor Profiler Phase B:仅以 headless 离线编译 `GM16020-06_profile(Debug)` 并产出 `.elf/.hex/.bin`;Phase C 未执行
-- [ ] **后续独立任务才可进入 Phase C**:先完成 SOP 物理准备(拆指针/固定电机/**串保险丝补限流**/急停/值守),再由用户按 HITL 明确授权烧录;烧录后仍须用户操作 MotorPilot,CC 旁站解读。标不动则转 SOP §7 Plan B 手工测参(需仪表)
-- ⚠️ **本次电源无可调限流**(12.6V/1.9A,F-25):靠"Motor Profiler Imax 低起步 + 串 1–1.5A 快熔保险丝 + 低速起步 + 值守随时断电"四层兜底
-- [ ] 用 **MC Workbench** 配置(三电阻 + 霍尔反馈)生成 FOC 工程
-- [ ] 编译正式 FOC 工程;在明确授权、电机电源安全状态确认后,再进入烧录/调试步骤
+- [x] **Phase C 烧录 + Phase D 标定已完成**:用户授权+母线断电下烧 profiler 固件,MotorPilot 完整标定电机+霍尔,结果落 F-28 + 备份 json(无保险丝,靠 Imax 0.5A 低起步 + 用户 1 秒断电兜底,标定顺利)
+- [x] MC Workbench 6.4.2 生成正式霍尔 FOC 工程 `GM16020-06_foc`;种子入库、生成树忽略策略与重生成协议已落实
+- [x] STM32CubeIDE 1.19.0 headless clean build Debug,生成 `.elf/.hex/.bin`;无需 CMSIS-DSP `-I` 绕过,无生成树手改
+- [ ] **当前主动暂停,不要自动继续。** 若用户恢复:先读 [`FOC_FW_BUILD.md`](FOC_FW_BUILD.md) 的 Ke 量化项,再为烧录单独执行 HITL(明确授权 + 母线断开/仅 USB + 目标板 SN 正确);烧录不等于授权上母线或转电机
+- [ ] 首次闭环带电另行获得授权并现场值守;先解决/接受限流与保险丝风险,从低速低电流开始,核对 Hall 方向/相序/故障状态/空载转速与 BEMF,必要时修正 Ke/PI
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
 ## 卡点 / 待用户拍板
-- **电机供电已定 12V**(F-25);仍需在标定任务书里定死:限流值、急停方式、电机固定方式、**拆除轴上打印指针**(高速会飞出)。
-- **Motor Profiler 标定风险**仍在:GM16020-06 为高 KV/低电流/低电感微型电机,标定可能失败或需调电压/转速/电流安全条件——预期非一次过。
-- 本轮 Phase B 已按范围结束。任何后续烧录、运行、Motor Profiler、MC Workbench 生成/下载、给电机扩展板上电或让电机转动的步骤,都必须重新获得明确授权并有人值守。只读霍尔固件每次烧录前也必须按 [`CODEX_TASK_hall_probe_fw.md`](CODEX_TASK_hall_probe_fw.md) §-1 重新确认授权、母线断电、目标板正确。
+- **Ke 标定值存疑**:三次 run 得 0.62/0.385/0.449,取 0.449;生成 FOC、首次跑起来后须**验证空载转速/BEMF 是否符合预期**,必要时微调 Ke。Rs/Ls/极对数/霍尔角均稳。
+- **生成器 Ke 精度项**:`.stwb6` 保留 0.449045...,但生成 `.ioc`/C 参数为 0.4;未擅自手改。源码核对显示该值主要进入导出的 motor configuration register,仍须在首次上电前由后续负责人决定是否回 Workbench 调整或接受并实测。
+- **供电仍无可调限流**(12.6V/1.9A,无保险丝):标定阶段靠 Imax 低起步 + 1 秒断电已顺利完成;将来闭环调速电流更大时,仍建议想办法加限流/保险丝。
+- 任何后续烧录、给电机上电、让电机转动(尤其 FOC 闭环调速,电流可能远高于标定的 0.5A)的步骤,都必须重新获得明确授权、有人值守、随时能断电。
