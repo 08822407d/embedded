@@ -14,6 +14,11 @@
 hw_smoke/g431_hw_smoke/
 hw_smoke_win/g431_hw_smoke_win/
 
+# ===== MC Workbench/MCSDK 生成的 Motor Profiler 工程(数 MB:HAL 驱动/MCSDK 中间件/libMP .a/CubeIDE 工程)=====
+# 全部由 MC Workbench GUI 从种子 .stwb6 重生成(见 docs/MOTOR_PROFILER_SOP.md §4.5),不入库;
+# 仅保留上级目录的 .stwb6 种子(MC Workbench 工程文件)作复现锚点。
+GM16020-06_profile/
+
 # ===== 手册原件 / 本地参考大文件 =====
 hw_ref/ihm16m1/source/
 
