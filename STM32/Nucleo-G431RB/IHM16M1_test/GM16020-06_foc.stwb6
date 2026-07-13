@@ -1,5 +1,5 @@
 {
-  "version": 16,
+  "version": 11,
   "algorithm": "FOC",
   "description": "",
   "workBenchVersion": "6.4.2",
@@ -2168,7 +2168,7 @@
         "rs": "Number.NaN",
         "ls": "Number.NaN",
         "mmsLd_lq_ratio": "Number.NaN",
-        "maxCurrent": "Number.NaN",
+        "maxCurrent": 0.3,
         "maxDCVoltage": 12.5,
         "BEmfConstant": "Number.NaN",
         "inertia": "Number.NaN",
@@ -2183,7 +2183,9 @@
         "quadratureEncoder": {
           "pulsesPerMechanicalRevolution": "Number.NaN",
           "hasIndexPin": false
-        }
+        },
+        "nominalCurrent": "Number.NaN",
+        "nominalDCVoltage": "Number.NaN"
       },
       "powerSwitches_0": {
         "setting": {
@@ -2299,7 +2301,7 @@
         },
         "speedReg": {
           "executionRate": "Number.NaN",
-          "targetSpeed": 500,
+          "targetSpeed": 100,
           "commutationTime": "Number.NaN",
           "KpKi": {
             "P": {

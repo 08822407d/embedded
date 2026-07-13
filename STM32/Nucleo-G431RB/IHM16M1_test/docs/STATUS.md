@@ -19,9 +19,10 @@
 - **Motor Profiler 固件 Phase B(仅离线编译)已完成**:MC Workbench 生成工程 `GM16020-06_profile` 以 CubeIDE 1.19.0 headless 构建 Debug 成功,`.elf/.hex/.bin` 留在 `GM16020-06_profile\STM32CubeIDE\Debug\`。该工程漏配 CMSIS-DSP include,构建命令以临时 `-I ...\Drivers\CMSIS\DSP\Include` 补齐,未手改生成树。完整命令、产物及首次失败记录见 [`PROFILER_FW_BUILD.md`](PROFILER_FW_BUILD.md)。该 Phase B 任务本身未烧录/未访问硬件;后续 Phase C/D 结果见下一条。
 - **Motor Profiler 标定(Phase C 烧录 + Phase D 标定)已完成**:CC 在用户授权+母线断电下用 `STM32_Programmer_CLI` 烧 profiler 固件(verified、认 SN),用户操作 MotorPilot 完成**电机+霍尔完整标定**。结果见 **F-28**:Rs=1.41Ω / Ls=0.19mH / 极对数=4 / Ke(BEmf)=0.449 / 霍尔 placement=58°、displacement=120°;⚠️ Ke run 间跳动(0.385~0.62),FOC 时须验证/微调。原 json 在被忽略目录,已备份 [`docs/profiler_results/GM16020-06.json`](profiler_results/GM16020-06.json)。母线范围 7–45V 确认(F-29)。
 - **正式霍尔 FOC 工程已生成并完成离线构建验证**:种子 `GM16020-06_foc.stwb6` 已保留,生成树 `GM16020-06_foc/` 按 [`GITIGNORE_AND_REGEN.md`](GITIGNORE_AND_REGEN.md) 忽略。STM32CubeIDE 1.19.0 headless clean build Debug 一次通过(`0 errors,0 warnings`),`.elf/.hex/.bin` 留在本机 ignored `Debug/`;未手改生成树。完整配置审计、命令、hash 和产物见 [`FOC_FW_BUILD.md`](FOC_FW_BUILD.md) / F-30/F-31。
-- 正式工程有效配置包括:Hall PC6/7/8、120°/58°、4 对极、PWM 30kHz、三电阻双 ADC、默认速度 500rpm、USART2 MCP 1843200;Start/Stop 与 potentiometer 均关闭,源码无自动 `MC_StartMotor1` 调用。
+- 正式工程有效配置包括:Hall PC6/7/8、120°/58°、4 对极、PWM 30kHz、三电阻双 ADC、**Iqmax/nominal current=0.3A、默认速度=100rpm**、USART2 MCP 1843200;Start/Stop 与 potentiometer 均关闭,源码无自动 `MC_StartMotor1` 调用。
 - **首次带电前离线审计与降险准备已完成**:见 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) / F-32~F-35。Ke 0.449→0.4 已定论为输出/只读上报量化,不进入当前 Hall FOC 运行时控制,无需仅为此重生成;F-23 序列换算后与 MCSDK `POSITIVE` 状态机完全一致。保护、默认安全态、MCP 可写项、100rpm/3-5s 首测参数、遥测与风险台账已落盘。
-- [`DECISIONS.md`](DECISIONS.md) #003 路线已完成到“正式工程生成 + 离线编译 + 首次带电前静态审计”。正式 FOC **仍未烧录**,未做首次闭环上电/调速;本次审计全程未访问硬件、未启动 MotorPilot/Workbench、未改生成树或重生成。
+- **DECISIONS #006-B 已执行并离线验证(F-36)**:用户在 WB 将 Iqmax/nominal current `0.5→0.3A`、默认目标 `500→100rpm` 并用内置 CubeMX 重生成;Codex 未再次生成,仅以 CubeIDE 1.19.0 headless clean build Debug。结果 `0 errors,0 warnings`,size=`text36484/data976/bss7152`,新 ELF/HEX/BIN 留在 ignored `Debug/`;构建前后60项生成源码hash一致。三组PI最终数值与旧版相同,符合控制对象参数未变、只改变限幅/reference的预期。其余 Hall/采样/PWM/保护/MCP/Ke/无自动Start全部复核不变。
+- [`DECISIONS.md`](DECISIONS.md) #003 路线已完成到“正式工程生成 + 0.3A/100rpm 降险重生成 + 离线重构建 + 首次带电前静态审计”。正式 FOC **仍未烧录**,未做首次闭环上电/调速;本次重构建全程未访问硬件、未启动 MotorPilot/Workbench、未手改生成树或重生成。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
@@ -34,14 +35,14 @@
 - [x] MC Workbench 6.4.2 生成正式霍尔 FOC 工程 `GM16020-06_foc`;种子入库、生成树忽略策略与重生成协议已落实
 - [x] STM32CubeIDE 1.19.0 headless clean build Debug,生成 `.elf/.hex/.bin`;无需 CMSIS-DSP `-I` 绕过,无生成树手改
 - [x] 正式 FOC 首次带电前离线审计:Ke/Hall/保护/MCP/参数/遥测/风险已落 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md);未碰硬件/未重生成
-- [ ] **ESC-1 由 CC/用户先拍板**:加可调限流/约1-1.5A快熔后接受现有 Iqmax=0.5A,或由用户回 WB 把 Iqmax/nominal current 改0.3A并重生成+重编译。stock MCP不能运行时降低 speed-mode Iqmax
+- [x] **ESC-1/#006-B 已关闭**:用户选择回 WB 将 Iqmax/nominal current 改0.3A、默认目标改100rpm并重生成;Codex离线重构建和差异复核通过(F-36)
 - [ ] 由 CC 把 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) 合入现场 SOP。烧录前单独 HITL(授权+母线断开/USB-only+目标板正确);烧录不等于授权上母线/转电机
-- [ ] 首次闭环带电另行授权并值守:Speed mode,Start 前写 `SPEED_RAMP=[+100rpm,3000..5000ms]`,盯 STATUS/FAULTS/speed/Hall angle/Iq/Id/Vbus;任何反号、抽搐、Iq饱和、fault立即Stop/断母线
+- [ ] 首次闭环带电另行授权并值守:Speed mode,Start 前读回默认 `100rpm`,按现场需要设置 `SPEED_RAMP=[+100rpm,3000..5000ms]`,盯 STATUS/FAULTS/speed/Hall angle/Iq/Id/Vbus;任何反号、抽搐、Iq接近0.3A持续饱和、fault立即Stop/断母线
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
 ## 卡点 / 待用户拍板
 - **Ke 输出量化已关闭为阻塞项(F-32)**:`0.4`不进入当前 Hall FOC 运行时控制,无需仅为此重生成。三次 Ke=0.62/0.385/0.449 的离散只保留为自动 PI 模型/整定风险,首测观察速度环即可;以后启用 observer/磁链算法再重测。
 - **Hall 电气正向已静态自洽(F-33),机械正方向未定义**:F-23 手转序列就是 MCSDK POSITIVE,但当时未记 CW/CCW;且58°依赖Profiler后相/Hall线未变。两项都只能现场确认,不能离线假设。
-- **供电/Iqmax 决策未关**:现有12.6V/1.9A无可调限流、无保险丝;项目speed-mode Iqmax=0.5A且stock MCP不能降。CC须在硬件兜底与WB重生成0.3A间拍板。
+- **供电/Iqmax 软件决策已关,硬件残余风险仍在**:项目speed-mode Iqmax已重生成到0.3A、默认目标100rpm;但现有12.6V/1.9A仍无可调限流/保险丝,`IQMAX`不是短路硬件trip。现场仍须有人值守并能立即断母线。
 - **保护边界(F-34)**:PA11/BKIN2是combined driver-protection而非可设阈值OCP/刹车;`M1_OCP_TOPOLOGY=NONE`,PC4只测功率板温度。不能依赖它们保护微型电机绕组/短路。
 - 任何后续烧录、连接 MotorPilot、给母线上电、Start/转电机都不在本任务授权内;须分别按现场SOP/HITL重新授权、有人值守、随时能断电。

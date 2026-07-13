@@ -1,17 +1,42 @@
 # FOC_BRINGUP_PREP - GM16020-06 正式 Hall FOC 首次带电前离线审计
 
-日期:2026-07-13
+日期:2026-07-13(同日补充 #006-B 降限流重生成后的离线重构建复核)
 
-> 范围:只读 `GM16020-06_foc/` 生成配置/源码、MCSDK 6.4.2 本机板卡定义、MotorPilot 注册表/QML,并写 `docs/`。
-> 本次未枚举/连接板卡,未调用 Programmer/ST-Link,未烧录/复位,未启动 MotorPilot/MC Workbench,未重生成,未修改生成树,未给母线上电或转电机。
+> 范围:只读 `GM16020-06_foc/` 生成配置/源码、MCSDK 6.4.2 本机板卡定义、MotorPilot 注册表/QML,执行 CubeIDE headless 离线构建,并写 `docs/`。
+> 用户已在 Workbench 把 Iqmax/nominal current 改为 0.3 A、默认目标改为 100 rpm 并完成重生成;Codex 没有启动 Workbench/CubeMX 或再次生成。本次未枚举/连接板卡,未调用 Programmer/ST-Link,未烧录/复位,未启动 MotorPilot,未修改生成树源码,未给母线上电或转电机。
 
 ## 0. 结论和现场闸门
 
 1. **Ke 量化定论:接受生成的 `0.4`,不要仅为此重生成。** `0.449045... -> 0.4` 是 Workbench 输出宏/只读配置上报的 1 位小数量化,当前 Hall 主反馈 FOC 的已编译控制路径不读取该值。Workbench 的控制参数计算路径收到的是项目模型中的未量化 `BEmfConstant`,所以 `0.4` 字符串不会再反向污染 PI 计算。
 2. **Hall 静态配置自洽。** F-23 的实测序列换算为 MCSDK 内部位序后,正好是生成状态机的 `POSITIVE` 序列;58 度相移和 120 度传感器布置均落入运行时 Hall handle。未记录当时手转是物理 CW 还是 CCW,所以“正速度对应机械哪一方向”仍须现场低速确认。
-3. **保护链存在,但不能把它误当 0.5 A 硬件限流。** 过压/欠压/板级温度会进入安全任务并关 PWM;PA11 是 STSPIN830 active-low driver-protection 到 TIM1 BKIN2 的异步关断输入。项目的 `M1_OCP_TOPOLOGY=NONE`,没有 MCSDK 可设阈值的独立 OCP/BRK1;`IQMAX=0.5 A` 是速度 PI 输出/电流环参考上限,不是短路保险。
-4. **默认上电不自动启动。** 三个桥臂 enable GPIO 先置低且有下拉,TIM1 automatic output 关闭,状态机初始 `IDLE`,应用层无 `MC_StartMotor1`;默认 500 rpm 只是缓冲参考。必须收到 MotorPilot/MCP Start 才进入启动状态机。
-5. **现场前仍有一个 CC 决策闸。** 固定 12.6 V/1.9 A 电源若仍无可调限流和保险丝,后续不得把软件 `IQMAX=0.5 A` 当唯一保护。CC/用户应在“加限流/快熔保险丝后接受现有 0.5 A”与“回 Workbench 将 Iqmax/nominal current 降至 0.3 A 并重生成”中明确选一个。
+3. **保护链存在,但不能把它误当 0.3 A 硬件限流。** 过压/欠压/板级温度会进入安全任务并关 PWM;PA11 是 STSPIN830 active-low driver-protection 到 TIM1 BKIN2 的异步关断输入。项目的 `M1_OCP_TOPOLOGY=NONE`,没有 MCSDK 可设阈值的独立 OCP/BRK1;`IQMAX=0.3 A` 是速度 PI 输出/电流环参考上限,不是短路保险。
+4. **默认上电不自动启动,默认参考已经是保守首测值。** 三个桥臂 enable GPIO 先置低且有下拉,TIM1 automatic output 关闭,状态机初始 `IDLE`,应用层无 `MC_StartMotor1`;默认缓冲参考已由 500 rpm 降为 100 rpm。必须收到 MotorPilot/MCP Start 才进入启动状态机。
+5. **DECISIONS #006 的电流软件限幅闸已关闭为 B 路线。** 用户已完成 0.3 A/100 rpm 重生成,Codex 离线重构建并复核通过。固定 12.6 V/1.9 A 电源仍无可调限流/保险丝,所以 0.3 A 只能降低正常闭环参考和异常相序时的能量,不能替代短路保护或现场断电措施。
+
+### 0.1 2026-07-13 降限流重构建检查点
+
+- `.ioc` 与生成头文件一致:`M1_IQMAX=0.3`,`M1_NOMINAL_CURRENT=0.3`,`IQMAX_A=0.3`,`NOMINAL_CURRENT_A=0.3`,`DEFAULT_TARGET_SPEED_RPM=100`。
+- `CURRENT_CONV_FACTOR=(uint16_t)(65536*0.33*1.53/3.3)=10027 counts/A`;因此 speed PI 输出上下限和 nominal torque 上下限截断为 `+/-3008` 内部单位,对应约 `+/-0.3 A`。旧 0.5 A 上限为 `+/-5013`。
+- CubeIDE 1.19.0 headless clean Debug:`0 errors,0 warnings`;size=`text 36484/data 976/bss 7152`。
+- 构建前后对 `.ioc`、`Inc/`、`Src/` 和 Eclipse 工程关键文件共 60 项做 SHA-256 清单比较,全部不变;构建后无 CubeIDE/Java 残留进程。
+- 受控种子相对旧版的控制意图差异只有 `maxCurrent: NaN -> 0.3` 与 `targetSpeed:500 -> 100`;Workbench 同时写入顶层/序列化元数据(`version 16 -> 11`及两个 `NaN` 字段),但生成 `.ioc`/C 的逐项复核未发现控制配置漂移。新种子 SHA-256=`BAE6EF859187C6C537F0FEBBA99DE9823D40A3C32D2B7AEFA52599B8E3321DAF`。
+
+| 构建产物 | 字节 | SHA-256 |
+|---|---:|---|
+| `GM16020-06_foc.elf` | 2,076,396 | `0036DEE8C9431ECA4AC763BF9B481E0C56F23C238EE5B1E77078C0A387092DB0` |
+| `GM16020-06_foc.hex` | 105,456 | `32A8BB022196651CD6A9649FC6616F23251DB3A19B5EC32F66A1315018EA565B` |
+| `GM16020-06_foc.bin` | 37,460 | `F82C985EFA18571AA37C26EB1422E1A64BC29E01FF576B1CD3A59E57F3BF94E8` |
+
+重生成后的非目标配置逐项复核:
+
+| 配置组 | 新生成值 | 与旧审计 |
+|---|---|---|
+| Hall | 4对极,120度,phase shift 58度,TIM3 PC6/PC7/PC8 | 不变 |
+| 电流采样 | 三电阻、外部运放、双ADC;U=PA1/ADC1_IN2,V=PB11共享ADC1/2_IN14,W=PA7/ADC2_IN4;0.33ohm,gain1.53 | 不变 |
+| PWM/enable | TIM1 30kHz;PA8/PA9/PA10;PB13/PB14/PB15 | 不变 |
+| 保护 | OV15V/UV7V/温度110C(10C回差);PA11/TIM1_BKIN2 DriverProtection;`M1_OCP_TOPOLOGY=NONE` | 不变 |
+| MCP | USART2 PA2/PA3,1843200,data log enabled | 不变 |
+| Ke/启动 | Ke宏0.4;无应用层 `MC_StartMotor1` 调用 | 不变 |
 
 ## 1. 证据范围
 
@@ -81,7 +106,7 @@
 |---|---|---|
 | 转动稳定、速度/Iq 正常,但机械方向不是用户想要的方向 | 只是方向约定不同 | Stop 后把 `SPEED_RAMP` 目标改为负值;这是运行时改法,不要动线 |
 | 正速度命令时 Hall speed/机械 speed 为负,或转子一冲就反向 | 相/Hall 坐标关系或现场接线与标定时不同 | 立即 Stop/断母线;恢复 Profiler 时记录的 U/V/W、H1/H2/H3 接线。不能靠随机换线继续试 |
-| 原地抽搐、尖叫、每 60 度猛跳、Iq 接近 0.5 A 而速度不起 | Hall 相移错误、相序错、电流极性错之一 | 立即断电并保存遥测;交 CC。先核接线,再决定重做 Hall profile/改 phase shift/重生成 |
+| 原地抽搐、尖叫、每 60 度猛跳、Iq 接近 0.3 A 而速度不起 | Hall 相移错误、相序错、电流极性错之一 | 立即断电并保存遥测;交 CC。先核接线,再决定重做 Hall profile/改 phase shift/重生成 |
 | 方向正确但 Id 与 Iq 同量级、噪声大、发热快、转矩弱 | 58 度偏移或相电流/相序错误 | 不用 PI 掩盖;先重核 Hall placement/相序。`HALL_PHASE_SHIFT` 不是本工程 MCP 可写寄存器,修正须 WB 重生成 |
 | `MC_SPEED_FDBK`,Hall angle 不动或只在少数值跳,可能见 000/111 | Hall 供电/接线/通道故障 | 母线断电后查 Hall 5V/GND/H1-3;stock MCP 不暴露原始三位 Hall state |
 
@@ -94,7 +119,7 @@
 | 软件过压 | PA0 ADC1;15 V;`TURN_OFF_PWM` | 使能;安全任务报 `MC_OVER_VOLT` 并关 PWM。没有制动电阻/低侧刹车 |
 | 软件欠压 | PA0 ADC1;7 V | 使能;报 `MC_UNDER_VOLT` 并关 PWM。USB-only 启动时出现/锁存 UV 是预期现象 |
 | 板级温度 | PC4 ADC2;110 C,回差 10 C | 使能;报 `MC_OVER_TEMP` 并关 PWM。它保护功率板传感点,**不测电机绕组温度** |
-| 速度模式电流上限 | `IQMAX_A=0.5`,速度 PI 输出限幅 +/-0.5 A | 有效的软件电流参考上限,但不是独立硬件 trip |
+| 速度模式电流上限 | `IQMAX_A=0.3`,速度 PI 输出限幅约 +/-0.3 A | 有效的软件电流参考上限,但不是独立硬件 trip |
 | MCSDK OCP | `M1_OCP_TOPOLOGY=NONE`;TIM1 BRK1 disabled | 没有 comparator/DAC OCP 阈值,MotorPilot 也无本工程可写 OCP threshold |
 | Driver protection | IHM16M1 JSON=active low;PA11 -> TIM1 BKIN2,filter 4 | 硬件 Break2 异步触发 `PWMC_DP_Handler`,立即关 MOE/enable 并上报 `MC_DRV_PROTEC`。原因/电流阈值不由固件区分 |
 | 默认 GPIO/PWM | PB13/14/15 初始化低+下拉;TIM1 automatic output disabled | 上电默认功率级关闭 |
@@ -116,9 +141,9 @@
 | 项目 | 本工程现值 | 建议首测 | 改动方式/持久性 |
 |---|---:|---:|---|
 | Control mode | Speed | **Speed,不切 Torque/Open Loop** | `CONTROL_MODE` 运行时可写,复位恢复生成值 |
-| 首次目标速度 | 默认 500 rpm | **+100 rpm** | `SPEED_RAMP` 运行时可写;在 Start 前写入可覆盖缓冲的 500 rpm |
+| 首次目标速度 | 默认 100 rpm | **+100 rpm** | 目标已烧进固件;Start 前读回确认,仍写 `SPEED_RAMP` 以设置3-5s duration |
 | 速度斜坡 | 未固定为首测值 | **3000-5000 ms** | `SPEED_RAMP=[rpm,duration_ms]` 运行时可写 |
-| Iqmax/速度 PI 输出限幅 | 0.5 A | 有硬件兜底时接受 **0.5 A**;否则建议 **0.3 A** | stock MCP **不可改 Iqmax**;降到 0.3 须 Workbench 改 `M1_IQMAX/nominal current` 后重生成 |
+| Iqmax/速度 PI 输出限幅 | 0.3 A | **保持 0.3 A** | 已按 #006-B 重生成;stock MCP 不可改 Iqmax,再改仍须 Workbench 重生成 |
 | Id reference | 0 A | **0 A** | `CURRENT_REF/I_D_REF` 运行时可写,但首测保持默认 |
 | Speed PI | Kp 2208/1024,Ki 21/16384 | **保持生成值** | Kp/Ki/divisor 运行时可写但不持久;异常先 Stop,交 CC 决定调参/回 WB 固化 |
 | Iq/Id PI | Kp 2445/4096,Ki 2412/16384 | **保持生成值** | 运行时可写但不持久;首测不改 |
@@ -129,6 +154,16 @@
 | Ke C 宏 | 0.4 | **接受** | 不需要运行时改,不因首测重生成 |
 
 `I_Q_REF`/`CURRENT_REF` 虽可写,但在 Speed mode 下会被速度 PI 生成的 Iq 参考覆盖,**不能充当 0.3 A 的速度模式电流上限**。Torque mode 虽可直接给小 Iq,但没有同等速度闭环约束,不作为这台高 KV 电机的首次方案。
+
+### D1.1 PI 重生成复核
+
+| 调节器 | 旧 0.5 A/500 rpm 工程 | 新 0.3 A/100 rpm 工程 | 判定 |
+|---|---:|---:|---|
+| Torque(Iq) | P=`2445/4096`,I=`2412/16384` | P=`2445/4096`,I=`2412/16384` | 相同 |
+| Flux(Id) | P=`2445/4096`,I=`2412/16384` | P=`2445/4096`,I=`2412/16384` | 相同 |
+| Speed | P=`2208/1024`,I=`21/16384` | P=`2208/1024`,I=`21/16384` | 相同 |
+
+任务书预期“PI 重算后数值会变”,但生成结果没有变化。种子仍是 `currentReg.autoPI=true`、`speedReg.autoPI=true`,具体 P/I 在种子中为 `NaN` 并由生成器计算;因此这不是手工沿用固定 PI。数值保持不变是合理的:Rs/Ls、母线、PWM/调节频率、shunt/gain、控制截止频率和机械模型均未改变;100 rpm 改的是默认 reference,0.3 A 改的是速度 PI 输出/torque saturation。两者不必改变当前环路增益。静态证据不能证明生成器内部每一步是否重新执行,但能确认最终固件 PI 与原稳定基线一致,无需仅为“数字没变”再次重生成。
 
 ### D2. 供现场 SOP 采用的顺序(本次未执行)
 
@@ -155,7 +190,7 @@ MotorPilot 6.4.2 默认 `MC_FOC_SDK.qml` 中:
 | `SPEED_MEAS` | 与 reference 同号并受控接近 | 反号;超过目标约 2 倍仍上升;剧烈来回翻转 |
 | `HALL_SPEED` | 与 F-23 正向定义、`SPEED_MEAS` 同号 | 反号/突变/长期为 0。它与 SPEED_MEAS 同源,不是独立测速旁证 |
 | `HALL_EL_ANGLE` | 按 60 度扇区连续前进并周期回绕;4 对极每机械圈回绕 4 次 | 不动、反复跨扇区抖、方向与速度不一致 |
-| `I_Q_REF` | 启动短时上升,受约 0.5 A 限制,速度起来后回落 | 接近 0.5 A 持续而速度不升 |
+| `I_Q_REF` | 启动短时上升,受约 0.3 A 限制,速度起来后回落 | 接近 0.3 A 持续而速度不升 |
 | `I_Q_MEAS` | 跟随 Iq ref,允许 30 kHz/低电感带来的纹波 | 长时间顶限、符号乱跳、明显不跟随 |
 | `I_D_MEAS` | 目标为 0,平均值应明显小于 Iq | 持续与 Iq 同量级或约 >0.1-0.2 A,伴随噪声/发热 |
 | `BUS_VOLTAGE` | 稳在约 12-13 V | <7 V、接近/超过 15 V、明显塌陷/上冲 |
@@ -172,8 +207,8 @@ stock MCP 没有原始 `H1/H2/H3` 或三位 `HallState` 注册表。若后续必
 
 | 风险 | 触发条件/表现 | 缓解与响应 | 状态 |
 |---|---|---|---|
-| 无可调限流、无保险丝 | 短路/相序错时固定电源可供约 1.9 A | 首测前加限流或约 1-1.5 A 快熔;否则回 WB 降 Iqmax,并由 CC 决策 | **开放闸门** |
-| `IQMAX=0.5 A` 不是硬件 trip | current loop 失效/驱动故障 | 不把软件限幅当保险;依赖 DP+物理断电 | 已确认边界 |
+| 无可调限流、无保险丝 | 短路/功率级故障时固定电源仍可供约 1.9 A | 软件上限已降 0.3 A;仍建议未来补限流/约1-1.5 A快熔,首测保持人工断电 | **残余硬件风险** |
+| `IQMAX=0.3 A` 不是硬件 trip | current loop 失效/驱动故障 | 不把软件限幅当保险;依赖 DP+物理断电 | 已确认边界 |
 | DP 触发原因/阈值不可见 | PA11 active-low | 看 `MC_DRV_PROTEC`,断电查因;禁止盲目清 fault 重试 | 须现场验证 |
 | 正方向机械定义未知 | F-23 未记 CW/CCW | 100 rpm 低速确认;若稳定但方向不合预期,改速度符号 | 待现场 |
 | 相/Hall 接线可能与 Profiler 时不同 | 线被交换/重插 | 首测前核记录;变化则 58 度失效,须重标/重生成 | 待人工确认 |
@@ -182,19 +217,13 @@ stock MCP 没有原始 `H1/H2/H3` 或三位 `HallState` 注册表。若后续必
 | Ke run 间离散 | 自动 PI 模型可能偏 | 0.4 宏无需修;低速观察速度环,必要时运行时调 PI后回 WB 固化 | 待现场 |
 | 仅板级温度保护 | 微型电机绕组先热而 PC4 未到 110 C | 短时测试、手工感知/后续加电机温度策略;异味/升温立即断电 | 开放风险 |
 | 15 V OV且无动态刹车 | 高速急停/回生抬母线 | 首测仅100 rpm;以后高速另做母线吸收/减速审计 | 后续风险 |
-| GUI 可输入到 19806 rpm | 误输入/滑块误操作 | Start 前逐字确认 100 rpm和 duration;禁止直接沿用界面默认/500 rpm固件默认 | 人因风险 |
+| GUI 可输入到 19806 rpm | 误输入/滑块误操作 | 固件默认已是100 rpm;Start前仍须读回100 rpm和duration,禁止误拖高目标 | 人因风险 |
 | USB-only 会锁存 UV | 母线断开启动固件 | 上母线后先验证 Vbus,只 ack 一次;UV仍在则不启动 | 预期行为 |
 | 无原始 Hall state 遥测 | 只能看 angle/speed | 先用已有 F-23 旁证;需要原始位时另立只读任务 | 工具限制 |
 
 ## 7. 交回 CC 的决策项(ESC)
 
-```text
-==== 需 CC 决策 [ESC-1] ====
-背景/卡点:正式工程 speed-mode Iqmax=0.5 A,stock MCP 无运行时 Iqmax setter;现有固定 12.6 V/1.9 A 电源记录为无可调限流、无保险丝。
-我已查:0.5 A 已进入 speed PI 输出限幅;M1_OCP_TOPOLOGY=NONE;PA11/BKIN2 只有 combined driver-protection,阈值/原因不可由固件确认。
-需要 CC 定的:首测前选择“加限流/快熔后接受0.5 A”或“用户回 WB 将 Iqmax/nominal current 改0.3 A并重生成+重编译”。Codex不改、不重生成。
-====
-```
+**ESC-1 已关闭:**用户选择 DECISIONS #006-B,已在 Workbench 设置 Iqmax/nominal current=0.3 A、默认目标=100 rpm并重生成;本次离线重构建和源码复核均通过。硬件无可调限流/保险丝仍是残余风险,但不再是等待控制参数选择的开放闸门。
 
 ```text
 ==== 需 CC 决策 [ESC-2] ====
@@ -206,4 +235,4 @@ stock MCP 没有原始 `H1/H2/H3` 或三位 `HallState` 注册表。若后续必
 
 ## 8. 本任务停止点
 
-离线准备已完成。没有发现必须在烧录前修补生成源码的错误;Ke `0.4` 不构成重生成理由。开放项均已上收为现场/CC 决策,本报告不授权烧录、连接 MotorPilot、接母线或启动电机。
+降限流后的离线准备已完成。没有发现必须在烧录前修补生成源码的错误;Ke `0.4` 不构成重生成理由,PI 数值保持不变也与未改变的控制对象参数一致。剩余开放项均是现场验证/硬件残余风险,本报告不授权烧录、连接 MotorPilot、接母线或启动电机。
