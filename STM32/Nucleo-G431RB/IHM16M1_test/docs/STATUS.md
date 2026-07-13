@@ -22,6 +22,7 @@
 - 正式工程有效配置包括:Hall PC6/7/8、120°/58°、4 对极、PWM 30kHz、三电阻双 ADC、**Iqmax/nominal current=0.3A、默认速度=100rpm**、USART2 MCP 1843200;Start/Stop 与 potentiometer 均关闭,源码无自动 `MC_StartMotor1` 调用。
 - **首次带电前离线审计与降险准备已完成**:见 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) / F-32~F-35。Ke 0.449→0.4 已定论为输出/只读上报量化,不进入当前 Hall FOC 运行时控制,无需仅为此重生成;F-23 序列换算后与 MCSDK `POSITIVE` 状态机完全一致。保护、默认安全态、MCP 可写项、100rpm/3-5s 首测参数、遥测与风险台账已落盘。
 - **DECISIONS #006-B 已执行并离线验证(F-36)**:用户在 WB 将 Iqmax/nominal current `0.5→0.3A`、默认目标 `500→100rpm` 并用内置 CubeMX 重生成;Codex 未再次生成,仅以 CubeIDE 1.19.0 headless clean build Debug。结果 `0 errors,0 warnings`,size=`text36484/data976/bss7152`,新 ELF/HEX/BIN 留在 ignored `Debug/`;构建前后60项生成源码hash一致。三组PI最终数值与旧版相同,符合控制对象参数未变、只改变限幅/reference的预期。其余 Hall/采样/PWM/保护/MCP/Ke/无自动Start全部复核不变。
+- **首次闭环带电 runbook 草稿已完成(仍未执行)**:见 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md)。草稿从生成源码与 MotorPilot 6.4.2 寄存器表核对了 STATUS/FAULTS、speed/Hall/Iq/Id/Vbus/temp、M1 data ID、`SPEED_RAMP=[S32 rpm,U16 ms]`、Start/Stop/Fault Ack 的精确语义,并按“安全闸→探测→逐次烧录 HITL→监视→100rpm点动→异常/急停→Ke复核→分级放开”组织。醒目标明 0.3A 仅为软件限幅、现有电源无保险丝;所有带电判断仍须 CC/用户现场定。本次只写 docs,未连接板卡、烧录、启动 MotorPilot/Workbench、上电、转电机、重生成或修改生成树。
 - [`DECISIONS.md`](DECISIONS.md) #003 路线已完成到“正式工程生成 + 0.3A/100rpm 降险重生成 + 离线重构建 + 首次带电前静态审计”。正式 FOC **仍未烧录**,未做首次闭环上电/调速;本次重构建全程未访问硬件、未启动 MotorPilot/Workbench、未手改生成树或重生成。
 
 ## 下一步(按顺序)
@@ -36,8 +37,10 @@
 - [x] STM32CubeIDE 1.19.0 headless clean build Debug,生成 `.elf/.hex/.bin`;无需 CMSIS-DSP `-I` 绕过,无生成树手改
 - [x] 正式 FOC 首次带电前离线审计:Ke/Hall/保护/MCP/参数/遥测/风险已落 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md);未碰硬件/未重生成
 - [x] **ESC-1/#006-B 已关闭**:用户选择回 WB 将 Iqmax/nominal current 改0.3A、默认目标改100rpm并重生成;Codex离线重构建和差异复核通过(F-36)
-- [ ] 由 CC 把 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) 合入现场 SOP。烧录前单独 HITL(授权+母线断开/USB-only+目标板正确);烧录不等于授权上母线/转电机
-- [ ] 首次闭环带电另行授权并值守:Speed mode,Start 前读回默认 `100rpm`,按现场需要设置 `SPEED_RAMP=[+100rpm,3000..5000ms]`,盯 STATUS/FAULTS/speed/Hall angle/Iq/Id/Vbus;任何反号、抽搐、Iq接近0.3A持续饱和、fault立即Stop/断母线
+- [x] 将 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) 落成精确寄存器/现场顺序的 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md) **DRAFT**;Codex 纯离线起草完成,未执行其中任何步骤
+- [ ] **先由 CC 安全审核/修订 runbook**,并由 CC/用户现场决定是否接受“固定12.6V/1.9A、无保险丝”的残余风险;草稿本身不构成授权
+- [ ] 审核通过后,烧录前单独 HITL(授权+母线断开/USB-only+目标板/SN正确+ELF hash正确);烧录不等于授权上母线/转电机
+- [ ] 首次闭环带电再单独 HITL并值守:Speed mode,Start 前读回 `SPEED_RAMP=[+100rpm,3000..5000ms]`,盯 STATUS/FAULTS/speed/Hall angle/Iq/Id/Vbus;任何反号、抽搐、Iq接近0.3A持续饱和、fault立即Stop/断母线
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
 ## 卡点 / 待用户拍板
@@ -45,4 +48,4 @@
 - **Hall 电气正向已静态自洽(F-33),机械正方向未定义**:F-23 手转序列就是 MCSDK POSITIVE,但当时未记 CW/CCW;且58°依赖Profiler后相/Hall线未变。两项都只能现场确认,不能离线假设。
 - **供电/Iqmax 软件决策已关,硬件残余风险仍在**:项目speed-mode Iqmax已重生成到0.3A、默认目标100rpm;但现有12.6V/1.9A仍无可调限流/保险丝,`IQMAX`不是短路硬件trip。现场仍须有人值守并能立即断母线。
 - **保护边界(F-34)**:PA11/BKIN2是combined driver-protection而非可设阈值OCP/刹车;`M1_OCP_TOPOLOGY=NONE`,PC4只测功率板温度。不能依赖它们保护微型电机绕组/短路。
-- 任何后续烧录、连接 MotorPilot、给母线上电、Start/转电机都不在本任务授权内;须分别按现场SOP/HITL重新授权、有人值守、随时能断电。
+- **现场 runbook 仍是待审 DRAFT**:精确操作顺序已写入 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md),但 CC 尚未审核,用户也尚未就本次首次闭环测试重新授权。任何后续烧录、连接 MotorPilot、给母线上电、Start/转电机都不在本任务授权内;须分别按 runbook/HITL 重新授权、有人值守、随时能断电。
