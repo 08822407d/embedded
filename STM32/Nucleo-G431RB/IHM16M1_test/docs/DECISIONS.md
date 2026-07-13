@@ -33,3 +33,9 @@
 - **理由**:UM2415 Rev 4 Table 2 把 FOC 三电阻列为默认配置(`JP4/JP7` open、`J5/J6` closed、`J2` 2-3、`J3` 1-2),同时也列出 FOC single-shunt 配置;MCSDK 6.4.1 IHM16M1 board JSON 同时提供 `ThreeShunt_AmplifiedCurrents` 与 `SingleShunt_AmplifiedCurrents`,Hall 传感器作为独立速度/位置反馈变体存在。
 - **风险边界**:MCSDK release notes 写明 Motor Profiler 不支持 single-shunt current sensing,且 STO-PLL 必须 three-shunt;因此即使 Hall FOC 不由霍尔本身强制三电阻,本项目的"未知电机 + Motor Profiler"路线仍应从三电阻开始。
 - **配套**:截图和实物核对清单见 [`IHM16M1_SHUNT_CONFIG.md`](IHM16M1_SHUNT_CONFIG.md);当前实物到底是默认三电阻还是被改过,仍待用户按 `JP4/JP7` 底面焊桥与 `J5/J6` 跳帽确认。
+
+## #006 — 2026-07-10 — 首次带电电流上限(ESC-1):CC 建议接受 Iqmax=0.5A(待用户最终确认)
+- **背景**:codex 离线审计(FOC_BRINGUP_PREP)查明 **stock MCP 不能在运行时降低 speed-mode 的 Iqmax**;`Iqmax=0.5A` 是**固件控制限、非硬件保护**;硬件保护是 STSPIN830 DriverProtection(PA11/BKIN2)硬关断,阈值不可调。本机供电无可调限流、无保险丝(F-25)。
+- **选项**:(A) 接受 0.5A 首测;(B) 回 MC Workbench 改 Iqmax/nominal current=0.3A 重生成+重编译;(C) 加硬件限流/保险丝(用户暂不可得)。
+- **CC 建议 = A(接受 0.5A)**,理由:① Motor Profiler 已在 0.5A 实跑无恙;② 对空载 0.16A 的微型电机,0.3A vs 0.5A 差别小,却要多一轮 GUI 重生成+重编译;③ 首测另有三层兜底:STSPIN830 硬件 OCP 关断 + 100rpm 低速目标 + 用户 1 秒断电。以后弄到保险丝再补硬件那层。
+- **状态**:**属用户风险决定**(用户在场、无保险丝),**首次带电前须用户最终拍板 A/B/C**;定了就在此条补记结论。Ke 量化(0.449→0.4)经 codex 查证不进 Hall FOC 运行时控制,故**不因 Ke 单独触发重生成**(与本决定独立)。
