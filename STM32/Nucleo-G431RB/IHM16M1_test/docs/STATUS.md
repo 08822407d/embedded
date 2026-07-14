@@ -23,7 +23,8 @@
 - **首次带电前离线审计与降险准备已完成**:见 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) / F-32~F-35。Ke 0.449→0.4 已定论为输出/只读上报量化,不进入当前 Hall FOC 运行时控制,无需仅为此重生成;F-23 序列换算后与 MCSDK `POSITIVE` 状态机完全一致。保护、默认安全态、MCP 可写项、100rpm/3-5s 首测参数、遥测与风险台账已落盘。
 - **DECISIONS #006-B 已执行并离线验证(F-36)**:用户在 WB 将 Iqmax/nominal current `0.5→0.3A`、默认目标 `500→100rpm` 并用内置 CubeMX 重生成;Codex 未再次生成,仅以 CubeIDE 1.19.0 headless clean build Debug。结果 `0 errors,0 warnings`,size=`text36484/data976/bss7152`,新 ELF/HEX/BIN 留在 ignored `Debug/`;构建前后60项生成源码hash一致。三组PI最终数值与旧版相同,符合控制对象参数未变、只改变限幅/reference的预期。其余 Hall/采样/PWM/保护/MCP/Ke/无自动Start全部复核不变。
 - **首次闭环带电 runbook 草稿已完成(仍未执行)**:见 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md)。草稿从生成源码与 MotorPilot 6.4.2 寄存器表核对了 STATUS/FAULTS、speed/Hall/Iq/Id/Vbus/temp、M1 data ID、`SPEED_RAMP=[S32 rpm,U16 ms]`、Start/Stop/Fault Ack 的精确语义,并按“安全闸→探测→逐次烧录 HITL→监视→100rpm点动→异常/急停→Ke复核→分级放开”组织。醒目标明 0.3A 仅为软件限幅、现有电源无保险丝;所有带电判断仍须 CC/用户现场定。本次只写 docs,未连接板卡、烧录、启动 MotorPilot/Workbench、上电、转电机、重生成或修改生成树。
-- [`DECISIONS.md`](DECISIONS.md) #003 路线已完成到“正式工程生成 + 0.3A/100rpm 降险重生成 + 离线重构建 + 首次带电前静态审计”。正式 FOC **仍未烧录**,未做首次闭环上电/调速;本次重构建全程未访问硬件、未启动 MotorPilot/Workbench、未手改生成树或重生成。
+- ✅ **首次闭环带电 bring-up 成功(2026-07-14,F-37)**:mode=UR 重烧+verify(HOTPLUG erase 曾失败)→ 板上确为 0.3A/100rpm FOC 固件;MotorPilot 上电 IDLE→Start→RUN 无故障,**电机闭环霍尔 FOC 正常旋转、方向/换相正确、电流受控**。整链验证通过,DECISIONS #003"闭环调速"目标达成。**低速下限 ~500rpm**(霍尔60°低速难点,#003风险③坐实);用户接受,应用侧用外接减速箱解决。GUI 花屏=显卡驱动 bug,更新驱动已修;Oray 远控/虚拟显示器已卸。
+- [`DECISIONS.md`](DECISIONS.md) #003 路线已完成:标定→生成→烧录→**闭环调速验证成功**。剩下是可选的整定/表征/应用集成(见下一步)。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
