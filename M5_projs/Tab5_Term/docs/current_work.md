@@ -1,5 +1,202 @@
 # Current Work
 
+## 2026-07-11 Runtime-Configurable Module Fan Policy
+
+The automatic Module Fan policy can now be changed without rebuilding or
+flashing the application. Runtime changes take effect immediately in RAM;
+Flash is written only by an explicit save command. The final device state is
+the accepted `40/50/60/65 C` policy saved in NVS with a 5-second interval.
+
+Implementation:
+
+- `module_fan_policy.*` owns the validated four-level policy and hysteresis
+  state. Temperatures are stored as 0.1 C fixed-point values; the control path
+  still consumes the existing floating-point sensor reading.
+- `module_fan_config_store.*` stores a fixed-width, versioned 48-byte blob in
+  NVS namespace `module_fan`, key `policy_v1`. Missing or invalid data falls
+  back to compiled defaults.
+- `persistent_storage.*` provides serialized, idempotent NVS initialization.
+  The existing Wi-Fi path now uses the same helper instead of independently
+  initializing NVS.
+- `module_fan_service.*` protects active/persisted policy state with a mutex and
+  publishes source, dirty state, and revision. A changed policy notifies the
+  automatic task, which samples and applies it immediately; normal waits use
+  the configured interval.
+- NVS writes run only in the debug command task after explicit `save`; the
+  periodic fan task never writes Flash.
+- `app/debug/module_fan_policy_commands.*` adds OSC-777 query, whole-curve set,
+  interval set, failsafe set, save, load, and defaults commands. The complete
+  candidate is validated before the active configuration is replaced.
+- `tools/module_fan_policy.py` provides matching host actions and can save or
+  collect controlled telemetry in the same serial session. This matters on the
+  current host because opening USB Serial/JTAG resets the Tab5.
+
+Validation:
+
+- A host C++ policy test passed for threshold entry, hysteresis exit, highest
+  level, sensor-read failsafe, and invalid threshold ordering.
+- ESP-IDF `v5.4.2` `idf.py reconfigure build` passed. The app is `0x580590`
+  bytes, with `0x47fa70` bytes (`45%`) free. SHA256 is
+  `39f8d105cb79efc788ab54d062187a2e4bf5b32bfdb96acb3f67c6cad3b191ae`.
+- Flash through the stable by-id path passed; bootloader, application, and
+  partition table all reported verified hashes.
+- First boot with no stored policy returned `source=defaults dirty=0`, interval
+  `5000`, failsafe `50`, and the accepted curve.
+- A RAM-only test raised the first level to 55 C. At `45.1 C`, policy revision
+  `2` immediately applied 0%; RPM settled from residual `4830` to `0`. After a
+  USB-triggered reset, the unsaved curve disappeared and the accepted 29% level
+  resumed, reaching `5070 RPM`.
+- A 6000 ms interval was explicitly saved. Two samples were exactly 6000 ms
+  apart, and a subsequent reset returned `source=nvs interval_ms=6000`.
+- Compiled defaults were then restored and explicitly saved. Final reset
+  verification returned `source=nvs dirty=0 interval_ms=5000`; samples at
+  `45.1 C` selected level 1, applied 29%, and measured `4680` and `5100 RPM`.
+- A deliberately invalid curve with duplicate enter thresholds returned
+  `TAB5FAN POLICY ERR action=set reason=invalid-curve` and was not applied.
+- A final LVGL screenshot after another USB-triggered reset was complete at
+  `1280x720`, RGB565LE, CRC32 `21484605`. The PNG is
+  `.logs/screenshots/tab5-module-fan-runtime-policy.png`, SHA256
+  `7599bfce2c625491744481b619f2401f6a6a30114003b5ca8f742b7d3a55471e`.
+- Controlled telemetry was stopped at the end. Automatic control remains
+  active independently of telemetry.
+
+## 2026-07-11 Module Fan Threshold Revision
+
+The accepted automatic start thresholds are now `40/50/60/65 C`. The existing
+5 C hysteresis is preserved, so the corresponding exit thresholds are
+`35/45/55/60 C`. Duty remains `29/49/69/98%`.
+
+Validation:
+
+- ESP-IDF `v5.4.2` build passed. The image remains `0x57d680` bytes with
+  `0x482980` bytes (`45%`) free in the smallest app partition.
+- Final binary SHA256:
+  `cfd050f1c560f87daf2b1e56b473ba5d67f3ba6707ace8875c75153ad1eb69d0`.
+- Flash to the stable Tab5 USB Serial/JTAG by-id path passed, with verified
+  hashes for bootloader, app, and partition table.
+- At `48.1 C`, five consecutive samples selected level `1`, target/applied duty
+  `29%`, firmware `0x01`, and RPM values `4740`, `4770`, `4800`, `4800`, and
+  `5190`, with `comm_ok=1` and no missed polls.
+- Ctrl-C stopped telemetry and returned
+  `TAB5FAN LOG enabled=0 interval_ms=5000`. Automatic fan control remains active
+  independently of telemetry.
+- The board is left running this revised formal policy. At the last measured
+  `48.1 C`, its automatic target is 29%.
+
+## 2026-07-11 Module Fan Automatic Control
+
+The Ubuntu official-firmware worktree now contains a native ESP-IDF automatic
+controller for M5Stack Module Fan v1.1. Manual duty control is intentionally
+not part of this checkpoint.
+
+Implementation:
+
+- `platforms/tab5/main/hal/components/cpu_temperature.*` owns the ESP32-P4
+  internal temperature-sensor handle and serializes reads shared by the
+  existing CPU-temperature GUI and fan service.
+- `platforms/tab5/main/hal/components/module_fan/` contains the fan-specific
+  device and service files. The device implements the register protocol on the
+  existing BSP system-I2C handle: address `0x18`, identity/firmware checks,
+  24 kHz PWM, volatile duty changes, and RPM reads.
+- `module_fan_service.*` runs one low-priority task at a 5-second interval. It
+  starts only after the official HAL init path has completed. The compact
+  policy table remains at the top of this file for straightforward tuning.
+- `app/debug/module_fan_telemetry.*` owns fan telemetry command state and line
+  formatting. `screen_capture_debug.cpp` remains responsible for the shared
+  USB transport, OSC framing, output serialization, and screenshot stream.
+- The automatic curve uses enter/exit temperature, duty pairs of
+  `40/35 C -> 29%`, `50/45 C -> 49%`, `60/55 C -> 69%`, and
+  `65/60 C -> 98%`. A failed temperature read requests a 50% failsafe duty.
+- Duty is written only when the target changes. A communication error forces
+  PWM configuration and duty to be re-applied on the next poll in case the
+  module reset during a short disconnect. Three failed attached polls mark the
+  module detached and remove its ESP-IDF I2C device handle. The service retains
+  only the shared bus reference and its low-rate task for hot-plug detection.
+- Existing EXT 5V policy is unchanged. Turning EXT 5V off through the official
+  GUI makes an M5-Bus fan disappear; turning it back on allows the next probe
+  to attach it again.
+
+Controlled debug telemetry extends the existing OSC-777 USB Serial/JTAG task:
+
+- `ESC ] 777 ; module-fan-log=start BEL` enables one `TAB5FAN SAMPLE` line for
+  each new 5-second snapshot.
+- `ESC ] 777 ; module-fan-log=stop BEL` disables it.
+- `ESC ] 777 ; module-fan-log? BEL` reports whether it is enabled.
+- Each sample contains an `uptime_ms` timestamp, temperature and validity,
+  attachment/communication state, cooling level, target/applied duty, RPM,
+  firmware version, and missed-poll count.
+- The fan task never writes the serial port. The existing debug-command task
+  owns command replies, fan telemetry, and screenshot streaming, so telemetry
+  cannot be inserted inside a screenshot binary frame.
+- `tools/module_fan_telemetry.py` provides `start`, `stop`, `status`, and
+  `stream` actions. `stream` sends stop on normal Ctrl-C cleanup.
+
+Portable replay artifact:
+
+- `port/official_firmware_patches/0003-module-fan-auto-control.patch`
+- The patch was generated relative to official HEAD with patches `0001` and
+  `0002` already applied. A temporary-index replay check confirmed that all
+  three patches reproduce the current fan-related worktree files exactly.
+
+Validation:
+
+- A first incremental link failed because the existing CMake glob had been
+  configured before the new source files existed. `idf.py reconfigure`
+  refreshed the source list; this was a build-cache issue rather than a source
+  or API error.
+- A clean reconfigured ESP-IDF `v5.4.2` build passed.
+- Final app binary: `build/m5stack_tab5.bin`.
+- Binary size: `0x57d680` bytes.
+- Binary SHA256:
+  `cfd050f1c560f87daf2b1e56b473ba5d67f3ba6707ace8875c75153ad1eb69d0`.
+- Smallest app partition: `0xa00000` bytes.
+- Free app partition space: `0x482980` bytes, `45%`.
+- New code produced no compiler warnings in the final incremental build. The
+  remaining warnings in `hal_esp32.cpp` predate this feature.
+- Both Python debug tools pass `python3 -m py_compile`.
+
+Hardware validation:
+
+- The connected port was identified as Espressif `303A:1001`, serial
+  `30:ED:A0:E2:E2:48`, at the stable by-id path ending in
+  `30:ED:A0:E2:E2:48-if00`. Esptool confirmed ESP32-P4 revision `v1.3` and the
+  matching MAC before flash.
+- The final build was flashed successfully. Bootloader, app, and partition
+  table writes all reported verified hashes.
+- Before the threshold revision, the `50/45 C` first threshold produced samples
+  at `43.1 C` and `45.1 C` with `attached=1`, `comm_ok=1`, fan firmware `0x01`,
+  level `0`, target/applied duty `0`, and settled RPM `0`.
+- An earlier temporary validation build lowered only the first threshold to
+  `40/35 C`.
+  At `45.1 C` it automatically selected level `1` and 29% target/applied duty;
+  RPM progressed from startup `0` to `5040`, `5040`, and `5190`. This threshold
+  was later accepted as the formal first level by the user.
+- On the previous 50 C-start image, the first sample observed residual fan coast at
+  `4890 RPM`, followed by repeated `0 RPM` samples with duty `0`. Ctrl-C sent
+  the stop command and received `TAB5FAN LOG enabled=0 interval_ms=5000`.
+- A separate final `module_fan_telemetry.py status` invocation also returned
+  `enabled=0`, verifying the query branch after the telemetry source split.
+- Screenshot capture after telemetry remained CRC-clean. An 8-second capture
+  caught an incompletely rendered launcher after USB-open reset; a settled
+  15-second capture was visually complete at `1280x720`, RGB565LE, CRC32
+  `90CEBF21`, SHA256
+  `99cbc10ac26a5271d31c8d001fbbb5f2c2187f06d7a38ffffdd051f0a8a1bc12`.
+  The verified PNG is
+  `.logs/screenshots/tab5-module-fan-final-settled.png`.
+- Opening this USB Serial/JTAG TTY causes `CHIP_USB_UART_RESET`. The telemetry
+  tool now waits 8 seconds by default for the debug task; the screenshot tool
+  waits 15 seconds for the launcher to settle.
+
+Remaining hardware checks:
+
+- Physical unplug/replug and EXT 5V off/on detach/re-attach behavior were not
+  exercised while the user was away from the board.
+- Higher automatic levels, the temperature-read failsafe path, and three-poll
+  detach recovery remain untested on hardware.
+- The board is left running the revised `40/50/60/65 C` start-threshold firmware
+  with telemetry disabled. At the last observed `48.1 C`, the fan target is
+  29%.
+
 ## 2026-07-09 End-Of-Day Handoff
 
 Today's official-firmware checkpoint is usable as the next starting point.

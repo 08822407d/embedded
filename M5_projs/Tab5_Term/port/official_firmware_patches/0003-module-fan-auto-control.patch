@@ -1,0 +1,1738 @@
+diff --git a/app/debug/module_fan_policy_commands.cpp b/app/debug/module_fan_policy_commands.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee0fc3ce6452c2bb6b8f5a48e49383ac3e389801
+--- /dev/null
++++ b/app/debug/module_fan_policy_commands.cpp
+@@ -0,0 +1,301 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_policy_commands.h"
++
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <limits>
++
++#include <esp_err.h>
++#include <hal/components/module_fan/module_fan_service.h>
++
++namespace debug {
++namespace module_fan_policy_commands {
++namespace {
++
++constexpr char kSetCurvePrefix[] = "module-fan-policy=set,";
++constexpr char kSetIntervalPrefix[] = "module-fan-policy-interval=set,";
++constexpr char kSetFailsafePrefix[] = "module-fan-policy-failsafe=set,";
++
++bool isDigit(char value)
++{
++    return value >= '0' && value <= '9';
++}
++
++bool parseUnsigned(const char** cursor, uint32_t* value)
++{
++    if (cursor == nullptr || *cursor == nullptr || value == nullptr || !isDigit(**cursor)) {
++        return false;
++    }
++
++    const char* current = *cursor;
++    uint32_t parsed = 0;
++    while (isDigit(*current)) {
++        const uint32_t digit = static_cast<uint32_t>(*current - '0');
++        if (parsed > (std::numeric_limits<uint32_t>::max() - digit) / 10) {
++            return false;
++        }
++        parsed = parsed * 10 + digit;
++        ++current;
++    }
++
++    *cursor = current;
++    *value = parsed;
++    return true;
++}
++
++bool parseDeciCelsius(const char** cursor, int16_t* value)
++{
++    uint32_t whole = 0;
++    if (!parseUnsigned(cursor, &whole)) {
++        return false;
++    }
++
++    uint32_t tenths = 0;
++    if (**cursor == '.') {
++        ++(*cursor);
++        if (!isDigit(**cursor)) {
++            return false;
++        }
++        tenths = static_cast<uint32_t>(**cursor - '0');
++        ++(*cursor);
++        if (isDigit(**cursor)) {
++            return false;
++        }
++    }
++
++    if (whole > static_cast<uint32_t>(std::numeric_limits<int16_t>::max()) / 10) {
++        return false;
++    }
++    const uint32_t deci_celsius = whole * 10 + tenths;
++    if (deci_celsius > static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
++        return false;
++    }
++
++    *value = static_cast<int16_t>(deci_celsius);
++    return true;
++}
++
++bool consume(const char** cursor, char expected)
++{
++    if (**cursor != expected) {
++        return false;
++    }
++    ++(*cursor);
++    return true;
++}
++
++bool parseCurve(const char* text, module_fan::PolicyConfig* config)
++{
++    if (text == nullptr || config == nullptr) {
++        return false;
++    }
++
++    module_fan::PolicyConfig candidate = *config;
++    const char* cursor = text;
++    for (size_t index = 0; index < module_fan::kPolicyLevelCount; ++index) {
++        int16_t enter_deci_celsius = 0;
++        int16_t exit_deci_celsius = 0;
++        uint32_t duty_percent = 0;
++        if (!parseDeciCelsius(&cursor, &enter_deci_celsius) || !consume(&cursor, ',')
++            || !parseDeciCelsius(&cursor, &exit_deci_celsius) || !consume(&cursor, ',')
++            || !parseUnsigned(&cursor, &duty_percent) || duty_percent > UINT8_MAX) {
++            return false;
++        }
++
++        candidate.levels[index] = {
++            enter_deci_celsius,
++            exit_deci_celsius,
++            static_cast<uint8_t>(duty_percent),
++        };
++
++        if (index + 1 < module_fan::kPolicyLevelCount) {
++            if (!consume(&cursor, '/')) {
++                return false;
++            }
++        } else if (*cursor != '\0') {
++            return false;
++        }
++    }
++
++    if (!module_fan::validatePolicyConfig(candidate)) {
++        return false;
++    }
++    *config = candidate;
++    return true;
++}
++
++bool parseExactUnsigned(const char* text, uint32_t* value)
++{
++    const char* cursor = text;
++    return parseUnsigned(&cursor, value) && *cursor == '\0';
++}
++
++void writeError(LineWriter writer, const char* action, const char* reason)
++{
++    if (writer == nullptr) {
++        return;
++    }
++
++    char line[128];
++    snprintf(line, sizeof(line), "TAB5FAN POLICY ERR action=%s reason=%s", action, reason);
++    writer(line);
++}
++
++void writeEspError(LineWriter writer, const char* action, esp_err_t error)
++{
++    writeError(writer, action, esp_err_to_name(error));
++}
++
++void writePolicyState(LineWriter writer, const char* action)
++{
++    if (writer == nullptr) {
++        return;
++    }
++
++    module_fan::PolicyState state;
++    if (!module_fan::getPolicyState(&state)) {
++        writeError(writer, action, "state-unavailable");
++        return;
++    }
++
++    const auto& levels = state.config.levels;
++    char line[320];
++    snprintf(line,
++             sizeof(line),
++             "TAB5FAN POLICY action=%s source=%s dirty=%u revision=%lu interval_ms=%lu failsafe_pct=%u "
++             "curve=%d.%u,%d.%u,%u/%d.%u,%d.%u,%u/%d.%u,%d.%u,%u/%d.%u,%d.%u,%u",
++             action,
++             module_fan::policySourceName(state.source),
++             state.dirty ? 1u : 0u,
++             static_cast<unsigned long>(state.revision),
++             static_cast<unsigned long>(state.config.interval_ms),
++             static_cast<unsigned>(state.config.sensor_failsafe_duty_percent),
++             levels[0].enter_deci_celsius / 10,
++             static_cast<unsigned>(levels[0].enter_deci_celsius % 10),
++             levels[0].exit_deci_celsius / 10,
++             static_cast<unsigned>(levels[0].exit_deci_celsius % 10),
++             static_cast<unsigned>(levels[0].duty_percent),
++             levels[1].enter_deci_celsius / 10,
++             static_cast<unsigned>(levels[1].enter_deci_celsius % 10),
++             levels[1].exit_deci_celsius / 10,
++             static_cast<unsigned>(levels[1].exit_deci_celsius % 10),
++             static_cast<unsigned>(levels[1].duty_percent),
++             levels[2].enter_deci_celsius / 10,
++             static_cast<unsigned>(levels[2].enter_deci_celsius % 10),
++             levels[2].exit_deci_celsius / 10,
++             static_cast<unsigned>(levels[2].exit_deci_celsius % 10),
++             static_cast<unsigned>(levels[2].duty_percent),
++             levels[3].enter_deci_celsius / 10,
++             static_cast<unsigned>(levels[3].enter_deci_celsius % 10),
++             levels[3].exit_deci_celsius / 10,
++             static_cast<unsigned>(levels[3].exit_deci_celsius % 10),
++             static_cast<unsigned>(levels[3].duty_percent));
++    writer(line);
++}
++
++} // namespace
++
++bool handleCommand(const char* command, LineWriter writer)
++{
++    if (command == nullptr) {
++        return false;
++    }
++
++    if (strcmp(command, "module-fan-policy?") == 0) {
++        writePolicyState(writer, "query");
++        return true;
++    }
++
++    if (strncmp(command, kSetCurvePrefix, sizeof(kSetCurvePrefix) - 1) == 0) {
++        module_fan::PolicyState state;
++        module_fan::getPolicyState(&state);
++        module_fan::PolicyConfig candidate = state.config;
++        if (!parseCurve(command + sizeof(kSetCurvePrefix) - 1, &candidate)) {
++            writeError(writer, "set", "invalid-curve");
++            return true;
++        }
++
++        const esp_err_t result = module_fan::setPolicyConfig(candidate);
++        if (result != ESP_OK) {
++            writeEspError(writer, "set", result);
++        } else {
++            writePolicyState(writer, "set");
++        }
++        return true;
++    }
++
++    if (strncmp(command, kSetIntervalPrefix, sizeof(kSetIntervalPrefix) - 1) == 0) {
++        uint32_t interval_ms = 0;
++        if (!parseExactUnsigned(command + sizeof(kSetIntervalPrefix) - 1, &interval_ms)) {
++            writeError(writer, "set-interval", "invalid-value");
++            return true;
++        }
++
++        module_fan::PolicyState state;
++        module_fan::getPolicyState(&state);
++        state.config.interval_ms = interval_ms;
++        const esp_err_t result = module_fan::setPolicyConfig(state.config);
++        if (result != ESP_OK) {
++            writeEspError(writer, "set-interval", result);
++        } else {
++            writePolicyState(writer, "set-interval");
++        }
++        return true;
++    }
++
++    if (strncmp(command, kSetFailsafePrefix, sizeof(kSetFailsafePrefix) - 1) == 0) {
++        uint32_t duty_percent = 0;
++        if (!parseExactUnsigned(command + sizeof(kSetFailsafePrefix) - 1, &duty_percent)
++            || duty_percent > UINT8_MAX) {
++            writeError(writer, "set-failsafe", "invalid-value");
++            return true;
++        }
++
++        module_fan::PolicyState state;
++        module_fan::getPolicyState(&state);
++        state.config.sensor_failsafe_duty_percent = static_cast<uint8_t>(duty_percent);
++        const esp_err_t result = module_fan::setPolicyConfig(state.config);
++        if (result != ESP_OK) {
++            writeEspError(writer, "set-failsafe", result);
++        } else {
++            writePolicyState(writer, "set-failsafe");
++        }
++        return true;
++    }
++
++    if (strcmp(command, "module-fan-policy=save") == 0) {
++        const esp_err_t result = module_fan::savePolicyConfig();
++        if (result != ESP_OK) {
++            writeEspError(writer, "save", result);
++        } else {
++            writePolicyState(writer, "save");
++        }
++        return true;
++    }
++
++    if (strcmp(command, "module-fan-policy=load") == 0) {
++        const esp_err_t result = module_fan::loadPolicyConfig();
++        if (result != ESP_OK) {
++            writeEspError(writer, "load", result);
++        } else {
++            writePolicyState(writer, "load");
++        }
++        return true;
++    }
++
++    if (strcmp(command, "module-fan-policy=defaults") == 0) {
++        module_fan::restoreDefaultPolicy();
++        writePolicyState(writer, "defaults");
++        return true;
++    }
++
++    return false;
++}
++
++} // namespace module_fan_policy_commands
++} // namespace debug
+diff --git a/app/debug/module_fan_policy_commands.h b/app/debug/module_fan_policy_commands.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..b56b001523f8e330ace7d4807bc6e418bd0f3e2a
+--- /dev/null
++++ b/app/debug/module_fan_policy_commands.h
+@@ -0,0 +1,16 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++namespace debug {
++namespace module_fan_policy_commands {
++
++using LineWriter = bool (*)(const char* line);
++
++bool handleCommand(const char* command, LineWriter writer);
++
++} // namespace module_fan_policy_commands
++} // namespace debug
+diff --git a/app/debug/module_fan_telemetry.cpp b/app/debug/module_fan_telemetry.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..33109a1c24533e4d80cd5bf00c9572263a6a01cc
+--- /dev/null
++++ b/app/debug/module_fan_telemetry.cpp
+@@ -0,0 +1,119 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_telemetry.h"
++
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++
++#include <hal/components/module_fan/module_fan_service.h>
++
++namespace debug {
++namespace module_fan_telemetry {
++namespace {
++
++bool g_enabled = false;
++uint32_t g_last_sequence = 0;
++
++void emitSnapshot(LineWriter writer, bool force)
++{
++    if (!g_enabled || writer == nullptr) {
++        return;
++    }
++
++    module_fan::Snapshot snapshot;
++    if (!module_fan::getSnapshot(&snapshot)) {
++        return;
++    }
++    if (!force && snapshot.sequence == g_last_sequence) {
++        return;
++    }
++
++    char line[256];
++    snprintf(line,
++             sizeof(line),
++             "TAB5FAN SAMPLE seq=%lu uptime_ms=%llu temp_c=%.1f temp_valid=%u attached=%u comm_ok=%u "
++             "level=%u target_pct=%u applied_pct=%u rpm=%u fw=0x%02X misses=%u policy_rev=%lu",
++             static_cast<unsigned long>(snapshot.sequence),
++             static_cast<unsigned long long>(snapshot.uptime_ms),
++             static_cast<double>(snapshot.temperature_celsius),
++             snapshot.temperature_valid ? 1u : 0u,
++             snapshot.attached ? 1u : 0u,
++             snapshot.communication_ok ? 1u : 0u,
++             static_cast<unsigned>(snapshot.cooling_level),
++             static_cast<unsigned>(snapshot.target_duty_percent),
++             static_cast<unsigned>(snapshot.applied_duty_percent),
++             static_cast<unsigned>(snapshot.rpm),
++             static_cast<unsigned>(snapshot.firmware_version),
++             static_cast<unsigned>(snapshot.missed_polls),
++             static_cast<unsigned long>(snapshot.policy_revision));
++    if (writer(line)) {
++        g_last_sequence = snapshot.sequence;
++    }
++}
++
++void writeLogState(LineWriter writer)
++{
++    if (writer == nullptr) {
++        return;
++    }
++
++    module_fan::PolicyState state;
++    module_fan::getPolicyState(&state);
++
++    char line[96];
++    snprintf(line,
++             sizeof(line),
++             "TAB5FAN LOG enabled=%u interval_ms=%lu",
++             g_enabled ? 1u : 0u,
++             static_cast<unsigned long>(state.config.interval_ms));
++    writer(line);
++}
++
++} // namespace
++
++bool handleCommand(const char* command, LineWriter writer)
++{
++    if (command == nullptr) {
++        return false;
++    }
++
++    if (strcmp(command, "module-fan-log=start") == 0) {
++        g_enabled = true;
++        writeLogState(writer);
++        emitSnapshot(writer, true);
++        return true;
++    }
++
++    if (strcmp(command, "module-fan-log=stop") == 0) {
++        g_enabled = false;
++        writeLogState(writer);
++        return true;
++    }
++
++    if (strcmp(command, "module-fan-log?") == 0) {
++        writeLogState(writer);
++        return true;
++    }
++
++    return false;
++}
++
++void emitPending(LineWriter writer, bool transport_connected)
++{
++    if (!g_enabled) {
++        return;
++    }
++    if (!transport_connected) {
++        g_enabled = false;
++        return;
++    }
++
++    emitSnapshot(writer, false);
++}
++
++} // namespace module_fan_telemetry
++} // namespace debug
+diff --git a/app/debug/module_fan_telemetry.h b/app/debug/module_fan_telemetry.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f9b18cccc7d414e433fd8c7789aee0cf21310b84
+--- /dev/null
++++ b/app/debug/module_fan_telemetry.h
+@@ -0,0 +1,17 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++namespace debug {
++namespace module_fan_telemetry {
++
++using LineWriter = bool (*)(const char* line);
++
++bool handleCommand(const char* command, LineWriter writer);
++void emitPending(LineWriter writer, bool transport_connected);
++
++} // namespace module_fan_telemetry
++} // namespace debug
+diff --git a/app/debug/screen_capture_debug.cpp b/app/debug/screen_capture_debug.cpp
+index 357d6b8a4ec030d68b0b8d12e760e56648e567a9..a63b9b9c3a2b7f439bc342ea425551cd04721261 100644
+--- a/app/debug/screen_capture_debug.cpp
++++ b/app/debug/screen_capture_debug.cpp
+@@ -4,6 +4,8 @@
+  * SPDX-License-Identifier: MIT
+  */
+ #include "screen_capture_debug.h"
++#include "module_fan_policy_commands.h"
++#include "module_fan_telemetry.h"
+ 
+ #include <algorithm>
+ #include <atomic>
+@@ -32,7 +34,7 @@ namespace {
+ constexpr const char* kTag = "screen-capture";
+ constexpr uint8_t kFramePrefix[] = {0x1B, ']', '7', '7', '7', ';'};
+ constexpr uint8_t kFrameTerminator = 0x07;
+-constexpr size_t kFrameCapacity = 96;
++constexpr size_t kFrameCapacity = 192;
+ constexpr uint32_t kCrcPolynomial = 0xEDB88320u;
+ constexpr uint32_t kTaskDelayMs = 10;
+ constexpr size_t kUsbSerialTxBufferBytes = 8192;
+@@ -121,10 +123,10 @@ bool write_text(const char* text)
+ 
+ bool write_line(const char* line)
+ {
+-    if (!write_text(line)) {
+-        return false;
+-    }
+-    return write_text("\r\n");
++    flockfile(stdout);
++    const bool success = write_text(line) && write_text("\r\n");
++    funlockfile(stdout);
++    return success;
+ }
+ 
+ void set_stdin_nonblocking()
+@@ -274,6 +276,14 @@ void handle_command(const char* command)
+         return;
+     }
+ 
++    if (module_fan_telemetry::handleCommand(command, write_line)) {
++        return;
++    }
++
++    if (module_fan_policy_commands::handleCommand(command, write_line)) {
++        return;
++    }
++
+     write_line("TAB5DBG ERR unknown-command");
+ }
+ 
+@@ -327,6 +337,7 @@ void task_entry(void*)
+             continue;
+         }
+ 
++        module_fan_telemetry::emitPending(write_line, usb_serial_jtag_is_connected());
+         vTaskDelay(pdMS_TO_TICKS(kTaskDelayMs));
+     }
+ }
+diff --git a/platforms/tab5/main/hal/components/cpu_temperature.cpp b/platforms/tab5/main/hal/components/cpu_temperature.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d243ce1c795b233a50857e81cb6750963b50f47
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/cpu_temperature.cpp
+@@ -0,0 +1,59 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "cpu_temperature.h"
++
++#include <mutex>
++
++#include <driver/temperature_sensor.h>
++#include <esp_err.h>
++
++namespace cpu_temperature {
++namespace {
++
++std::mutex g_sensor_mutex;
++temperature_sensor_handle_t g_sensor = nullptr;
++
++bool ensure_sensor()
++{
++    if (g_sensor != nullptr) {
++        return true;
++    }
++
++    temperature_sensor_config_t config = {};
++    config.range_min = 20;
++    config.range_max = 100;
++    config.clk_src = TEMPERATURE_SENSOR_CLK_SRC_DEFAULT;
++    if (temperature_sensor_install(&config, &g_sensor) != ESP_OK) {
++        g_sensor = nullptr;
++        return false;
++    }
++
++    if (temperature_sensor_enable(g_sensor) != ESP_OK) {
++        temperature_sensor_uninstall(g_sensor);
++        g_sensor = nullptr;
++        return false;
++    }
++
++    return true;
++}
++
++} // namespace
++
++bool read(float* celsius)
++{
++    if (celsius == nullptr) {
++        return false;
++    }
++
++    std::lock_guard<std::mutex> lock(g_sensor_mutex);
++    if (!ensure_sensor()) {
++        return false;
++    }
++
++    return temperature_sensor_get_celsius(g_sensor, celsius) == ESP_OK;
++}
++
++} // namespace cpu_temperature
+diff --git a/platforms/tab5/main/hal/components/cpu_temperature.h b/platforms/tab5/main/hal/components/cpu_temperature.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e5a2c82af7ff15872a8b3e2a892e3521ed3ce8d
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/cpu_temperature.h
+@@ -0,0 +1,12 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++namespace cpu_temperature {
++
++bool read(float* celsius);
++
++} // namespace cpu_temperature
+diff --git a/platforms/tab5/main/hal/components/hal_wifi.cpp b/platforms/tab5/main/hal/components/hal_wifi.cpp
+index a9d6f67b48ce0e95267d44ace2cc1795112f7fae..6ae5b180113ee70b738507124ee54f79b795a2b6 100644
+--- a/platforms/tab5/main/hal/components/hal_wifi.cpp
++++ b/platforms/tab5/main/hal/components/hal_wifi.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: MIT
+  */
+ #include "hal/hal_esp32.h"
++#include "persistent_storage.h"
+ #include <mooncake_log.h>
+ #include <vector>
+ #include <memory>
+@@ -12,10 +13,8 @@
+ #include <freertos/FreeRTOS.h>
+ #include <freertos/event_groups.h>
+ #include <esp_wifi.h>
+-#include <nvs_flash.h>
+ #include <esp_event.h>
+ #include <esp_log.h>
+-#include <nvs_flash.h>
+ #include <esp_netif.h>
+ #include <esp_wifi_default.h>
+ #include <esp_wifi_netif.h>
+@@ -188,12 +187,7 @@ bool HalEsp32::wifi_init()
+ {
+     mclog::tagInfo(TAG, "wifi init");
+ 
+-    esp_err_t ret = nvs_flash_init();
+-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+-        ESP_ERROR_CHECK(nvs_flash_erase());
+-        ret = nvs_flash_init();
+-    }
+-    ESP_ERROR_CHECK(ret);
++    ESP_ERROR_CHECK(persistent_storage::ensureInitialized());
+ 
+     xTaskCreate(wifi_ap_test_task, "ap", 4096, nullptr, 5, nullptr);
+     return true;
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.cpp b/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..74a956ca90d088e32903979a6d9a9653fce059cb
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.cpp
+@@ -0,0 +1,152 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_config_store.h"
++
++#include <cstddef>
++#include <cstdint>
++
++#include <nvs.h>
++
++#include "../persistent_storage.h"
++
++namespace module_fan {
++namespace config_store {
++namespace {
++
++constexpr char kNamespace[] = "module_fan";
++constexpr char kPolicyKey[] = "policy_v1";
++constexpr uint32_t kPolicyMagic = 0x314E4146;
++constexpr uint16_t kPolicyVersion = 1;
++
++struct StoredPolicyLevel {
++    int16_t enter_deci_celsius;
++    int16_t exit_deci_celsius;
++    uint8_t duty_percent;
++    uint8_t reserved[3];
++};
++
++struct StoredPolicy {
++    uint32_t magic;
++    uint16_t version;
++    uint16_t size;
++    uint32_t interval_ms;
++    uint8_t sensor_failsafe_duty_percent;
++    uint8_t level_count;
++    uint8_t reserved[2];
++    StoredPolicyLevel levels[kPolicyLevelCount];
++};
++
++static_assert(sizeof(StoredPolicyLevel) == 8);
++static_assert(sizeof(StoredPolicy) == 48);
++
++bool decode(const StoredPolicy& stored, PolicyConfig* config)
++{
++    if (config == nullptr || stored.magic != kPolicyMagic || stored.version != kPolicyVersion
++        || stored.size != sizeof(StoredPolicy) || stored.level_count != kPolicyLevelCount) {
++        return false;
++    }
++
++    PolicyConfig candidate;
++    candidate.interval_ms = stored.interval_ms;
++    candidate.sensor_failsafe_duty_percent = stored.sensor_failsafe_duty_percent;
++    for (size_t index = 0; index < kPolicyLevelCount; ++index) {
++        candidate.levels[index].enter_deci_celsius = stored.levels[index].enter_deci_celsius;
++        candidate.levels[index].exit_deci_celsius = stored.levels[index].exit_deci_celsius;
++        candidate.levels[index].duty_percent = stored.levels[index].duty_percent;
++    }
++
++    if (!validatePolicyConfig(candidate)) {
++        return false;
++    }
++    *config = candidate;
++    return true;
++}
++
++StoredPolicy encode(const PolicyConfig& config)
++{
++    StoredPolicy stored = {};
++    stored.magic = kPolicyMagic;
++    stored.version = kPolicyVersion;
++    stored.size = sizeof(StoredPolicy);
++    stored.interval_ms = config.interval_ms;
++    stored.sensor_failsafe_duty_percent = config.sensor_failsafe_duty_percent;
++    stored.level_count = kPolicyLevelCount;
++    for (size_t index = 0; index < kPolicyLevelCount; ++index) {
++        stored.levels[index].enter_deci_celsius = config.levels[index].enter_deci_celsius;
++        stored.levels[index].exit_deci_celsius = config.levels[index].exit_deci_celsius;
++        stored.levels[index].duty_percent = config.levels[index].duty_percent;
++    }
++    return stored;
++}
++
++} // namespace
++
++esp_err_t load(PolicyConfig* config)
++{
++    if (config == nullptr) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    esp_err_t result = persistent_storage::ensureInitialized();
++    if (result != ESP_OK) {
++        return result;
++    }
++
++    nvs_handle_t handle = 0;
++    result = nvs_open(kNamespace, NVS_READONLY, &handle);
++    if (result != ESP_OK) {
++        return result;
++    }
++
++    size_t stored_size = 0;
++    result = nvs_get_blob(handle, kPolicyKey, nullptr, &stored_size);
++    if (result == ESP_OK && stored_size != sizeof(StoredPolicy)) {
++        result = ESP_ERR_INVALID_RESPONSE;
++    }
++
++    StoredPolicy stored = {};
++    if (result == ESP_OK) {
++        result = nvs_get_blob(handle, kPolicyKey, &stored, &stored_size);
++    }
++    nvs_close(handle);
++
++    if (result != ESP_OK) {
++        return result;
++    }
++    if (!decode(stored, config)) {
++        return ESP_ERR_INVALID_RESPONSE;
++    }
++    return ESP_OK;
++}
++
++esp_err_t save(const PolicyConfig& config)
++{
++    if (!validatePolicyConfig(config)) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    esp_err_t result = persistent_storage::ensureInitialized();
++    if (result != ESP_OK) {
++        return result;
++    }
++
++    nvs_handle_t handle = 0;
++    result = nvs_open(kNamespace, NVS_READWRITE, &handle);
++    if (result != ESP_OK) {
++        return result;
++    }
++
++    const StoredPolicy stored = encode(config);
++    result = nvs_set_blob(handle, kPolicyKey, &stored, sizeof(stored));
++    if (result == ESP_OK) {
++        result = nvs_commit(handle);
++    }
++    nvs_close(handle);
++    return result;
++}
++
++} // namespace config_store
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.h b/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..e96815c23bee953420d99f7c6cca3dc8e185f634
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_config_store.h
+@@ -0,0 +1,19 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++#include <esp_err.h>
++
++#include "module_fan_policy.h"
++
++namespace module_fan {
++namespace config_store {
++
++esp_err_t load(PolicyConfig* config);
++esp_err_t save(const PolicyConfig& config);
++
++} // namespace config_store
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_device.cpp b/platforms/tab5/main/hal/components/module_fan/module_fan_device.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..50431030db195cb54c302983f1100534b12280ea
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_device.cpp
+@@ -0,0 +1,146 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_device.h"
++
++namespace module_fan {
++namespace {
++
++constexpr uint8_t kAddress = 0x18;
++constexpr uint32_t kI2cFrequencyHz = 400000;
++constexpr int kI2cTimeoutMs = 50;
++
++constexpr uint8_t kRegControl = 0x00;
++constexpr uint8_t kRegPwmFrequency = 0x10;
++constexpr uint8_t kRegPwmDutyCycle = 0x20;
++constexpr uint8_t kRegRpm = 0x30;
++constexpr uint8_t kRegFirmwareVersion = 0xFE;
++constexpr uint8_t kRegI2cAddress = 0xFF;
++
++constexpr uint8_t kFanDisable = 0x00;
++constexpr uint8_t kFanEnable = 0x01;
++constexpr uint8_t kPwmFrequency24KHz = 0x02;
++
++} // namespace
++
++esp_err_t Device::begin(i2c_master_bus_handle_t bus_handle)
++{
++    if (bus_handle == nullptr) {
++        return ESP_ERR_INVALID_ARG;
++    }
++    if (_bus_handle != nullptr && _bus_handle != bus_handle) {
++        return ESP_ERR_INVALID_STATE;
++    }
++
++    _bus_handle = bus_handle;
++    return ESP_OK;
++}
++
++esp_err_t Device::probe() const
++{
++    if (_bus_handle == nullptr) {
++        return ESP_ERR_INVALID_STATE;
++    }
++    return i2c_master_probe(_bus_handle, kAddress, kI2cTimeoutMs);
++}
++
++esp_err_t Device::connect()
++{
++    if (_bus_handle == nullptr) {
++        return ESP_ERR_INVALID_STATE;
++    }
++    if (_device_handle != nullptr) {
++        return ESP_OK;
++    }
++
++    i2c_device_config_t config = {};
++    config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
++    config.device_address = kAddress;
++    config.scl_speed_hz = kI2cFrequencyHz;
++    return i2c_master_bus_add_device(_bus_handle, &config, &_device_handle);
++}
++
++esp_err_t Device::disconnect()
++{
++    if (_device_handle == nullptr) {
++        return ESP_OK;
++    }
++
++    const esp_err_t result = i2c_master_bus_rm_device(_device_handle);
++    if (result == ESP_OK) {
++        _device_handle = nullptr;
++    }
++    return result;
++}
++
++esp_err_t Device::readIdentity(uint8_t* firmware_version) const
++{
++    if (firmware_version == nullptr) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    uint8_t reported_address = 0;
++    esp_err_t result = readRegister(kRegI2cAddress, &reported_address, 1);
++    if (result != ESP_OK) {
++        return result;
++    }
++    if (reported_address != kAddress) {
++        return ESP_ERR_INVALID_RESPONSE;
++    }
++
++    return readRegister(kRegFirmwareVersion, firmware_version, 1);
++}
++
++esp_err_t Device::configurePwm24KHz() const
++{
++    return writeRegister8(kRegPwmFrequency, kPwmFrequency24KHz);
++}
++
++esp_err_t Device::applyDutyPercent(uint8_t duty_percent) const
++{
++    if (duty_percent > 100) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    esp_err_t result = writeRegister8(kRegPwmDutyCycle, duty_percent);
++    if (result != ESP_OK) {
++        return result;
++    }
++    return writeRegister8(kRegControl, duty_percent == 0 ? kFanDisable : kFanEnable);
++}
++
++esp_err_t Device::readRpm(uint16_t* rpm) const
++{
++    if (rpm == nullptr) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    uint8_t data[2] = {};
++    const esp_err_t result = readRegister(kRegRpm, data, sizeof(data));
++    if (result == ESP_OK) {
++        *rpm = static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
++    }
++    return result;
++}
++
++esp_err_t Device::readRegister(uint8_t reg, uint8_t* data, size_t length) const
++{
++    if (_device_handle == nullptr || data == nullptr || length == 0) {
++        return ESP_ERR_INVALID_ARG;
++    }
++    return i2c_master_transmit_receive(_device_handle, &reg, 1, data, length, kI2cTimeoutMs);
++}
++
++esp_err_t Device::writeRegister8(uint8_t reg, uint8_t value) const
++{
++    if (_device_handle == nullptr) {
++        return ESP_ERR_INVALID_STATE;
++    }
++
++    const uint8_t data[] = {reg, value};
++    return i2c_master_transmit(_device_handle, data, sizeof(data), kI2cTimeoutMs);
++}
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_device.h b/platforms/tab5/main/hal/components/module_fan/module_fan_device.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac837b38d724aa9ca5582221f49686808cff104c
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_device.h
+@@ -0,0 +1,35 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++
++#include <driver/i2c_master.h>
++#include <esp_err.h>
++
++namespace module_fan {
++
++class Device {
++public:
++    esp_err_t begin(i2c_master_bus_handle_t bus_handle);
++    esp_err_t probe() const;
++    esp_err_t connect();
++    esp_err_t disconnect();
++    esp_err_t readIdentity(uint8_t* firmware_version) const;
++    esp_err_t configurePwm24KHz() const;
++    esp_err_t applyDutyPercent(uint8_t duty_percent) const;
++    esp_err_t readRpm(uint16_t* rpm) const;
++
++private:
++    esp_err_t readRegister(uint8_t reg, uint8_t* data, size_t length) const;
++    esp_err_t writeRegister8(uint8_t reg, uint8_t value) const;
++
++    i2c_master_bus_handle_t _bus_handle = nullptr;
++    i2c_master_dev_handle_t _device_handle = nullptr;
++};
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_policy.cpp b/platforms/tab5/main/hal/components/module_fan/module_fan_policy.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..c77d677824aecca2616ad727e3956b0a311a4e85
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_policy.cpp
+@@ -0,0 +1,123 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_policy.h"
++
++namespace module_fan {
++namespace {
++
++constexpr uint32_t kMinimumControlIntervalMs = 1000;
++constexpr uint32_t kMaximumControlIntervalMs = 60000;
++constexpr int16_t kMinimumPolicyTemperatureDeciCelsius = 0;
++constexpr int16_t kMaximumPolicyTemperatureDeciCelsius = 1000;
++
++} // namespace
++
++PolicyConfig defaultPolicyConfig()
++{
++    PolicyConfig config;
++    config.interval_ms = kDefaultControlIntervalMs;
++    config.sensor_failsafe_duty_percent = 50;
++    config.levels[0] = {400, 350, 29};
++    config.levels[1] = {500, 450, 49};
++    config.levels[2] = {600, 550, 69};
++    config.levels[3] = {650, 600, 98};
++    return config;
++}
++
++bool validatePolicyConfig(const PolicyConfig& config)
++{
++    if (config.interval_ms < kMinimumControlIntervalMs || config.interval_ms > kMaximumControlIntervalMs
++        || config.sensor_failsafe_duty_percent > 100) {
++        return false;
++    }
++
++    for (size_t index = 0; index < kPolicyLevelCount; ++index) {
++        const PolicyLevel& level = config.levels[index];
++        if (level.enter_deci_celsius < kMinimumPolicyTemperatureDeciCelsius
++            || level.enter_deci_celsius > kMaximumPolicyTemperatureDeciCelsius
++            || level.exit_deci_celsius < kMinimumPolicyTemperatureDeciCelsius
++            || level.exit_deci_celsius > kMaximumPolicyTemperatureDeciCelsius
++            || level.exit_deci_celsius > level.enter_deci_celsius || level.duty_percent == 0
++            || level.duty_percent > 100) {
++            return false;
++        }
++
++        if (index > 0) {
++            const PolicyLevel& previous = config.levels[index - 1];
++            if (level.enter_deci_celsius <= previous.enter_deci_celsius
++                || level.exit_deci_celsius <= previous.exit_deci_celsius
++                || level.duty_percent < previous.duty_percent) {
++                return false;
++            }
++        }
++    }
++
++    return true;
++}
++
++bool policyConfigsEqual(const PolicyConfig& left, const PolicyConfig& right)
++{
++    if (left.interval_ms != right.interval_ms
++        || left.sensor_failsafe_duty_percent != right.sensor_failsafe_duty_percent) {
++        return false;
++    }
++
++    for (size_t index = 0; index < kPolicyLevelCount; ++index) {
++        const PolicyLevel& left_level = left.levels[index];
++        const PolicyLevel& right_level = right.levels[index];
++        if (left_level.enter_deci_celsius != right_level.enter_deci_celsius
++            || left_level.exit_deci_celsius != right_level.exit_deci_celsius
++            || left_level.duty_percent != right_level.duty_percent) {
++            return false;
++        }
++    }
++    return true;
++}
++
++AutomaticPolicy::AutomaticPolicy()
++    : _config(defaultPolicyConfig())
++{
++}
++
++bool AutomaticPolicy::setConfig(const PolicyConfig& config)
++{
++    if (!validatePolicyConfig(config)) {
++        return false;
++    }
++
++    _config = config;
++    reset();
++    return true;
++}
++
++void AutomaticPolicy::reset()
++{
++    _cooling_level = 0;
++}
++
++PolicyDemand AutomaticPolicy::update(bool temperature_valid, float temperature_celsius)
++{
++    if (!temperature_valid) {
++        return {_cooling_level, _config.sensor_failsafe_duty_percent};
++    }
++
++    const float temperature_deci_celsius = temperature_celsius * 10.0f;
++    while (_cooling_level < kPolicyLevelCount
++           && temperature_deci_celsius >= _config.levels[_cooling_level].enter_deci_celsius) {
++        ++_cooling_level;
++    }
++    while (_cooling_level > 0
++           && temperature_deci_celsius < _config.levels[_cooling_level - 1].exit_deci_celsius) {
++        --_cooling_level;
++    }
++
++    if (_cooling_level == 0) {
++        return {0, 0};
++    }
++    return {_cooling_level, _config.levels[_cooling_level - 1].duty_percent};
++}
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_policy.h b/platforms/tab5/main/hal/components/module_fan/module_fan_policy.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..6fbbc037516156351b7e118d45d39bd97bb145eb
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_policy.h
+@@ -0,0 +1,50 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++
++namespace module_fan {
++
++constexpr size_t kPolicyLevelCount = 4;
++constexpr uint32_t kDefaultControlIntervalMs = 5000;
++
++struct PolicyLevel {
++    int16_t enter_deci_celsius = 0;
++    int16_t exit_deci_celsius = 0;
++    uint8_t duty_percent = 0;
++};
++
++struct PolicyConfig {
++    uint32_t interval_ms = kDefaultControlIntervalMs;
++    uint8_t sensor_failsafe_duty_percent = 50;
++    PolicyLevel levels[kPolicyLevelCount] = {};
++};
++
++struct PolicyDemand {
++    uint8_t cooling_level = 0;
++    uint8_t duty_percent = 0;
++};
++
++PolicyConfig defaultPolicyConfig();
++bool validatePolicyConfig(const PolicyConfig& config);
++bool policyConfigsEqual(const PolicyConfig& left, const PolicyConfig& right);
++
++class AutomaticPolicy {
++public:
++    AutomaticPolicy();
++
++    bool setConfig(const PolicyConfig& config);
++    void reset();
++    PolicyDemand update(bool temperature_valid, float temperature_celsius);
++
++private:
++    PolicyConfig _config;
++    uint8_t _cooling_level = 0;
++};
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_service.cpp b/platforms/tab5/main/hal/components/module_fan/module_fan_service.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..123d6c343313bd45800e78c6653450add1c74634
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_service.cpp
+@@ -0,0 +1,329 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "module_fan_service.h"
++
++#include <atomic>
++#include <mutex>
++
++#include <esp_timer.h>
++#include <freertos/FreeRTOS.h>
++#include <freertos/task.h>
++#include <nvs.h>
++
++#include "../cpu_temperature.h"
++#include "module_fan_config_store.h"
++#include "module_fan_device.h"
++
++namespace module_fan {
++namespace {
++
++constexpr uint8_t kMissedPollsToDetach = 3;
++constexpr uint8_t kInvalidDutyPercent = 0xFF;
++
++Device g_device;
++std::atomic_bool g_started{false};
++std::mutex g_snapshot_mutex;
++Snapshot g_snapshot;
++std::mutex g_policy_mutex;
++PolicyState g_policy_state;
++PolicyConfig g_persisted_policy;
++bool g_has_persisted_policy = false;
++TaskHandle_t g_task_handle = nullptr;
++
++void advancePolicyRevisionLocked()
++{
++    ++g_policy_state.revision;
++    if (g_policy_state.revision == 0) {
++        g_policy_state.revision = 1;
++    }
++}
++
++TaskHandle_t replaceActivePolicyLocked(const PolicyConfig& config, PolicySource source, bool dirty)
++{
++    const bool changed = !policyConfigsEqual(g_policy_state.config, config);
++    g_policy_state.config = config;
++    g_policy_state.source = source;
++    g_policy_state.dirty = dirty;
++    if (changed) {
++        advancePolicyRevisionLocked();
++        return g_task_handle;
++    }
++    return nullptr;
++}
++
++void notifyPolicyChanged(TaskHandle_t task_handle)
++{
++    if (task_handle != nullptr) {
++        xTaskNotifyGive(task_handle);
++    }
++}
++
++void selectRuntimePolicyStateLocked(const PolicyConfig& config, PolicySource* source, bool* dirty)
++{
++    if (g_has_persisted_policy && policyConfigsEqual(config, g_persisted_policy)) {
++        *source = PolicySource::PersistedNvs;
++        *dirty = false;
++        return;
++    }
++
++    if (!g_has_persisted_policy && policyConfigsEqual(config, defaultPolicyConfig())) {
++        *source = PolicySource::CompiledDefaults;
++        *dirty = false;
++        return;
++    }
++
++    *source = PolicySource::Runtime;
++    *dirty = true;
++}
++
++void publishSnapshot(Snapshot snapshot)
++{
++    std::lock_guard<std::mutex> lock(g_snapshot_mutex);
++    snapshot.sequence = g_snapshot.sequence + 1;
++    g_snapshot = snapshot;
++}
++
++void taskEntry(void*)
++{
++    bool attached = false;
++    uint8_t firmware_version = 0;
++    uint8_t last_applied_duty_percent = kInvalidDutyPercent;
++    uint8_t missed_polls = 0;
++    uint16_t last_rpm = 0;
++    bool reconfigure_after_error = false;
++    uint32_t active_policy_revision = 0;
++    AutomaticPolicy policy;
++
++    while (true) {
++        PolicyState policy_state;
++        getPolicyState(&policy_state);
++        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(policy_state.config.interval_ms));
++        getPolicyState(&policy_state);
++
++        if (policy_state.revision != active_policy_revision) {
++            policy.setConfig(policy_state.config);
++            active_policy_revision = policy_state.revision;
++        }
++
++        Snapshot snapshot;
++        snapshot.uptime_ms = static_cast<uint64_t>(esp_timer_get_time()) / 1000;
++        snapshot.temperature_valid = cpu_temperature::read(&snapshot.temperature_celsius);
++        const PolicyDemand demand = policy.update(snapshot.temperature_valid, snapshot.temperature_celsius);
++        snapshot.cooling_level = demand.cooling_level;
++        snapshot.target_duty_percent = demand.duty_percent;
++        snapshot.policy_revision = active_policy_revision;
++
++        if (!attached && g_device.probe() == ESP_OK) {
++            uint8_t detected_firmware_version = 0;
++            if (g_device.connect() == ESP_OK && g_device.readIdentity(&detected_firmware_version) == ESP_OK
++                && g_device.configurePwm24KHz() == ESP_OK) {
++                attached = true;
++                firmware_version = detected_firmware_version;
++                last_applied_duty_percent = kInvalidDutyPercent;
++                missed_polls = 0;
++                reconfigure_after_error = false;
++            } else {
++                g_device.disconnect();
++            }
++        }
++
++        bool communication_ok = false;
++        if (attached) {
++            esp_err_t result = ESP_OK;
++            if (reconfigure_after_error) {
++                result = g_device.configurePwm24KHz();
++            }
++            if (result == ESP_OK
++                && (reconfigure_after_error || snapshot.target_duty_percent != last_applied_duty_percent)) {
++                result = g_device.applyDutyPercent(snapshot.target_duty_percent);
++                if (result == ESP_OK) {
++                    last_applied_duty_percent = snapshot.target_duty_percent;
++                }
++            }
++
++            uint16_t rpm = 0;
++            if (result == ESP_OK) {
++                result = g_device.readRpm(&rpm);
++            }
++
++            communication_ok = result == ESP_OK;
++            if (communication_ok) {
++                last_rpm = rpm;
++                missed_polls = 0;
++                reconfigure_after_error = false;
++            } else {
++                reconfigure_after_error = true;
++                if (missed_polls < 0xFF) {
++                    ++missed_polls;
++                }
++                if (missed_polls >= kMissedPollsToDetach) {
++                    attached = false;
++                    firmware_version = 0;
++                    last_applied_duty_percent = kInvalidDutyPercent;
++                    last_rpm = 0;
++                    reconfigure_after_error = false;
++                    g_device.disconnect();
++                }
++            }
++        }
++
++        snapshot.attached = attached;
++        snapshot.communication_ok = communication_ok;
++        snapshot.applied_duty_percent =
++            last_applied_duty_percent == kInvalidDutyPercent ? 0 : last_applied_duty_percent;
++        snapshot.rpm = last_rpm;
++        snapshot.firmware_version = firmware_version;
++        snapshot.missed_polls = missed_polls;
++        publishSnapshot(snapshot);
++    }
++}
++
++} // namespace
++
++esp_err_t start(i2c_master_bus_handle_t bus_handle)
++{
++    bool expected = false;
++    if (!g_started.compare_exchange_strong(expected, true)) {
++        return ESP_OK;
++    }
++
++    const esp_err_t begin_result = g_device.begin(bus_handle);
++    if (begin_result != ESP_OK) {
++        g_started = false;
++        return begin_result;
++    }
++
++    loadPolicyConfig();
++
++    TaskHandle_t task_handle = nullptr;
++    const BaseType_t task_result = xTaskCreate(taskEntry, "module_fan_auto", 4096, nullptr, 1, &task_handle);
++    if (task_result != pdPASS) {
++        g_started = false;
++        return ESP_ERR_NO_MEM;
++    }
++
++    {
++        std::lock_guard<std::mutex> lock(g_policy_mutex);
++        g_task_handle = task_handle;
++    }
++
++    return ESP_OK;
++}
++
++bool getSnapshot(Snapshot* snapshot)
++{
++    if (snapshot == nullptr) {
++        return false;
++    }
++
++    std::lock_guard<std::mutex> lock(g_snapshot_mutex);
++    *snapshot = g_snapshot;
++    return snapshot->sequence != 0;
++}
++
++bool getPolicyState(PolicyState* state)
++{
++    if (state == nullptr) {
++        return false;
++    }
++
++    std::lock_guard<std::mutex> lock(g_policy_mutex);
++    *state = g_policy_state;
++    return true;
++}
++
++esp_err_t setPolicyConfig(const PolicyConfig& config)
++{
++    if (!validatePolicyConfig(config)) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    TaskHandle_t task_handle = nullptr;
++    {
++        std::lock_guard<std::mutex> lock(g_policy_mutex);
++        PolicySource source = PolicySource::Runtime;
++        bool dirty = true;
++        selectRuntimePolicyStateLocked(config, &source, &dirty);
++        task_handle = replaceActivePolicyLocked(config, source, dirty);
++    }
++    notifyPolicyChanged(task_handle);
++    return ESP_OK;
++}
++
++esp_err_t savePolicyConfig()
++{
++    PolicyConfig config;
++    {
++        std::lock_guard<std::mutex> lock(g_policy_mutex);
++        config = g_policy_state.config;
++    }
++
++    const esp_err_t result = config_store::save(config);
++    if (result != ESP_OK) {
++        return result;
++    }
++
++    std::lock_guard<std::mutex> lock(g_policy_mutex);
++    g_persisted_policy = config;
++    g_has_persisted_policy = true;
++    if (policyConfigsEqual(g_policy_state.config, config)) {
++        g_policy_state.source = PolicySource::PersistedNvs;
++        g_policy_state.dirty = false;
++    } else {
++        g_policy_state.source = PolicySource::Runtime;
++        g_policy_state.dirty = true;
++    }
++    return ESP_OK;
++}
++
++esp_err_t loadPolicyConfig()
++{
++    PolicyConfig config;
++    const esp_err_t result = config_store::load(&config);
++    const bool use_defaults = result == ESP_ERR_NVS_NOT_FOUND || result == ESP_ERR_INVALID_RESPONSE;
++    if (result != ESP_OK && !use_defaults) {
++        return result;
++    }
++
++    if (use_defaults) {
++        config = defaultPolicyConfig();
++    }
++
++    TaskHandle_t task_handle = nullptr;
++    {
++        std::lock_guard<std::mutex> lock(g_policy_mutex);
++        g_has_persisted_policy = !use_defaults;
++        if (g_has_persisted_policy) {
++            g_persisted_policy = config;
++        }
++        task_handle = replaceActivePolicyLocked(config,
++                                                use_defaults ? PolicySource::CompiledDefaults
++                                                             : PolicySource::PersistedNvs,
++                                                false);
++    }
++    notifyPolicyChanged(task_handle);
++    return ESP_OK;
++}
++
++void restoreDefaultPolicy()
++{
++    setPolicyConfig(defaultPolicyConfig());
++}
++
++const char* policySourceName(PolicySource source)
++{
++    switch (source) {
++        case PolicySource::CompiledDefaults:
++            return "defaults";
++        case PolicySource::PersistedNvs:
++            return "nvs";
++        case PolicySource::Runtime:
++            return "runtime";
++    }
++    return "unknown";
++}
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/module_fan/module_fan_service.h b/platforms/tab5/main/hal/components/module_fan/module_fan_service.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..d47c7e3f7e47042a48b6ca9509c8c2d4a217e437
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/module_fan/module_fan_service.h
+@@ -0,0 +1,55 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++#include <cstdint>
++
++#include <driver/i2c_master.h>
++#include <esp_err.h>
++
++#include "module_fan_policy.h"
++
++namespace module_fan {
++
++enum class PolicySource : uint8_t {
++    CompiledDefaults,
++    PersistedNvs,
++    Runtime,
++};
++
++struct PolicyState {
++    PolicyConfig config = defaultPolicyConfig();
++    PolicySource source = PolicySource::CompiledDefaults;
++    bool dirty = false;
++    uint32_t revision = 1;
++};
++
++struct Snapshot {
++    uint32_t sequence = 0;
++    uint64_t uptime_ms = 0;
++    bool temperature_valid = false;
++    float temperature_celsius = 0.0f;
++    bool attached = false;
++    bool communication_ok = false;
++    uint8_t cooling_level = 0;
++    uint8_t target_duty_percent = 0;
++    uint8_t applied_duty_percent = 0;
++    uint16_t rpm = 0;
++    uint8_t firmware_version = 0;
++    uint8_t missed_polls = 0;
++    uint32_t policy_revision = 0;
++};
++
++esp_err_t start(i2c_master_bus_handle_t bus_handle);
++bool getSnapshot(Snapshot* snapshot);
++bool getPolicyState(PolicyState* state);
++esp_err_t setPolicyConfig(const PolicyConfig& config);
++esp_err_t savePolicyConfig();
++esp_err_t loadPolicyConfig();
++void restoreDefaultPolicy();
++const char* policySourceName(PolicySource source);
++
++} // namespace module_fan
+diff --git a/platforms/tab5/main/hal/components/persistent_storage.cpp b/platforms/tab5/main/hal/components/persistent_storage.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2001bcc1e5b8b0ce70eba6b407f5f94400174c2
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/persistent_storage.cpp
+@@ -0,0 +1,41 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#include "persistent_storage.h"
++
++#include <mutex>
++
++#include <nvs_flash.h>
++
++namespace persistent_storage {
++namespace {
++
++std::mutex g_init_mutex;
++bool g_initialized = false;
++
++} // namespace
++
++esp_err_t ensureInitialized()
++{
++    std::lock_guard<std::mutex> lock(g_init_mutex);
++    if (g_initialized) {
++        return ESP_OK;
++    }
++
++    esp_err_t result = nvs_flash_init();
++    if (result == ESP_ERR_NVS_NO_FREE_PAGES || result == ESP_ERR_NVS_NEW_VERSION_FOUND) {
++        result = nvs_flash_erase();
++        if (result == ESP_OK) {
++            result = nvs_flash_init();
++        }
++    }
++
++    if (result == ESP_OK) {
++        g_initialized = true;
++    }
++    return result;
++}
++
++} // namespace persistent_storage
+diff --git a/platforms/tab5/main/hal/components/persistent_storage.h b/platforms/tab5/main/hal/components/persistent_storage.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..dcf2920125d4f3dafd90caedbf18e349d512b23b
+--- /dev/null
++++ b/platforms/tab5/main/hal/components/persistent_storage.h
+@@ -0,0 +1,14 @@
++/*
++ * SPDX-FileCopyrightText: 2026 Tab5 terminal port contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++#pragma once
++
++#include <esp_err.h>
++
++namespace persistent_storage {
++
++esp_err_t ensureInitialized();
++
++} // namespace persistent_storage
+diff --git a/platforms/tab5/main/hal/hal_esp32.cpp b/platforms/tab5/main/hal/hal_esp32.cpp
+index dda5d573bad9f31a6700bcaaa40bb3a5d60a22b8..63d85c0a9302c5e0b3334826681a48d9e29eebf6 100644
+--- a/platforms/tab5/main/hal/hal_esp32.cpp
++++ b/platforms/tab5/main/hal/hal_esp32.cpp
+@@ -4,6 +4,8 @@
+  * SPDX-License-Identifier: MIT
+  */
+ #include "hal/hal_esp32.h"
++#include "components/cpu_temperature.h"
++#include "components/module_fan/module_fan_service.h"
+ extern "C" {
+ #include "utils/rx8130/rx8130.h"
+ }
+@@ -124,6 +126,12 @@ void HalEsp32::init()
+     set_gpio_output_capability();
+ 
+     bsp_display_unlock();
++
++    mclog::tagInfo(_tag, "module fan service init");
++    const esp_err_t fan_service_result = module_fan::start(i2c_bus_handle);
++    if (fan_service_result != ESP_OK) {
++        mclog::tagWarn(_tag, "module fan service init failed: {}", esp_err_to_name(fan_service_result));
++    }
+ }
+ 
+ static const gpio_num_t _driver_gpios[] = {
+@@ -176,9 +184,6 @@ void HalEsp32::set_gpio_output_capability()
+ /* -------------------------------------------------------------------------- */
+ /*                                   System                                   */
+ /* -------------------------------------------------------------------------- */
+-#include <driver/temperature_sensor.h>
+-static temperature_sensor_handle_t _temp_sensor = nullptr;
+-
+ void HalEsp32::delay(uint32_t ms)
+ {
+     vTaskDelay(pdMS_TO_TICKS(ms));
+@@ -191,19 +196,8 @@ uint32_t HalEsp32::millis()
+ 
+ int HalEsp32::getCpuTemp()
+ {
+-    if (_temp_sensor == nullptr) {
+-        temperature_sensor_config_t temp_sensor_config = {
+-            .range_min = 20,
+-            .range_max = 100,
+-        };
+-        temperature_sensor_install(&temp_sensor_config, &_temp_sensor);
+-        temperature_sensor_enable(_temp_sensor);
+-    }
+-
+     float temp = 0;
+-    temperature_sensor_get_celsius(_temp_sensor, &temp);
+-
+-    return temp;
++    return cpu_temperature::read(&temp) ? static_cast<int>(temp) : 0;
+ }
+ 
+ /* -------------------------------------------------------------------------- */

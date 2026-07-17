@@ -1,5 +1,103 @@
 # Decision Log
 
+## 2026-07-11: Use A Validated Runtime Policy With Explicit NVS Save
+
+Decision: split automatic fan selection into `module_fan_policy.*`, keep one
+thread-safe active policy in the service, and expose atomic updates through the
+existing OSC-777 debug command task. Runtime updates wake the control task and
+apply immediately. Only `module-fan-policy=save` writes a versioned NVS blob;
+the 5-second control loop never writes Flash.
+
+Reason: thresholds, hysteresis, duty, interval, and sensor-failure behavior now
+form a real configuration boundary rather than a small compile-time table. A
+pure policy object keeps those rules independent of I2C and FreeRTOS, while
+whole-candidate validation prevents a partially parsed or unsafe curve from
+becoming active. Explicit persistence avoids both rebuilds for normal tuning
+and unnecessary Flash wear during experimentation.
+
+Decision: use NVS rather than a text file as the primary store. The official
+firmware already has a 24 KiB NVS partition, while its SPIFFS partition is not
+mounted in the normal startup path. The stored record has magic, version, size,
+level count, fixed-width fields, and reserved bytes; NVS supplies record-level
+integrity, and the policy layer supplies semantic validation. Missing or invalid
+records select compiled defaults.
+
+Decision: centralize NVS initialization in `persistent_storage.*` and route the
+existing Wi-Fi initialization through it. This prevents two features from
+independently owning NVS lifecycle while preserving the official recovery
+behavior for no-free-pages and version-mismatch errors.
+
+Rejected: periodic auto-save and a primary JSON/SPIFFS settings file. They add
+Flash wear or filesystem startup/lifecycle work without improving the current
+CDC tuning workflow. A future GUI or file importer can call the same validated
+service API without changing the automatic controller.
+
+## 2026-07-11: Revise Module Fan Start Thresholds
+
+Decision: use automatic start thresholds `40/50/60/65 C` with duty
+`29/49/69/98%`. Preserve the existing 5 C hysteresis, giving exit thresholds
+`35/45/55/60 C`.
+
+Reason: this directly implements the user's revised cooling preference while
+retaining the existing table-driven policy and anti-chatter behavior. No task,
+I2C, telemetry, or manual-control behavior changes with this adjustment.
+
+## 2026-07-11: Keep Module Fan Control In A Native IDF Device Service
+
+Decision: implement Module Fan v1.1 as a small register-level ESP-IDF device
+wrapper plus one 5-second automatic-control service task. Use the BSP-provided
+system-I2C handle and the ESP32-P4 internal temperature sensor. Do not port the
+Arduino M5Stack fan library or add manual-control state in this checkpoint.
+
+Reason: the official firmware is ESP-IDF-native, and its system I2C bus is
+already shared by codec, RTC, camera, power monitor, IO expanders, touch, and
+IMU devices. A contained low-rate task adds no calls to the official launcher
+loop and lets the IDF I2C driver serialize transactions on the existing bus.
+The SoC temperature is also the closest match to the Raspberry Pi-style policy
+being reused and was already exposed by the official CPU-temperature panel.
+
+The service does not change EXT 5V. It creates the fan device handle only after
+an ACK plus identity-register check, removes that handle after three failed
+polls, and keeps only the task and shared bus reference needed for hot-plug
+probing. Any communication error also causes PWM configuration and duty to be
+re-applied on the next poll, covering a module reset shorter than the three-poll
+detach window. Dynamic duty changes are not saved to the module's flash.
+
+## 2026-07-11: Publish Fan Snapshots Through The Existing Debug Writer
+
+Decision: the automatic task publishes a mutex-protected snapshot and never
+prints. Extend the existing OSC-777 screenshot command task with opt-in
+`module-fan-log=start`, `module-fan-log=stop`, and `module-fan-log?` commands;
+that task emits at most one line per new snapshot.
+
+Reason: using the existing command task gives screenshots, command replies, and
+fan telemetry a single device-side writer. Screenshot transfer is synchronous,
+so telemetry pauses during the raw RGB565 frame and cannot split it. A monotonic
+`uptime_ms` is used instead of RTC wall time because it remains useful even
+when the board RTC is unset or incorrect.
+
+Host-side consequence: only one program should open the serial port. The
+dedicated telemetry tool combines command sending and reading and sends stop
+when streaming is interrupted.
+
+## 2026-07-11: Group Fan HAL Files And Separate Telemetry Formatting
+
+Decision: keep shared `cpu_temperature.*` beside the existing HAL component
+files, group the four fan-only device/service files under
+`hal/components/module_fan/`, and place telemetry command state/formatting in
+`app/debug/module_fan_telemetry.*`.
+
+Reason: device/register access and the automatic task form one fan capability,
+while CPU temperature remains shared with the official power-monitor GUI. Fan
+line formatting belongs to the app debug layer, not to the hardware task or a
+file whose only stated role is screen capture. The existing screenshot task
+continues to own USB transport and OSC dispatch so there is still exactly one
+device-side writer.
+
+Superseded later on 2026-07-11: runtime configuration, persistence, validation,
+and immediate task wakeup added enough policy-specific behavior to justify the
+separate `module_fan_policy.*` class recorded above.
+
 ## 2026-07-09: Use USB Serial/JTAG OSC 777 For LVGL Screenshots
 
 Decision: add a private debug command on USB Serial/JTAG using the existing

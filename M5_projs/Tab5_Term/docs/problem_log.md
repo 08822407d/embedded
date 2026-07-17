@@ -1,5 +1,92 @@
 # Problem Log
 
+## 2026-07-11: Runtime Fan Policy And NVS Validation
+
+The runtime policy path was built, flashed, and exercised on the connected Tab5
+with a real Module Fan v1.1. Verified behavior includes immediate RAM-only
+application, dirty/source reporting, explicit NVS save, recovery after the
+USB-open reset, restoration of compiled defaults, dynamic 5000/6000 ms control
+intervals, and whole-curve rejection on invalid ordering.
+
+One sample immediately after applying 0% still reported `4830 RPM` while the
+target and applied duty were already 0. The next sample reported 0 RPM. This is
+expected fan inertia plus the timing of the RPM register, not a failed duty
+write.
+
+The first build command in this session sourced ESP-IDF without setting the
+project-local `IDF_TOOLS_PATH`, so it looked for a nonexistent Python virtual
+environment under `~/.espressif` and never entered compilation. Re-running from
+`platforms/tab5` with the documented project-local `IDF_TOOLS_PATH` completed
+normally. No source change was required for that host-environment error.
+
+NVS fallback was verified for the missing-record case. Deliberate blob
+corruption, version mismatch, NVS-full recovery, and power loss during
+`nvs_commit` were not destructively tested. The centralized initializer retains
+the official firmware's existing behavior of erasing NVS when initialization
+reports no free pages or a newer incompatible NVS version.
+
+Status: runtime update and normal persistence are hardware-verified. Corrupt
+storage recovery remains source- and build-verified only.
+
+## 2026-07-11: Module Fan Runtime Validation Coverage
+
+The native driver, automatic service, and controlled telemetry were flashed to
+the connected Tab5 and exercised with a real Module Fan v1.1. Verified behavior
+includes identity/firmware reads, 5-second temperature snapshots, opt-in
+start/stop telemetry, 0% stop control, 29% automatic control, RPM reads around
+`5040-5190`, and CRC-clean screenshot capture after telemetry.
+
+The following behavior remains unverified on hardware:
+
+- Detach/re-attach behavior when the module is hot-plugged or the official GUI
+  toggles EXT 5V.
+- The 49%, 69%, and 98% levels under real thermal load.
+- Temperature-read failure and three-consecutive-error recovery paths.
+
+Known access boundary: screenshot commands and fan telemetry are serialized by
+one firmware task, but two host processes opening the same serial device can
+still divide input bytes or fail on exclusive access. Use one of
+`tools/module_fan_telemetry.py` or `tools/capture_screen.py` at a time. A stop
+command sent during a screenshot is handled after the synchronous image stream
+finishes.
+
+Status: core source/build/flash/runtime path verified; destructive or
+high-temperature edge cases remain pending.
+
+## 2026-07-11: USB Serial Open Resets The Board Before Debug Commands
+
+Symptom: a status command sent after only a 1-second serial-open delay timed
+out. A direct boot capture showed `rst:0x17 (CHIP_USB_UART_RESET)` whenever this
+Ubuntu host opened the USB Serial/JTAG TTY. The debug command task starts about
+7 seconds later.
+
+Related screenshot symptom: a CRC-valid capture taken after 8 seconds contained
+large black areas because the launcher had not completed asynchronous drawing.
+A 15-second retry produced the complete launcher with CRC32 `90CEBF21`.
+
+Action taken: `tools/module_fan_telemetry.py` now defaults to an 8-second open
+delay, and `tools/capture_screen.py` defaults to 15 seconds. Both remain
+overridable for hosts whose serial-open behavior differs.
+
+Status: mitigated in the host tools. Opening the TTY still resets this board, so
+stream mode is preferred for telemetry start/read/stop in one connection.
+
+## 2026-07-11: Existing CMake Glob Needed Reconfiguration For New Sources
+
+Symptom: the first incremental build compiled the modified callers but failed
+at link time with undefined references to `cpu_temperature::read`,
+`module_fan::start`, and `module_fan::getSnapshot`.
+
+Cause: `platforms/tab5/main/CMakeLists.txt` uses `GLOB_RECURSE` without
+`CONFIGURE_DEPENDS`. Its cached Ninja source list was created before the new
+component files existed.
+
+Action taken: ran `idf.py reconfigure build`. The new sources were then compiled
+and the complete firmware linked successfully. Fresh builds that configure
+after applying patch `0003` naturally include them.
+
+Status: resolved; no CMake source change was needed.
+
 ## 2026-07-09: Parent Git Root Can Make Commits Too Broad
 
 Symptom: running normal git commands from `M5_projs/Tab5_Term` can be

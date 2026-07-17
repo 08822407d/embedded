@@ -136,10 +136,12 @@ raw serial boot capture reached `AppLauncher`, including display/touch, USB
 host, RS485, and Wi-Fi/AP initialization logs.
 
 As of 2026-07-09, the Ubuntu worktree also has local terminal-entry and
-screenshot-debug patches applied:
+screenshot-debug patches applied. As of 2026-07-11 it also has the automatic
+Module Fan service:
 
 - `port/official_firmware_patches/0001-launcher-terminal-button.patch`
 - `port/official_firmware_patches/0002-screen-capture-debug.patch`
+- `port/official_firmware_patches/0003-module-fan-auto-control.patch`
 
 The patched build was flashed to `/dev/ttyACM0` and verified by:
 
@@ -148,6 +150,94 @@ The patched build was flashed to `/dev/ttyACM0` and verified by:
 - host screenshot command:
   `python3 tools/capture_screen.py --port /dev/ttyACM0 --output .logs/screenshots/tab5-launcher-terminal-entry-fixed.png --open-delay 8 --timeout 90`;
 - screenshot metadata: `1280x720`, `rgb565le`, CRC32 `2B8CB402`.
+
+The 2026-07-11 Module Fan build used the same project-local ESP-IDF `v5.4.2`
+environment. Because new files were added beneath an already-configured CMake
+glob, the first build required:
+
+```bash
+idf.py reconfigure build
+```
+
+The final repeated `idf.py build` passed. `m5stack_tab5.bin` is `0x57d680`
+bytes with `0x482980` bytes (`45%`) free in the smallest app partition. Its
+SHA256 is
+`cfd050f1c560f87daf2b1e56b473ba5d67f3ba6707ace8875c75153ad1eb69d0`.
+
+The final image was flashed through the stable Espressif by-id path for serial
+`30:ED:A0:E2:E2:48`. Esptool identified ESP32-P4 revision `v1.3`, and all three
+flashed images reported verified hashes.
+
+When hardware returns, controlled fan telemetry can be observed with one
+serial-port owner:
+
+```bash
+python3 tools/module_fan_telemetry.py stream --port /dev/ttyACM0
+```
+
+Do not run that tool concurrently with `tools/capture_screen.py` or another
+serial monitor on the same device.
+
+Runtime validation found the real Module Fan at `0x18`, firmware `0x01`. The
+current accepted start thresholds are `40/50/60/65 C`, with 5 C lower exit
+thresholds and `29/49/69/98%` duty. After rebuilding and re-flashing this curve,
+samples at `48.1 C` selected level 1 and 29%, with measured RPM from `4740` to
+`5190` and no communication failures.
+
+Opening the USB Serial/JTAG TTY resets this board. The fan telemetry tool waits
+8 seconds by default for the debug task. The screenshot tool waits 15 seconds
+for complete launcher rendering; the final settled screenshot is
+`.logs/screenshots/tab5-module-fan-final-settled.png`, CRC32 `90CEBF21`.
+
+### 2026-07-11 Runtime Fan Policy Build And Flash
+
+The runtime-configurable policy revision was built with:
+
+```bash
+export IDF_TOOLS_PATH="$PWD/toolchains/ubuntu/espressif"
+source toolchains/ubuntu/esp-idf-v5.4.2/export.sh
+cd worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5
+idf.py reconfigure build
+idf.py -p /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 flash
+```
+
+The current `m5stack_tab5.bin` is `0x580590` bytes, leaving `0x47fa70` bytes
+(`45%`) in the smallest app partition. SHA256:
+`39f8d105cb79efc788ab54d062187a2e4bf5b32bfdb96acb3f67c6cad3b191ae`.
+Esptool again identified ESP32-P4 revision `v1.3`, MAC
+`30:ed:a0:e2:e2:48`, and verified all three written images.
+
+Policy management uses one serial owner:
+
+```bash
+python3 tools/module_fan_policy.py get --port /dev/ttyACM0
+python3 tools/module_fan_policy.py set \
+  --curve 40.0,35.0,29/50.0,45.0,49/60.0,55.0,69/65.0,60.0,98 \
+  --port /dev/ttyACM0
+python3 tools/module_fan_policy.py set-interval --interval 5000 --save \
+  --port /dev/ttyACM0
+python3 tools/module_fan_policy.py defaults --save --port /dev/ttyACM0
+```
+
+`set`, `set-interval`, and `set-failsafe` are RAM-only unless `--save` is
+present. Because this board resets when the port opens, use one invocation with
+`--save` when a changed value must survive. `--samples N` keeps telemetry in the
+same session and sends the stop command before exit.
+
+Hardware validation proved that an unsaved 55 C first threshold disappeared
+after reset, while a saved 6000 ms interval survived reset and produced samples
+exactly 6000 ms apart. The final saved state was restored to interval 5000 ms,
+failsafe 50%, and curve `40/35@29`, `50/45@49`, `60/55@69`, `65/60@98`.
+Final query reported `source=nvs dirty=0`; at `45.1 C` the fan selected level 1,
+applied 29%, and measured `4680-5100 RPM`. Telemetry was disabled before the
+host tool exited.
+
+The final launcher smoke-test screenshot is
+`.logs/screenshots/tab5-module-fan-runtime-policy.png`: `1280x720`, RGB565LE,
+CRC32 `21484605`, PNG SHA256
+`7599bfce2c625491744481b619f2401f6a6a30114003b5ca8f742b7d3a55471e`.
+Visual inspection confirmed a complete official launcher rather than the prior
+white-screen failure mode.
 
 ## Current Windows Status
 

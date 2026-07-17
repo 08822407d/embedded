@@ -101,7 +101,7 @@ def main() -> int:
     parser.add_argument("--port", required=True)
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--output", type=Path, required=True, help="Output PNG path")
-    parser.add_argument("--open-delay", type=float, default=2.0)
+    parser.add_argument("--open-delay", type=float, default=15.0)
     parser.add_argument("--timeout", type=float, default=45.0)
     args = parser.parse_args()
 
