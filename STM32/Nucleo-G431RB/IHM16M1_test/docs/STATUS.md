@@ -26,6 +26,7 @@
 - ✅ **首次闭环带电 bring-up 成功(2026-07-14,F-37)**:mode=UR 重烧+verify(HOTPLUG erase 曾失败)→ 板上确为 0.3A/100rpm FOC 固件;MotorPilot 上电 IDLE→Start→RUN 无故障,**电机闭环霍尔 FOC 正常旋转、方向/换相正确、电流受控**。整链验证通过,DECISIONS #003"闭环调速"目标达成。**低速下限 ~500rpm**(霍尔60°低速难点,#003风险③坐实);用户接受,应用侧用外接减速箱解决。GUI 花屏=显卡驱动 bug,更新驱动已修;Oray 远控/虚拟显示器已卸。
 - [`DECISIONS.md`](DECISIONS.md) #003 路线已完成:标定→生成→烧录→**闭环调速验证成功**。剩下是可选的整定/表征/应用集成(见下一步)。
 - 🔬 **位置控制可行性已离线研究完(2026-07-16,F-38,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md))**:①当前固件**只有速度/力矩控制,根本没编译位置控制**(源码核实);②官方 MCSDK 位置模式**要求正交编码器为主传感器,霍尔因分辨率过低不被允许**(ST 确认 + `TC_Init` 绑定编码器句柄印证),而本电机**无编码器轴**;③"整圈数"精度**不需要官方位置模式**,应用层数霍尔圈即可。三条路 A(加编码器,精度高/要硬件)/B(应用层数圈粗控,匹配"整圈数"、不加硬件、**推荐**)/C(魔改,不推荐)。**待用户选方向。** 纯离线,未碰硬件。
+- 🎯 **位置控制已拍板 B 方案(DECISIONS #007,2026-07-16)**:应用层数圈粗控,Phase-1 PC 侧 PoC **零固件改动**;用户依据 = 大减速比减速箱稀释电机侧整圈误差、低于机械工艺公差,且应用转速远高于 ~500rpm 下限。源码预检修正前提:`MC_REG_CURRENT_POSITION` 零实现不可用(F-39),改用 `MC_REG_HALL_EL_ANGLE`(s16 电角度)解回绕计圈(4 电气圈=1 机械圈)。需求落 REQUIREMENTS §6;任务书 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 已写好,**待用户派发 codex 执行**。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
@@ -43,7 +44,8 @@
 - [x] **CC 安全审核 runbook 通过并定稿**;用户就首次闭环测试给出 HITL-FLASH/HITL-POWER 授权
 - [x] 烧录前 HITL(授权+母线断开/USB-only+目标板/SN正确);mode=UR 重烧+verify 通过
 - [x] **首次闭环带电已完成并成功(F-37)**:Speed mode、IDLE→Start→RUN 无故障、电机正常旋转/换相/电流受控;实测**低速下限 ~500rpm**,用户接受(应用侧减速箱)
-- [ ] **位置控制方向待用户拍板(A/B/C,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md) §4)**:选 B→CC 写"数圈粗控"需求+codex 任务书(先离线核 `MC_REG_CURRENT_POSITION` 速度模式下是否有效计数);选 A→先核 IHM16M1 编码器接口+选型编码器,再 WB 重配+重生成+重构建+新 bring-up;选 C→评估补丁/regen 维护(不推荐)
+- [x] 位置控制方向已拍板:**B**(DECISIONS #007);需求 REQUIREMENTS §6;任务书 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 已写好
+- [ ] **用户把 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 派发给 codex**:§1 选型(MotorPilot 脚本 vs 独立 MCP 客户端,优先调研高频遥测通道)→ §2 工具离线实现+自测 → §3 USB-only 手转计圈验证(母线断开、只读、用户手转)→ §4 带电 N 圈停止试验(**须新 HITL-POWER + 用户值守 + CC 旁站**)→ 数据/统计/结论落盘
 - [ ] (可选)运行包络表征/整定:Ke 现场验证、速度 PI 低速表现、放开电流/转速分级建议
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
