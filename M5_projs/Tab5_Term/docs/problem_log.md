@@ -1,5 +1,60 @@
 # Problem Log
 
+## 2026-07-18: Title-Bar Dots Appeared Uneven Against Rounded Edge
+
+Symptom: although the three colored title-bar dots used the same diameter and
+vertical coordinate, the red dot appeared to have a different gap from the
+window's top edge.
+
+Root cause: the first dot crossed the 16 px rounded-corner transition while the
+other two were beneath the horizontal top segment. Equal circle coordinates
+did not imply equal local boundary geometry.
+
+Action taken: shifted the group 5 px right and derived the first visible dot
+pixel from the corner's horizontal tangent (`x=1146`). All three dots are 9x9
+with top coordinate `y=172` and now lie completely under the same straight
+edge.
+
+Status: resolved and hardware-verified in
+`.logs/screenshots/tab5-launcher-terminal-window-v12.png` (CRC32 `D19CF65E`).
+The complete 51,642-byte terminal resource rectangle matches the baked asset
+with zero differing bytes.
+
+## 2026-07-18: Terminal Tile Looked Too Square
+
+Symptom: after the obsolete sleep labels were removed, the baked terminal tile
+still occupied the full 146x144 touch region and looked too square.
+
+Action taken: cleared the old button art to the launcher background color and
+redrew only the visible tile at 144x108, an exact 4:3 ratio. The original `>_`
+glyph pixels were repainted unchanged. The transparent touch target remains
+146x144.
+
+Status: resolved and hardware-verified. Screenshot
+`.logs/screenshots/tab5-launcher-terminal-4x3.png` has CRC32 `775442C5` and
+shows the 4:3 tile with clean margins. The edited screenshot region exactly
+matches all 44,998 bytes of the asset, and the new glyph crop exactly matches
+the prior glyph crop.
+
+## 2026-07-18: Old Sleep Labels Visible Through Terminal Overlay
+
+Symptom: the terminal tile still showed faint traces of `SLEEP & SHAKE TO
+WAKEUP` and `SLEEP 10 SECONDS` on the physical display.
+
+Root cause: those labels are pixels in `app/assets/images/launcher_bg.c`. The
+replacement LVGL container used background opacity `245/255`, so it darkened
+but did not fully replace the underlying pixels.
+
+Action taken: preserved the official background and generated the independent
+`launcher_bg_terminal.c` copy with the terminal tile written directly into its
+RGB565 data. `LauncherView` now uses that copy, while `PanelPower` exposes a
+fully transparent 146x144 hit region with the existing callback.
+
+Status: resolved and hardware-verified. The final 4:3 revision is captured in
+`.logs/screenshots/tab5-launcher-terminal-4x3.png` with CRC32 `775442C5`.
+Visual inspection shows no obsolete text. Direct touch input was not repeated
+in this checkpoint.
+
 ## 2026-07-11: Runtime Fan Policy And NVS Validation
 
 The runtime policy path was built, flashed, and exercised on the connected Tab5
@@ -184,9 +239,9 @@ is recorded at
 `port/official_firmware_patches/0001-launcher-terminal-button.patch` for replay
 against fresh official-firmware worktrees.
 
-Status: partially runtime-validated. `idf.py build` and flash passed on Ubuntu
-with ESP-IDF `v5.4.2`, and the automated screenshot shows the terminal overlay
-covering the old two-button region. Direct touch-hit validation is still
+Status: the original diagnosis remains correct. The temporary overlay was
+replaced on 2026-07-18 by a dedicated background asset, and the visual result is
+now hardware-verified without label bleed. Direct touch-hit validation is still
 pending.
 
 ## 2026-07-07: Official Firmware Dependency Fetch Can Look Stalled

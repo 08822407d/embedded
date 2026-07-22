@@ -1,5 +1,63 @@
 # Current Work
 
+## 2026-07-18 Window-Style Launcher Terminal Entry
+
+The baked terminal entry now uses the accepted compact window-style artwork
+instead of the earlier plain 4:3 screen. The official `launcher_bg.c` remains
+unchanged; the customized launcher still selects the independent
+`launcher_bg_terminal.c` RGB565 asset.
+
+Implementation:
+
+- The 144x108 window occupies `x=1130..1273`, `y=166..273`. Its outer corner
+  radius is 16 px and its title bar is 17 px high.
+- The title bar has red, yellow, and green 9x9 control dots. All three share
+  the same top coordinate (`y=172`) and spacing. The red dot starts at
+  `x=1146`, the window corner's horizontal tangent, so every dot lies beneath
+  the same straight top edge.
+- The `>_` prompt and `Term` label have independent nominal font sizes: 34 px
+  and 20 px respectively. The rendered prompt is 35x21 px at `x=1143`,
+  `y=194`, leaving 9 px from both the inner left edge and the content area's
+  top edge. `Term` is centered beneath the window.
+- The existing transparent 146x144 `PanelPower` touch target, click tone, and
+  placeholder callback are unchanged.
+- `tools/update_launcher_terminal_asset.py` decodes the existing RGB565 C
+  array, replaces only `x=1127..1277`, `y=151..321` from a reviewed 1280x720
+  preview, rewrites the original row-oriented C format, and refuses output if
+  any pixel outside that rectangle changes.
+- `port/official_firmware_patches/0001-launcher-terminal-button.patch` carries
+  the copied asset and launcher changes for replay on official commit
+  `68b19d3`.
+
+Validation:
+
+- ESP-IDF `v5.4.2` `idf.py reconfigure build` passed. The application remains
+  `0x580290` bytes, leaving `0x47fd70` bytes (`45%`) in the smallest app
+  partition. Binary SHA256 is
+  `c63371e9e3158c12da21d39953dbf89389c4ee6c76b32578759af60d78030b00`.
+- Flash through the stable Espressif by-id path passed. Esptool identified the
+  ESP32-P4 rev `v1.3`; bootloader, application, and partition writes all
+  reported verified hashes.
+- The settled CDC screenshot is
+  `.logs/screenshots/tab5-launcher-terminal-window-v12.png`: 1280x720
+  RGB565LE, CRC32 `D19CF65E`, raw SHA256
+  `d13f299e9daae43db03443285d6f086bcb12be00dd68e2d2b5776ed91c2c6802`,
+  and PNG SHA256
+  `d1dc4e3b3fe032b8cf7012e647024177fe5d93c24b1a5e9120c891a9d936472e`.
+- Visual inspection confirms the accepted geometry and clean RGB565 colors.
+  The 51,642-byte edited rectangle in the captured framebuffer is
+  byte-for-byte identical to the baked asset, with zero differing bytes.
+- A clean detached worktree at official commit `68b19d3` accepted and applied
+  patches `0001`, `0002`, and `0003` in order; `git diff --check` passed after
+  the complete stack was applied.
+
+Next work:
+
+- Directly tap-test the transparent terminal hit region when convenient. Its
+  callback is unchanged, but this revision was validated by build, flash, and
+  screenshot rather than physical touch input.
+- Replace the placeholder callback with the real terminal view.
+
 ## 2026-07-11 Runtime-Configurable Module Fan Policy
 
 The automatic Module Fan policy can now be changed without rebuilding or

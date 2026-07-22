@@ -1,5 +1,61 @@
 # Decision Log
 
+## 2026-07-18: Use A Metric-Driven Window-Style Terminal Tile
+
+Decision: keep the 144x108 terminal tile but render it as a compact application
+window with a 17 px title bar, 16 px outer radius, three 9x9 colored controls,
+a 34 px `>_` prompt, and a separate 20 px `Term` label. The prompt is placed by
+its rendered 35x21 px bounds with 9 px inner left/top padding. The colored
+controls share one vertical coordinate; the first circle begins at the rounded
+window's horizontal tangent so all three sit below the same straight edge.
+
+Reason: the application-window silhouette is more recognizable than a plain
+screen while preserving the accepted 4:3 footprint. Separate text metrics keep
+later label changes from silently resizing or moving the prompt. Deriving the
+control group from the corner geometry removes the apparent top-edge mismatch
+that occurred when the first circle overlapped the rounded-corner transition.
+
+Decision: use `tools/update_launcher_terminal_asset.py` to merge only the
+reviewed launcher rectangle into the existing RGB565 C asset and assert zero
+changes outside it.
+
+Reason: visual reviews are made against full screenshots containing live GUI
+values. A bounded merge prevents voltage, temperature, time, or other runtime
+overlays from accidentally becoming static launcher pixels and makes future
+icon iterations reproducible.
+
+## 2026-07-18: Separate The 4:3 Visual Tile From Its Touch Target
+
+Decision: draw the visible terminal tile as a centered 144x108 rectangle while
+retaining the existing transparent 146x144 `PanelPower` touch target. Repaint
+the original `>_` raster glyph at its native proportions instead of resizing
+the old square tile as a whole.
+
+Reason: the nearly square visible tile read as a generic button rather than a
+terminal screen. Separating visual bounds from interaction bounds gives the art
+an exact 4:3 display proportion without reducing the convenient touch area or
+changing its callback. Repainting rather than squashing preserves stroke weight
+and glyph shape.
+
+## 2026-07-18: Bake Static Terminal Art Into A Copied Background
+
+Decision: retain the official `launcher_bg.c` unchanged, create the separate
+`launcher_bg_terminal.c` RGB565 asset, and make `LauncherView` use the copied
+asset. The terminal `Container` remains at the same size and position solely as
+a fully transparent touch target; it no longer paints a background, border, or
+label.
+
+Reason: the removed sleep labels are baked into the official bitmap. The prior
+`245/255`-opaque LVGL overlay allowed them to remain faintly visible, and static
+launcher art does not need a second runtime rendering layer. A named copy keeps
+the upstream asset available for comparison and makes the customized main
+screen explicit. Linker section garbage collection retains only the selected
+1.8 MiB map, so this source-level copy does not duplicate the final firmware
+payload.
+
+This supersedes the 2026-07-09 visible-overlay decision. The historical entry
+below remains as the reason the first placeholder was implemented quickly.
+
 ## 2026-07-11: Use A Validated Runtime Policy With Explicit NVS Save
 
 Decision: split automatic fan selection into `module_fan_policy.*`, keep one
@@ -156,6 +212,9 @@ before the terminal GUI design is mature.
 Rejected direction for now: editing `launcher_bg.c` directly. It is generated
 image data and would make the first terminal-entry iteration harder to review
 and replay across fresh official-firmware worktrees.
+
+Status: superseded on 2026-07-18 by a dedicated copied background asset after
+hardware screenshots exposed label bleed through the translucent overlay.
 
 ## 2026-07-07: Separate Official Firmware Worktrees By Host OS
 

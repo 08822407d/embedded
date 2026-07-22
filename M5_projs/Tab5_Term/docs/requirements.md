@@ -9,6 +9,20 @@ The user-facing behavior currently required is minimal:
 - the official firmware GUI will add a terminal entry button;
 - the first entry point is in the launcher power panel, replacing the former
   shake-wakeup and 10-second sleep entries with one terminal-style icon button;
+- the terminal tile must be baked into a dedicated copy of the launcher
+  background; its runtime GUI object is a transparent touch region so obsolete
+  labels cannot bleed through a translucent overlay;
+- the visible terminal tile uses a 4:3 aspect ratio while the existing
+  approximately square 146x144 touch target remains unchanged;
+- the tile should read as a compact terminal application window: a narrow
+  title bar, three aligned red/yellow/green controls, a `>_` prompt in the
+  content area, and a centered English `Term` label below it;
+- keep independent nominal font sizes for the `>_` prompt and `Term` label
+  (currently 34 px and 20 px). Position the prompt by its own rendered metrics,
+  with approximately half a visible character of left and top padding;
+- derive title-bar control positions from shared radius, diameter, baseline,
+  and spacing values. Keep all three circles under the straight portion of the
+  rounded top edge rather than placing the first circle in the corner arc;
 - clicking the final button will open a terminal popup or terminal view;
 - as of 2026-07-09, the button is allowed to be a placeholder that only emits a
   click tone/log while terminal view work remains unimplemented;
@@ -85,9 +99,9 @@ not continue expanding the old `terminal_core`.
   from unmodified official-firmware baseline checks.
 - Continue to focus on source layout, third-party import, adapter boundaries,
   and durable records before adding product GUI behavior.
-- The launcher terminal-entry visual overlay was flash- and screenshot-verified
-  on a physical Tab5 on 2026-07-09. Touch behavior is still pending direct
-  tap-test validation.
+- The dedicated launcher terminal background and transparent hit region were
+  flash- and screenshot-verified on a physical Tab5 on 2026-07-18. Touch
+  behavior is still pending direct tap-test validation.
 
 ## Persistence Requirement
 

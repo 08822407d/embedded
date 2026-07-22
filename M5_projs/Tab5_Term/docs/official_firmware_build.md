@@ -239,6 +239,106 @@ CRC32 `21484605`, PNG SHA256
 Visual inspection confirmed a complete official launcher rather than the prior
 white-screen failure mode.
 
+### 2026-07-18 Baked Terminal Background Build And Flash
+
+The launcher now uses `app/assets/images/launcher_bg_terminal.c`, a copy of the
+official 1280x720 RGB565 background. The old two-button art is cleared, and a
+144x108 4:3 terminal tile is centered inside the unchanged transparent 146x144
+`PanelPower` click target. The `>_` raster is repainted without nonuniform
+scaling. Because this adds a source file beneath the existing CMake glob, build
+with reconfiguration:
+
+```bash
+export IDF_TOOLS_PATH="$PWD/toolchains/ubuntu/espressif"
+source toolchains/ubuntu/esp-idf-v5.4.2/export.sh
+cd worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5
+idf.py reconfigure build
+idf.py -p /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 flash
+```
+
+The build and flash passed. `m5stack_tab5.bin` is `0x580290` bytes, leaving
+`0x47fd70` bytes (`45%`) in the smallest app partition. SHA256 is
+`fb6423cc8d6c2fb0294883943c800a0a9a561cd6a9baf9bc9fedf470a89e3848`.
+The ELF contains `launcher_bg_terminal_map` but not the unreferenced original
+`launcher_bg_map`, confirming that the copied source asset does not double the
+linked image size.
+
+The regenerated `0001-launcher-terminal-button.patch` includes the full
+uncompressed RGB565 C asset and is therefore about 11 MiB. A clean detached
+worktree at official commit `68b19d3` successfully applied the complete patch
+stack in order: `0001`, `0002`, then `0003`.
+
+The post-flash capture command was:
+
+```bash
+python3 tools/capture_screen.py \
+  --port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 \
+  --output .logs/screenshots/tab5-launcher-terminal-4x3.png \
+  --open-delay 15 --timeout 120
+```
+
+The capture is 1280x720 RGB565LE with CRC32 `775442C5`; PNG SHA256 is
+`e635dad8cbe36a815fa2431793b1ae692e6630687f944d453b65544253f18c92`.
+The captured edited rectangle exactly matches all 44,998 bytes of the baked
+asset region. The glyph pixels match the prior unsquashed `>_` exactly, and
+visual inspection confirms the 4:3 shape and clean margins.
+
+### 2026-07-18 Window-Style Terminal Tile Build And Flash
+
+The accepted launcher artwork keeps the 144x108 visual footprint but now looks
+like a compact terminal application window. It has a 17 px title bar, aligned
+red/yellow/green controls, independently sized `>_` and `Term` text, and a
+smaller prompt margin. The 146x144 transparent touch target is unchanged.
+
+`tools/update_launcher_terminal_asset.py` performed a bounded merge from the
+reviewed preview into `launcher_bg_terminal.c`:
+
+```bash
+python3 tools/update_launcher_terminal_asset.py \
+  --asset worktrees/ubuntu/M5Tab5-UserDemo/app/assets/images/launcher_bg_terminal.c \
+  --preview .logs/previews/tab5-launcher-terminal-gnome-v12-aligned-dots.png \
+  --output worktrees/ubuntu/M5Tab5-UserDemo/app/assets/images/launcher_bg_terminal.c \
+  --merged-png .logs/previews/tab5-launcher-terminal-gnome-v12-baked.png
+```
+
+The merge changed 6,657 pixels inside `x=1127..1277`, `y=151..321` and zero
+pixels outside it. The resulting complete RGB565 map SHA256 is
+`03653aa5f5f7ab7fb6b437f88f2c8df470bf71cf9d89b2ed48c307488115afb2`.
+
+The normal ESP-IDF `v5.4.2` build and flash commands passed:
+
+```bash
+export IDF_TOOLS_PATH="$PWD/toolchains/ubuntu/espressif"
+source toolchains/ubuntu/esp-idf-v5.4.2/export.sh
+cd worktrees/ubuntu/M5Tab5-UserDemo/platforms/tab5
+idf.py reconfigure build
+idf.py -p /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 flash
+```
+
+`m5stack_tab5.bin` remains `0x580290` bytes with `45%` free in the smallest
+application partition. Its SHA256 is
+`c63371e9e3158c12da21d39953dbf89389c4ee6c76b32578759af60d78030b00`.
+Esptool identified ESP32-P4 revision `v1.3` and verified every written image.
+
+The post-flash capture command was:
+
+```bash
+python3 tools/capture_screen.py \
+  --port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_30:ED:A0:E2:E2:48-if00 \
+  --output .logs/screenshots/tab5-launcher-terminal-window-v12.png \
+  --open-delay 15 --timeout 120
+```
+
+The settled 1280x720 RGB565LE capture has CRC32 `D19CF65E`, raw SHA256
+`d13f299e9daae43db03443285d6f086bcb12be00dd68e2d2b5776ed91c2c6802`,
+and PNG SHA256
+`d1dc4e3b3fe032b8cf7012e647024177fe5d93c24b1a5e9120c891a9d936472e`.
+The captured terminal rectangle contains 51,642 bytes and is byte-for-byte
+identical to the corresponding baked asset region.
+The refreshed patch stack (`0001`, `0002`, and `0003`) also passed sequential
+`git apply --check`, application, and `git diff --check` in a clean detached
+worktree at official commit `68b19d3`.
+
 ## Current Windows Status
 
 The current Windows host has `git`, `python`, `cmake`, and `ninja`, but does
