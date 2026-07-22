@@ -1,0 +1,6 @@
+logs/*.csv
+logs/*.summary.json
+!logs/.gitkeep
+__pycache__/
+tests/__pycache__/
+revcount/__pycache__/

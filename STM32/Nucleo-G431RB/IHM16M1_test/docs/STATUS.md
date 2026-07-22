@@ -3,7 +3,7 @@
 > **每次会话先读本文件;收尾必更新它,然后 `git commit`。** 这是恢复上下文的第一站。
 > 维护原则:**只覆盖『进行中 / 下一步 / 卡点』,别无限堆历史 —— 历史交给 git。**
 
-**最后更新:2026-07-16**
+**最后更新:2026-07-22**
 
 ## 现在到哪
 - 持久化骨架 + 安全红线已建并入 git;本项目继续按 [`SYNC_WORKFLOW.md`](SYNC_WORKFLOW.md) 双机 `commit + push` 交接。
@@ -22,11 +22,11 @@
 - 正式工程有效配置包括:Hall PC6/7/8、120°/58°、4 对极、PWM 30kHz、三电阻双 ADC、**Iqmax/nominal current=0.3A、默认速度=100rpm**、USART2 MCP 1843200;Start/Stop 与 potentiometer 均关闭,源码无自动 `MC_StartMotor1` 调用。
 - **首次带电前离线审计与降险准备已完成**:见 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) / F-32~F-35。Ke 0.449→0.4 已定论为输出/只读上报量化,不进入当前 Hall FOC 运行时控制,无需仅为此重生成;F-23 序列换算后与 MCSDK `POSITIVE` 状态机完全一致。保护、默认安全态、MCP 可写项、100rpm/3-5s 首测参数、遥测与风险台账已落盘。
 - **DECISIONS #006-B 已执行并离线验证(F-36)**:用户在 WB 将 Iqmax/nominal current `0.5→0.3A`、默认目标 `500→100rpm` 并用内置 CubeMX 重生成;Codex 未再次生成,仅以 CubeIDE 1.19.0 headless clean build Debug。结果 `0 errors,0 warnings`,size=`text36484/data976/bss7152`,新 ELF/HEX/BIN 留在 ignored `Debug/`;构建前后60项生成源码hash一致。三组PI最终数值与旧版相同,符合控制对象参数未变、只改变限幅/reference的预期。其余 Hall/采样/PWM/保护/MCP/Ke/无自动Start全部复核不变。
-- **首次闭环带电 runbook 草稿已完成(仍未执行)**:见 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md)。草稿从生成源码与 MotorPilot 6.4.2 寄存器表核对了 STATUS/FAULTS、speed/Hall/Iq/Id/Vbus/temp、M1 data ID、`SPEED_RAMP=[S32 rpm,U16 ms]`、Start/Stop/Fault Ack 的精确语义,并按“安全闸→探测→逐次烧录 HITL→监视→100rpm点动→异常/急停→Ke复核→分级放开”组织。醒目标明 0.3A 仅为软件限幅、现有电源无保险丝;所有带电判断仍须 CC/用户现场定。本次只写 docs,未连接板卡、烧录、启动 MotorPilot/Workbench、上电、转电机、重生成或修改生成树。
+- **首次闭环带电 runbook 已经 CC 安全审核并用于成功 bring-up**:见 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md)。精确 STATUS/FAULTS、speed/Hall/Iq/Id/Vbus/temp、M1 data ID、`SPEED_RAMP=[S32 rpm,U16 ms]`、Start/Stop/Fault Ack 语义仍是后续现场操作基线;0.3A 仅为软件限幅、无保险丝的警示不变。
 - ✅ **首次闭环带电 bring-up 成功(2026-07-14,F-37)**:mode=UR 重烧+verify(HOTPLUG erase 曾失败)→ 板上确为 0.3A/100rpm FOC 固件;MotorPilot 上电 IDLE→Start→RUN 无故障,**电机闭环霍尔 FOC 正常旋转、方向/换相正确、电流受控**。整链验证通过,DECISIONS #003"闭环调速"目标达成。**低速下限 ~500rpm**(霍尔60°低速难点,#003风险③坐实);用户接受,应用侧用外接减速箱解决。GUI 花屏=显卡驱动 bug,更新驱动已修;Oray 远控/虚拟显示器已卸。
 - [`DECISIONS.md`](DECISIONS.md) #003 路线已完成:标定→生成→烧录→**闭环调速验证成功**。剩下是可选的整定/表征/应用集成(见下一步)。
-- 🔬 **位置控制可行性已离线研究完(2026-07-16,F-38,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md))**:①当前固件**只有速度/力矩控制,根本没编译位置控制**(源码核实);②官方 MCSDK 位置模式**要求正交编码器为主传感器,霍尔因分辨率过低不被允许**(ST 确认 + `TC_Init` 绑定编码器句柄印证),而本电机**无编码器轴**;③"整圈数"精度**不需要官方位置模式**,应用层数霍尔圈即可。三条路 A(加编码器,精度高/要硬件)/B(应用层数圈粗控,匹配"整圈数"、不加硬件、**推荐**)/C(魔改,不推荐)。**待用户选方向。** 纯离线,未碰硬件。
-- 🎯 **位置控制已拍板 B 方案(DECISIONS #007,2026-07-16)**:应用层数圈粗控,Phase-1 PC 侧 PoC **零固件改动**;用户依据 = 大减速比减速箱稀释电机侧整圈误差、低于机械工艺公差,且应用转速远高于 ~500rpm 下限。源码预检修正前提:`MC_REG_CURRENT_POSITION` 零实现不可用(F-39),改用 `MC_REG_HALL_EL_ANGLE`(s16 电角度)解回绕计圈(4 电气圈=1 机械圈)。需求落 REQUIREMENTS §6;任务书 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 已写好,**待用户派发 codex 执行**。
+- 🔬 **位置控制可行性已离线研究完(2026-07-16,F-38,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md))**:①当前固件**只有速度/力矩控制,根本没编译位置控制**(源码核实);②官方 MCSDK 位置模式要求正交编码器为主传感器,本电机无编码器轴;③“整圈数”精度不需要官方位置模式,应用层数霍尔圈即可。用户随后已选择 B 方案。
+- 🎯 **位置控制 B 方案 PC 工具离线阶段完成(F-40,2026-07-22)**:[`tools/revcount_poc/`](../tools/revcount_poc/README.md) 已实现独立 MCP/ASPEP、只读 hand-turn、1kHz async powered run、解回绕/丢样判定/CSV/安全 guard;synthetic+serial mock 15/15 通过。详见 [`REVCOUNT_POC.md`](REVCOUNT_POC.md)。本阶段纯离线,真实轮询率/手转误差/lead/停位精度尚无数据。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
@@ -45,7 +45,9 @@
 - [x] 烧录前 HITL(授权+母线断开/USB-only+目标板/SN正确);mode=UR 重烧+verify 通过
 - [x] **首次闭环带电已完成并成功(F-37)**:Speed mode、IDLE→Start→RUN 无故障、电机正常旋转/换相/电流受控;实测**低速下限 ~500rpm**,用户接受(应用侧减速箱)
 - [x] 位置控制方向已拍板:**B**(DECISIONS #007);需求 REQUIREMENTS §6;任务书 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 已写好
-- [ ] **用户把 [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) 派发给 codex**:§1 选型(MotorPilot 脚本 vs 独立 MCP 客户端,优先调研高频遥测通道)→ §2 工具离线实现+自测 → §3 USB-only 手转计圈验证(母线断开、只读、用户手转)→ §4 带电 N 圈停止试验(**须新 HITL-POWER + 用户值守 + CC 旁站**)→ 数据/统计/结论落盘
+- [x] [`CODEX_TASK_revcount_poc.md`](CODEX_TASK_revcount_poc.md) §1/§2:选独立 Python MCP/ASPEP 客户端,工具+README+15项离线测试已完成(F-40)
+- [ ] **§3 USB-only 手转验证等待 HITL-USB-READONLY**:用户确认母线物理断开/仅USB、MotorPilot关闭、目标板SN正确后,先只读 `probe`,再 K=4 正反向多次;严禁 Ack/Start/Ramp/SET
+- [ ] **§4 带电 N 圈停止矩阵尚未授权**:仅当§3通过后另取 HITL-POWER + 用户值守 + 1秒断母线 + CC旁站;不得沿用§3授权
 - [ ] (可选)运行包络表征/整定:Ke 现场验证、速度 PI 低速表现、放开电流/转速分级建议
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
@@ -54,4 +56,4 @@
 - **Hall 电气正向已静态自洽(F-33),机械正方向未定义**:F-23 手转序列就是 MCSDK POSITIVE,但当时未记 CW/CCW;且58°依赖Profiler后相/Hall线未变。两项都只能现场确认,不能离线假设。
 - **供电/Iqmax 软件决策已关,硬件残余风险仍在**:项目speed-mode Iqmax已重生成到0.3A、默认目标100rpm;但现有12.6V/1.9A仍无可调限流/保险丝,`IQMAX`不是短路硬件trip。现场仍须有人值守并能立即断母线。
 - **保护边界(F-34)**:PA11/BKIN2是combined driver-protection而非可设阈值OCP/刹车;`M1_OCP_TOPOLOGY=NONE`,PC4只测功率板温度。不能依赖它们保护微型电机绕组/短路。
-- **现场 runbook 仍是待审 DRAFT**:精确操作顺序已写入 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md),但 CC 尚未审核,用户也尚未就本次首次闭环测试重新授权。任何后续烧录、连接 MotorPilot、给母线上电、Start/转电机都不在本任务授权内;须分别按 runbook/HITL 重新授权、有人值守、随时能断电。
+- **revcount 实测分级闸门**:当前只完成离线阶段。下一步仅可在用户明确确认母线物理断开后做 USB-only GET/手转;任何 Ack/Start/Ramp/SET、给母线上电或转电机都属于独立 §4,须新的 HITL-POWER + CC/用户现场条件。
