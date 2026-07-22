@@ -3,7 +3,7 @@
 > **每次会话先读本文件;收尾必更新它,然后 `git commit`。** 这是恢复上下文的第一站。
 > 维护原则:**只覆盖『进行中 / 下一步 / 卡点』,别无限堆历史 —— 历史交给 git。**
 
-**最后更新:2026-07-13**
+**最后更新:2026-07-16**
 
 ## 现在到哪
 - 持久化骨架 + 安全红线已建并入 git;本项目继续按 [`SYNC_WORKFLOW.md`](SYNC_WORKFLOW.md) 双机 `commit + push` 交接。
@@ -25,6 +25,7 @@
 - **首次闭环带电 runbook 草稿已完成(仍未执行)**:见 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md)。草稿从生成源码与 MotorPilot 6.4.2 寄存器表核对了 STATUS/FAULTS、speed/Hall/Iq/Id/Vbus/temp、M1 data ID、`SPEED_RAMP=[S32 rpm,U16 ms]`、Start/Stop/Fault Ack 的精确语义,并按“安全闸→探测→逐次烧录 HITL→监视→100rpm点动→异常/急停→Ke复核→分级放开”组织。醒目标明 0.3A 仅为软件限幅、现有电源无保险丝;所有带电判断仍须 CC/用户现场定。本次只写 docs,未连接板卡、烧录、启动 MotorPilot/Workbench、上电、转电机、重生成或修改生成树。
 - ✅ **首次闭环带电 bring-up 成功(2026-07-14,F-37)**:mode=UR 重烧+verify(HOTPLUG erase 曾失败)→ 板上确为 0.3A/100rpm FOC 固件;MotorPilot 上电 IDLE→Start→RUN 无故障,**电机闭环霍尔 FOC 正常旋转、方向/换相正确、电流受控**。整链验证通过,DECISIONS #003"闭环调速"目标达成。**低速下限 ~500rpm**(霍尔60°低速难点,#003风险③坐实);用户接受,应用侧用外接减速箱解决。GUI 花屏=显卡驱动 bug,更新驱动已修;Oray 远控/虚拟显示器已卸。
 - [`DECISIONS.md`](DECISIONS.md) #003 路线已完成:标定→生成→烧录→**闭环调速验证成功**。剩下是可选的整定/表征/应用集成(见下一步)。
+- 🔬 **位置控制可行性已离线研究完(2026-07-16,F-38,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md))**:①当前固件**只有速度/力矩控制,根本没编译位置控制**(源码核实);②官方 MCSDK 位置模式**要求正交编码器为主传感器,霍尔因分辨率过低不被允许**(ST 确认 + `TC_Init` 绑定编码器句柄印证),而本电机**无编码器轴**;③"整圈数"精度**不需要官方位置模式**,应用层数霍尔圈即可。三条路 A(加编码器,精度高/要硬件)/B(应用层数圈粗控,匹配"整圈数"、不加硬件、**推荐**)/C(魔改,不推荐)。**待用户选方向。** 纯离线,未碰硬件。
 
 ## 下一步(按顺序)
 - [x] 烧录前按任务书 HITL 确认:授权 + IHM16M1 外部母线断开/仅 USB/Nucleo 供电 + 目标板 SN `002A00403234510E33353533`
@@ -39,9 +40,11 @@
 - [x] 正式 FOC 首次带电前离线审计:Ke/Hall/保护/MCP/参数/遥测/风险已落 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md);未碰硬件/未重生成
 - [x] **ESC-1/#006-B 已关闭**:用户选择回 WB 将 Iqmax/nominal current 改0.3A、默认目标改100rpm并重生成;Codex离线重构建和差异复核通过(F-36)
 - [x] 将 [`FOC_BRINGUP_PREP.md`](FOC_BRINGUP_PREP.md) 落成精确寄存器/现场顺序的 [`FOC_BRINGUP_RUNBOOK.md`](FOC_BRINGUP_RUNBOOK.md) **DRAFT**;Codex 纯离线起草完成,未执行其中任何步骤
-- [ ] **先由 CC 安全审核/修订 runbook**,并由 CC/用户现场决定是否接受“固定12.6V/1.9A、无保险丝”的残余风险;草稿本身不构成授权
-- [ ] 审核通过后,烧录前单独 HITL(授权+母线断开/USB-only+目标板/SN正确+ELF hash正确);烧录不等于授权上母线/转电机
-- [ ] 首次闭环带电再单独 HITL并值守:Speed mode,Start 前读回 `SPEED_RAMP=[+100rpm,3000..5000ms]`,盯 STATUS/FAULTS/speed/Hall angle/Iq/Id/Vbus;任何反号、抽搐、Iq接近0.3A持续饱和、fault立即Stop/断母线
+- [x] **CC 安全审核 runbook 通过并定稿**;用户就首次闭环测试给出 HITL-FLASH/HITL-POWER 授权
+- [x] 烧录前 HITL(授权+母线断开/USB-only+目标板/SN正确);mode=UR 重烧+verify 通过
+- [x] **首次闭环带电已完成并成功(F-37)**:Speed mode、IDLE→Start→RUN 无故障、电机正常旋转/换相/电流受控;实测**低速下限 ~500rpm**,用户接受(应用侧减速箱)
+- [ ] **位置控制方向待用户拍板(A/B/C,见 [`POSITION_CTRL_ANALYSIS.md`](POSITION_CTRL_ANALYSIS.md) §4)**:选 B→CC 写"数圈粗控"需求+codex 任务书(先离线核 `MC_REG_CURRENT_POSITION` 速度模式下是否有效计数);选 A→先核 IHM16M1 编码器接口+选型编码器,再 WB 重配+重生成+重构建+新 bring-up;选 C→评估补丁/regen 维护(不推荐)
+- [ ] (可选)运行包络表征/整定:Ke 现场验证、速度 PI 低速表现、放开电流/转速分级建议
 - [ ] 若只想复测 Windows 工具链健康,运行 `hw_smoke_win\build_win.ps1`;该脚本只生成/编译磁盘工程,仍然不要烧录测试固件
 
 ## 卡点 / 待用户拍板
